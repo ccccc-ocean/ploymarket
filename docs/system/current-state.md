@@ -1,0 +1,97 @@
+# 当前系统状态
+
+最后更新：2026-05-07
+
+## 项目定位
+
+`ploymarket` 当前是一个 BTC 预测市场研究和模拟盘工具。它只读公开数据，不会下实盘订单，也不会读取钱包、私钥或交易 API key。
+
+## 已实现功能
+
+### 市场发现
+
+代码位置：[src/ploymarket_sim/polymarket.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/polymarket.py)
+
+- 搜索 BTC / Bitcoin 相关 Polymarket 市场。
+- 过滤活跃、未关闭、有订单簿、达到最低流动性的市场。
+- 提取市场问题、slug、流动性、24 小时成交量、YES 价格、CLOB token id。
+
+### 价格历史
+
+代码位置：[src/ploymarket_sim/clob.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/clob.py)
+
+- 调用 CLOB `prices-history` 获取 YES token 的历史价格。
+- 当前默认参数：
+  - `interval = 1w`
+  - `fidelity = 60` 分钟
+
+### 信号生成
+
+代码位置：[src/ploymarket_sim/signals.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/signals.py)
+
+当前信号是简单均线动量：
+
+- 计算短窗口均价和长窗口均价。
+- 如果短期均值明显高于长期均值，且当前价格没有太接近 1，生成 `BUY_YES`。
+- 如果短期均值明显低于长期均值，生成 `AVOID`。
+- 其他情况为 `HOLD`。
+
+### 风控
+
+代码位置：[src/ploymarket_sim/risk.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/risk.py)
+
+当前风控规则包括：
+
+- `max_position_usdc`: 单笔最大投入。
+- `max_market_exposure_usdc`: 单个市场最大敞口。
+- `max_total_exposure_usdc`: 总持仓敞口。
+- `max_open_positions`: 最大同时持仓数。
+- `daily_loss_limit_usdc`: 日内亏损上限。
+- `max_drawdown_pct`: 最大账户回撤。
+- `stop_loss_pct`: 单笔止损比例。
+- `take_profit_pct`: 单笔止盈比例。
+- `max_spread`: 最大允许价差。
+- `min_price` / `max_price`: 不交易过于极端的价格。
+
+### 回测
+
+代码位置：[src/ploymarket_sim/backtest.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/backtest.py)
+
+- 对每个市场逐步读取历史价格。
+- 使用当前信号决定是否模拟买入 YES。
+- 使用风控决定是否允许开仓。
+- 使用止损、止盈和回测结束平仓退出。
+- 输出每个市场一份 CSV。
+
+### CLI
+
+代码位置：[src/ploymarket_sim/cli.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/cli.py)
+
+可用命令：
+
+```bash
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discover
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml signals
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml backtest
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explain-risk
+```
+
+## 当前限制
+
+- 没有真实订单执行。
+- 没有持续运行的模拟盘循环。
+- 没有数据库或本地行情缓存。
+- 没有盘口深度模拟。
+- 没有考虑到期结算和市场 resolution 风险。
+- 没有接 BTC 现货/永续价格源。
+- 当前信号很初级，不能直接作为实盘依据。
+
+## 重要原则
+
+进入实盘之前，必须先满足：
+
+- 模拟盘稳定运行至少数周。
+- 每笔交易有可解释原因。
+- 每次亏损都能归类。
+- 风控能自动阻止继续扩大亏损。
+- 真实小仓位测试的滑点和成交情况可接受。

@@ -9,6 +9,16 @@
 - 用统一风控规则做模拟开仓、止损、止盈和回测。
 - 输出每个市场的回测交易 CSV，方便之后复盘。
 
+## 学习和项目文档
+
+持续学习、系统状态、风控笔记和模拟盘记录都放在 [docs/](docs/README.md)。
+
+下次重新打开项目时，建议先读：
+
+- [当前系统状态](docs/system/current-state.md)
+- [学习进度记录](docs/learning/progress-log.md)
+- [模拟盘运行手册](docs/runbooks/paper-trading.md)
+
 ## 快速开始
 
 ```bash
