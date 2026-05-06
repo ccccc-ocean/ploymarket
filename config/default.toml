@@ -1,0 +1,44 @@
+[api]
+gamma_base_url = "https://gamma-api.polymarket.com"
+clob_base_url = "https://clob.polymarket.com"
+request_timeout_seconds = 12
+
+[universe]
+keywords = ["bitcoin", "btc"]
+limit = 20
+max_pages = 10
+order = "volume_24hr"
+active = true
+closed = false
+min_liquidity = 1000.0
+require_orderbook = true
+
+[signal]
+history_interval = "1w"
+history_fidelity_minutes = 60
+short_window = 6
+long_window = 24
+min_momentum = 0.015
+min_edge = 0.025
+buy_below = 0.92
+sell_above = 0.08
+
+[risk]
+starting_cash = 1000.0
+max_position_usdc = 50.0
+max_market_exposure_usdc = 75.0
+max_total_exposure_usdc = 250.0
+max_open_positions = 5
+daily_loss_limit_usdc = 35.0
+max_drawdown_pct = 0.12
+stop_loss_pct = 0.25
+take_profit_pct = 0.35
+max_spread = 0.08
+min_price = 0.03
+max_price = 0.97
+
+[backtest]
+trade_size_usdc = 25.0
+fee_rate = 0.0
+slippage_bps = 25
+output_dir = "data"
