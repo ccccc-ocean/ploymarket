@@ -56,3 +56,26 @@
 - 当前信号只是简单动量，不代表稳定 edge。
 - 回测仍很粗糙，没有严格模拟盘口深度、成交概率和市场到期结算。
 - 还没有持续运行的 paper trading loop。
+
+## 2026-05-07 补充：Polymarket 底层机制学习
+
+### 本次新增资料
+
+- 阅读并整理了 @MrRyanChi 关于 Polymarket 底层机制的长文。
+- 可访问转载来源：<https://www.chaincatcher.com/article/2262869>
+- 已整理为知识库文档：[Polymarket 底层机制知识库](../strategy/polymarket-market-structure.md)
+
+### 关键收获
+
+- Polymarket 是链下 CLOB + 链上结算的混合架构。
+- 下单是签名意图，不等于立即链上成交。
+- Maker / Taker 在速度、费用和风险上很不一样。
+- Split / Merge / Redeem 会让简单 PnL 统计失真。
+- Taker 手续费使用 `p * (1 - p)` 曲线，未来回测必须纳入。
+- 实盘系统必须有订单状态机，不能把 API 返回成功直接当最终成交。
+
+### 对项目的影响
+
+- 下一步优先给回测加入更真实的费用和滑点。
+- 设计模拟盘订单状态机，为未来实盘打底。
+- 把 API 错误、维护窗口和成交失败作为系统风险处理。

@@ -6,7 +6,8 @@
 2. [学习进度记录](learning/progress-log.md)
 3. [模拟盘运行手册](runbooks/paper-trading.md)
 4. [风控学习笔记](strategy/risk-control-basics.md)
-5. [项目路线图](system/roadmap.md)
+5. [Polymarket 底层机制知识库](strategy/polymarket-market-structure.md)
+6. [项目路线图](system/roadmap.md)
 
 ## 目录说明
 
