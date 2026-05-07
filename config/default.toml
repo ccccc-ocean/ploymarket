@@ -20,6 +20,7 @@ short_window = 6
 long_window = 24
 min_momentum = 0.015
 min_edge = 0.025
+safety_margin = 0.01
 buy_below = 0.92
 sell_above = 0.08
 
@@ -39,6 +40,6 @@ max_price = 0.97
 
 [backtest]
 trade_size_usdc = 25.0
-fee_rate = 0.0
+taker_fee_rate = 0.02
 slippage_bps = 25
 output_dir = "data"

@@ -45,6 +45,13 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 - `HOLD`: 没有足够优势。
 - `AVOID`: 当前版本认为 YES 动量转弱。
 
+输出字段里：
+
+- `gross_edge`: 只看历史价格动量得到的原始优势。
+- `net_edge`: 扣除 Taker fee、滑点和安全边际后的净优势。
+
+优先关注 `net_edge`。如果 `gross_edge` 是正数但 `net_edge` 是负数，说明这个机会大概率被交易成本吃掉了。
+
 注意：`BUY_YES` 只是研究信号，不是实盘建议。
 
 ## 跑回测
@@ -62,6 +69,7 @@ data/backtest_<market_id>.csv
 复盘时重点看：
 
 - 买入是否发生在价格已经过高的时候。
+- `fee` 和 `slippage` 是否明显吞掉收益。
 - 止损是否太紧或太松。
 - 止盈是否过早。
 - 盈亏是否来自少数偶然交易。

@@ -1,1 +1,1 @@
-timestamp,market_id,action,price,notional,pnl,reason
+timestamp,market_id,action,price,notional,fee,slippage,pnl,net_edge,reason

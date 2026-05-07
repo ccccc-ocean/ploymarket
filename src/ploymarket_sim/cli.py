@@ -35,7 +35,7 @@ def main() -> None:
             history = _safe_history(config, market)
             if not history:
                 continue
-            print_signal(market, build_signal(market, history, config.signal))
+            print_signal(market, build_signal(market, history, config.signal, config.backtest))
     elif args.command == "backtest":
         for market in discover_btc_markets(config):
             history = _safe_history(config, market)
@@ -43,9 +43,12 @@ def main() -> None:
                 continue
             result = backtest_market(market, history, config)
             path = write_backtest_csv(result, config.backtest.output_dir)
+            trade_count = len([trade for trade in result.trades if trade.action != "REJECTED"])
+            total_fees = sum(trade.fee for trade in result.trades)
+            total_slippage = sum(trade.slippage for trade in result.trades)
             print(
-                f"{market.id} | trades={len(result.trades)} | pnl={result.realized_pnl:.2f} | "
-                f"ending_cash={result.ending_cash:.2f} | {path}"
+                f"{market.id} | trades={trade_count} | pnl={result.realized_pnl:.2f} | "
+                f"fees={total_fees:.2f} | slippage={total_slippage:.2f} | ending_cash={result.ending_cash:.2f} | {path}"
             )
     elif args.command == "explain-risk":
         _explain_risk(config)

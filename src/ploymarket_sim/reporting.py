@@ -18,7 +18,10 @@ def print_market_table(markets: list[Market]) -> None:
 
 
 def print_signal(market: Market, signal: Signal) -> None:
-    print(f"{market.id} | {signal.action} | edge={signal.edge:.4f} | confidence={signal.confidence:.2f}")
+    print(
+        f"{market.id} | {signal.action} | gross_edge={signal.edge:.4f} | "
+        f"net_edge={signal.net_edge:.4f} | confidence={signal.confidence:.2f}"
+    )
     print(f"  {market.question}")
     print(f"  reason: {signal.reason}")
 
@@ -29,9 +32,20 @@ def write_backtest_csv(result: BacktestResult, output_dir: str) -> Path:
     path = directory / f"backtest_{result.market_id}.csv"
     with path.open("w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
-        writer.writerow(["timestamp", "market_id", "action", "price", "notional", "pnl", "reason"])
+        writer.writerow(["timestamp", "market_id", "action", "price", "notional", "fee", "slippage", "pnl", "net_edge", "reason"])
         for trade in result.trades:
             writer.writerow(
-                [trade.timestamp, trade.market_id, trade.action, trade.price, trade.notional, trade.pnl, trade.reason]
+                [
+                    trade.timestamp,
+                    trade.market_id,
+                    trade.action,
+                    trade.price,
+                    trade.notional,
+                    trade.fee,
+                    trade.slippage,
+                    trade.pnl,
+                    trade.net_edge,
+                    trade.reason,
+                ]
             )
     return path

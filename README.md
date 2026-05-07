@@ -5,9 +5,9 @@
 ## 当前能力
 
 - 从 Polymarket Gamma API 发现活跃的 BTC / Bitcoin 相关市场。
-- 用 CLOB 公开价格历史生成简单的 YES 动量信号。
+- 用 CLOB 公开价格历史生成简单的 YES 动量信号，并区分 gross edge / net edge。
 - 用统一风控规则做模拟开仓、止损、止盈和回测。
-- 输出每个市场的回测交易 CSV，方便之后复盘。
+- 输出包含费用、滑点和 PnL 的回测交易 CSV，方便之后复盘。
 
 ## 学习和项目文档
 

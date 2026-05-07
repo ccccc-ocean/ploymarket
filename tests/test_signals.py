@@ -21,6 +21,6 @@ class SignalTests(unittest.TestCase):
             ["yes", "no"],
         )
         history = [PricePoint(i, 0.45) for i in range(24)] + [PricePoint(24 + i, 0.52) for i in range(6)]
-        config = SignalConfig("1w", 60, 6, 24, 0.01, 0.015, 0.92, 0.08)
+        config = SignalConfig("1w", 60, 6, 24, 0.01, 0.015, 0.0, 0.92, 0.08)
         signal = build_signal(market, history, config)
         self.assertEqual(signal.action, "BUY_YES")

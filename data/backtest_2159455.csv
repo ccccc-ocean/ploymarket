@@ -1,3 +1,1 @@
-timestamp,market_id,action,price,notional,pnl,reason
-1778018416,2159455,BUY_YES,0.9172875,25.0,0.0,短期隐含概率强于长期均值
-1778084284,2159455,MARK_TO_MARKET_EXIT,0.85,23.166128394859843,-1.833871605140157,回测结束平仓
+timestamp,market_id,action,price,notional,fee,slippage,pnl,net_edge,reason

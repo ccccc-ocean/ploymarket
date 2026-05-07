@@ -32,9 +32,12 @@
 当前信号是简单均线动量：
 
 - 计算短窗口均价和长窗口均价。
-- 如果短期均值明显高于长期均值，且当前价格没有太接近 1，生成 `BUY_YES`。
+- 计算 `gross_edge` 和扣除 Taker fee、滑点、安全边际后的 `net_edge`。
+- 如果短期均值明显高于长期均值，当前价格没有太接近 1，且 `net_edge` 达到门槛，生成 `BUY_YES`。
 - 如果短期均值明显低于长期均值，生成 `AVOID`。
 - 其他情况为 `HOLD`。
+
+成本估算代码位置：[src/ploymarket_sim/costs.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/costs.py)
 
 ### 风控
 
@@ -61,7 +64,13 @@
 - 使用当前信号决定是否模拟买入 YES。
 - 使用风控决定是否允许开仓。
 - 使用止损、止盈和回测结束平仓退出。
-- 输出每个市场一份 CSV。
+- 输出每个市场一份 CSV，包含费用、滑点、净 edge 和 PnL。
+
+当前费用模型：
+
+```text
+taker_fee = notional * taker_fee_rate * p * (1 - p)
+```
 
 ### CLI
 
@@ -85,6 +94,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 - 没有考虑到期结算和市场 resolution 风险。
 - 没有接 BTC 现货/永续价格源。
 - 当前信号很初级，不能直接作为实盘依据。
+- 当前费用模型还是估算值，后续应读取市场真实 fee 设置。
 
 ## 重要原则
 

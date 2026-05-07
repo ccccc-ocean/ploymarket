@@ -32,6 +32,7 @@ class SignalConfig:
     long_window: int
     min_momentum: float
     min_edge: float
+    safety_margin: float
     buy_below: float
     sell_above: float
 
@@ -55,7 +56,7 @@ class RiskConfig:
 @dataclass(frozen=True)
 class BacktestConfig:
     trade_size_usdc: float
-    fee_rate: float
+    taker_fee_rate: float
     slippage_bps: int
     output_dir: str
 
