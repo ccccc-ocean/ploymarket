@@ -47,6 +47,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml data-q
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml btc-price
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml alignment-report
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml edge-report
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml daily-report
 ```
 
 `paper-run` 输出里的 `execution_mode` 含义：
@@ -146,6 +147,8 @@ data/alignment_summary.csv
 `edge-report` 会进一步按可提前知道的条件分层，例如 YES 价格区间和过去 1 小时 BTC 动量。注意：它不会用未来 BTC 收益做分组，避免引入未来函数。
 
 当前默认启用了一个保守 BTC 过滤器：当 `YES >= 0.50` 且 BTC 过去 1 小时跌幅超过 `0.25%` 时，不允许做多 YES。这个规则来自 `edge-report` 的坏条件分层，不是盈利保证。
+
+`daily-report` 会汇总当前模拟盘、回放、对齐和 edge 报告，并给出 `not_ready` / `candidate` 状态。
 
 默认值偏保守，是为了先观察策略行为。等我们看过几轮模拟盘结果，再逐步回答：
 

@@ -12,6 +12,7 @@ from .cache import CachePolicy, JsonCache
 from .classifier import MARKET_TYPES, is_market_type
 from .clob import get_price_history
 from .config import load_config
+from .daily_report import build_daily_report, write_daily_report_csv
 from .edge_report import build_edge_buckets, load_alignment_rows_csv
 from .execution import plan_execution
 from .http import HttpError
@@ -81,6 +82,7 @@ def main() -> None:
     alignment_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
     edge_parser = subparsers.add_parser("edge-report", help="bucket alignment rows to inspect conditional edge")
     edge_parser.add_argument("--min-samples", type=int, default=30)
+    subparsers.add_parser("daily-report", help="summarize paper, replay, alignment, and edge outputs")
     subparsers.add_parser("explain-risk", help="explain the current risk limits")
 
     args = parser.parse_args()
@@ -131,6 +133,8 @@ def main() -> None:
         _run_alignment_report(config, args.market_type)
     elif args.command == "edge-report":
         _run_edge_report(config, args.min_samples)
+    elif args.command == "daily-report":
+        _run_daily_report(config)
 
 
 def _run_backtest(config, markets, storage, prefer_local: bool) -> None:
@@ -353,6 +357,17 @@ def _run_edge_report(config, min_samples: int) -> None:
     path = write_edge_report_csv(buckets, config.backtest.output_dir)
     print_edge_report_summary(buckets)
     print(f"edge_report_csv={path}")
+
+
+def _run_daily_report(config) -> None:
+    report = build_daily_report(config.backtest.output_dir)
+    path = write_daily_report_csv(report, config.backtest.output_dir)
+    print(
+        f"daily_report | readiness={report.readiness} | paper_runs={report.paper_runs} | "
+        f"trades={report.replay_trade_count} | pnl={report.replay_pnl:.2f} | "
+        f"max_drawdown={report.replay_max_drawdown:.1%} | reason={report.reason}"
+    )
+    print(f"daily_report_csv={path}")
 
 
 if __name__ == "__main__":

@@ -815,3 +815,38 @@ avoid_yes_price_gte = 0.50
 ### 当前判断
 
 这是一个方向正确的小改进：先减少坏交易，而不是追求更多交易。但样本仍然太小，必须进入长期模拟盘验证。
+
+## 2026-05-10：每日复盘报告
+
+### 本次目标
+
+为长期模拟盘建立每日健康检查，不再靠人工翻 CSV 判断是否接近实盘。
+
+### 已完成
+
+- 新增 `src/ploymarket_sim/daily_report.py`。
+- 新增 CLI 命令：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml daily-report
+```
+
+- 输出 `data/daily_report.csv`。
+
+### 当前日报
+
+当前状态：
+
+```text
+readiness = not_ready
+```
+
+原因：
+
+- paper-run 样本只有 `3` 轮。
+- 离线回放交易数只有 `12`。
+- 虽然当前回放 PnL 为正，最大回撤约 `1.2%`，但样本远远不足。
+
+### 下次继续
+
+建议开始长期模拟盘采样流程：让 `paper-loop` 以固定频率运行，并每天生成 `paper-report`、`alignment-report`、`edge-report` 和 `daily-report`。

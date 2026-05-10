@@ -119,6 +119,14 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 
 命中时，不允许做多 YES。该过滤器来自 `edge-report` 的坏条件分层，用于先排除明显差的交易环境。
 
+### 每日复盘报告
+
+代码位置：[src/ploymarket_sim/daily_report.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/daily_report.py)
+
+- 汇总 paper report、离线回放、alignment、edge report。
+- 输出 `data/daily_report.csv`。
+- 给出 `not_ready` / `candidate` 状态和原因。
+
 ### 信号生成
 
 代码位置：[src/ploymarket_sim/signals.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/signals.py)
@@ -255,6 +263,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml btc-price
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml alignment-report
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml edge-report
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml daily-report
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explain-risk
 ```
 

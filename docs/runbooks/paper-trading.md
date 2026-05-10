@@ -327,6 +327,30 @@ avoid_yes_price_gte = 0.50
 
 这仍然只是小样本结果，不能外推为稳定盈利。
 
+## 每日复盘报告
+
+生成日报：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml daily-report
+```
+
+输出：
+
+```text
+data/daily_report.csv
+```
+
+当前 readiness 规则偏保守：
+
+- paper-run 样本至少需要多轮连续观察。
+- 离线回放交易数需要足够多。
+- alignment 样本需要足够大。
+- 扣费后回放 PnL 需要为正。
+- 最大回撤不能超过保守阈值。
+
+当前状态：`not_ready`，主要原因是 paper-run 样本太少。
+
 输出文件在：
 
 ```text
