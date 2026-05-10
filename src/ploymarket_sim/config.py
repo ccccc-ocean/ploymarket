@@ -21,6 +21,12 @@ class CacheConfig:
 
 
 @dataclass(frozen=True)
+class StorageConfig:
+    enabled: bool
+    sqlite_path: str
+
+
+@dataclass(frozen=True)
 class UniverseConfig:
     keywords: list[str]
     limit: int
@@ -73,6 +79,7 @@ class BacktestConfig:
 class AppConfig:
     api: ApiConfig
     cache: CacheConfig
+    storage: StorageConfig
     universe: UniverseConfig
     signal: SignalConfig
     risk: RiskConfig
@@ -84,6 +91,7 @@ def load_config(path: str | Path) -> AppConfig:
     return AppConfig(
         api=ApiConfig(**data["api"]),
         cache=CacheConfig(**data["cache"]),
+        storage=StorageConfig(**data["storage"]),
         universe=UniverseConfig(**data["universe"]),
         signal=SignalConfig(**data["signal"]),
         risk=RiskConfig(**data["risk"]),

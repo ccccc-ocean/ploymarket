@@ -2,7 +2,7 @@ import unittest
 
 from ploymarket_sim.backtest import backtest_market
 from ploymarket_sim.clob import PricePoint
-from ploymarket_sim.config import ApiConfig, AppConfig, BacktestConfig, CacheConfig, RiskConfig, SignalConfig, UniverseConfig
+from ploymarket_sim.config import ApiConfig, AppConfig, BacktestConfig, CacheConfig, RiskConfig, SignalConfig, StorageConfig, UniverseConfig
 from ploymarket_sim.polymarket import Market
 
 
@@ -11,6 +11,7 @@ class BacktestTests(unittest.TestCase):
         config = AppConfig(
             api=ApiConfig("", "", 1),
             cache=CacheConfig(False, ".cache/http", 60, False),
+            storage=StorageConfig(False, "unused.sqlite"),
             universe=UniverseConfig(["btc"], 1, 1, "volume", True, False, 0.0, True),
             signal=SignalConfig("1w", 60, 2, 4, 0.01, 0.01, 0.0, 0.98, 0.02),
             risk=RiskConfig(10.0, 50.0, 50.0, 50.0, 1, 10.0, 1.0, 0.9, 0.9, 1.0, 0.01, 0.99),

@@ -9,6 +9,10 @@ directory = ".cache/http"
 ttl_seconds = 900
 stale_if_error = true
 
+[storage]
+enabled = true
+sqlite_path = "data/ploymarket.sqlite"
+
 [universe]
 keywords = ["bitcoin", "btc"]
 limit = 20

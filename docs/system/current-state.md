@@ -32,6 +32,22 @@
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-info
 ```
 
+### SQLite 存储
+
+代码位置：[src/ploymarket_sim/storage.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/storage.py)
+
+- 存储市场快照。
+- 存储价格历史点。
+- `discover`、`signals`、`backtest` 会自动写入。
+- 默认路径：`data/ploymarket.sqlite`
+- SQLite 文件已加入 `.gitignore`。
+
+查看存储：
+
+```bash
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml storage-info
+```
+
 ### 市场分类
 
 代码位置：[src/ploymarket_sim/classifier.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/classifier.py)
@@ -168,7 +184,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 
 - 没有真实订单执行。
 - 没有持续运行的模拟盘循环。
-- 没有数据库；当前只有文件级 HTTP 响应缓存。
+- 有本地 SQLite 存储，但还没有用于回放历史采样或离线回测。
 - 没有盘口深度模拟。
 - 没有考虑到期结算和市场 resolution 风险。
 - 没有接 BTC 现货/永续价格源。

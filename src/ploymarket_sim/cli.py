@@ -25,6 +25,7 @@ from .reporting import (
     write_summary_csv,
 )
 from .signals import build_signal
+from .storage import storage_from_config
 from .summary import aggregate_summaries, summarize_all, summarize_market
 
 
@@ -43,26 +44,37 @@ def main() -> None:
     backtest_parser = subparsers.add_parser("backtest", help="run a simple historical paper-trading backtest")
     backtest_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
     subparsers.add_parser("cache-info", help="show local HTTP cache status")
+    subparsers.add_parser("storage-info", help="show local SQLite storage status")
     subparsers.add_parser("explain-risk", help="explain the current risk limits")
 
     args = parser.parse_args()
     config = load_config(args.config)
 
     if args.command == "discover":
-        print_market_table(_filter_markets(discover_btc_markets(config), args.market_type))
+        markets = _filter_markets(discover_btc_markets(config), args.market_type)
+        storage_from_config(config).save_markets(markets)
+        print_market_table(markets)
     elif args.command == "signals":
-        for market in _filter_markets(discover_btc_markets(config), args.market_type):
+        markets = _filter_markets(discover_btc_markets(config), args.market_type)
+        storage = storage_from_config(config)
+        storage.save_markets(markets)
+        for market in markets:
             history = _safe_history(config, market)
             if not history:
                 continue
+            storage.save_price_history(market.yes_token_id or "", history)
             print_signal(market, build_signal(market, history, config.signal, config.backtest))
     elif args.command == "backtest":
+        storage = storage_from_config(config)
+        markets = _filter_markets(discover_btc_markets(config), args.market_type)
+        storage.save_markets(markets)
         results = []
         summaries = []
-        for market in _filter_markets(discover_btc_markets(config), args.market_type):
+        for market in markets:
             history = _safe_history(config, market)
             if not history:
                 continue
+            storage.save_price_history(market.yes_token_id or "", history)
             result = backtest_market(market, history, config)
             results.append(result)
             path = write_backtest_csv(result, config.backtest.output_dir)
@@ -99,6 +111,8 @@ def main() -> None:
         _explain_risk(config)
     elif args.command == "cache-info":
         _print_cache_info(config)
+    elif args.command == "storage-info":
+        _print_storage_info(config)
 
 
 def _explain_risk(config) -> None:
@@ -145,6 +159,15 @@ def _print_cache_info(config) -> None:
     print(f"- stale_if_error: {config.cache.stale_if_error}")
     print(f"- files: {stats.file_count}")
     print(f"- size_bytes: {stats.total_bytes}")
+
+
+def _print_storage_info(config) -> None:
+    stats = storage_from_config(config).stats()
+    print("local SQLite storage")
+    print(f"- enabled: {stats.enabled}")
+    print(f"- sqlite_path: {stats.sqlite_path}")
+    print(f"- markets: {stats.market_count}")
+    print(f"- price_points: {stats.price_point_count}")
 
 
 if __name__ == "__main__":

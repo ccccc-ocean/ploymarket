@@ -363,3 +363,40 @@ Polymarket 真实下单不是“API 返回成功就等于最终成交”。未�
 ### 下次继续
 
 建议下一步做 SQLite 行情库，把 HTTP cache 升级成结构化 market/history 存储，为长期模拟盘积累数据。
+
+## 2026-05-10：SQLite 市场与价格历史存储
+
+### 本次目标
+
+把短期 HTTP cache 升级为可长期积累的结构化本地数据库。
+
+### 已完成
+
+- 新增 `src/ploymarket_sim/storage.py`。
+- 新增 `[storage]` 配置区块。
+- `discover` 自动保存市场快照。
+- `signals` 和 `backtest` 自动保存市场快照和价格历史。
+- 新增 `storage-info` 命令。
+- SQLite 文件加入 `.gitignore`。
+
+### 当前本地数据库状态
+
+```text
+markets: 35
+price_points: 5446
+```
+
+### 为什么重要
+
+HTTP cache 解决“短时间重复请求”的问题；SQLite 解决“长期积累研究样本”的问题。
+
+未来我们可以用 SQLite 做：
+
+- 离线回测。
+- 每日市场快照对比。
+- 策略样本统计。
+- 模拟盘持仓和订单日志。
+
+### 下次继续
+
+建议下一步做逐 bar mark-to-market 组合曲线，让回测组合净值不只在交易事件时更新。

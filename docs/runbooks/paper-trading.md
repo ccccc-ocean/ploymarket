@@ -26,6 +26,12 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m unitte
 env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml cache-info
 ```
 
+查看 SQLite 存储状态：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml storage-info
+```
+
 ## 发现市场
 
 ```bash
@@ -208,6 +214,21 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 - 默认 `15` 分钟内重复请求会直接读缓存。
 - 如果远程请求失败，且本地有旧缓存，会用旧缓存继续运行。
 - `.cache/` 不提交到 GitHub。
+
+### SQLite 存储
+
+`discover`、`signals` 和 `backtest` 会把市场和价格历史写入：
+
+```text
+data/ploymarket.sqlite
+```
+
+当前存储内容：
+
+- `markets`: 市场快照、分类、YES token、市场级 fee rate。
+- `price_history`: YES token 历史价格点。
+
+SQLite 文件用于本地长期学习，不提交到 GitHub。
 
 ### 找到的 BTC 市场太少或太杂
 

@@ -35,6 +35,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml signal
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml backtest
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explain-risk
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-info
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml storage-info
 ```
 
 可以用 `--market-type` 只观察某一类市场：
@@ -72,6 +73,22 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-
 ```
 
 相关配置在 `config/default.toml` 的 `[cache]` 区块。
+
+## 本地 SQLite 存储
+
+市场快照和价格历史会写入本地 SQLite：
+
+```text
+data/ploymarket.sqlite
+```
+
+查看状态：
+
+```bash
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml storage-info
+```
+
+SQLite 文件不会提交到 GitHub，用于本地长期研究样本积累。
 
 默认值偏保守，是为了先观察策略行为。等我们看过几轮模拟盘结果，再逐步回答：
 

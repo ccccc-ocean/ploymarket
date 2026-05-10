@@ -1,7 +1,7 @@
 import unittest
 
 from ploymarket_sim.backtest import BacktestResult, Trade
-from ploymarket_sim.config import ApiConfig, AppConfig, BacktestConfig, CacheConfig, RiskConfig, SignalConfig, UniverseConfig
+from ploymarket_sim.config import ApiConfig, AppConfig, BacktestConfig, CacheConfig, RiskConfig, SignalConfig, StorageConfig, UniverseConfig
 from ploymarket_sim.portfolio import build_portfolio_curve, summarize_portfolio
 
 
@@ -9,6 +9,7 @@ def app_config() -> AppConfig:
     return AppConfig(
         api=ApiConfig("", "", 1),
         cache=CacheConfig(False, ".cache/http", 60, False),
+        storage=StorageConfig(False, "unused.sqlite"),
         universe=UniverseConfig(["btc"], 1, 1, "volume", True, False, 0.0, True),
         signal=SignalConfig("1w", 60, 2, 4, 0.01, 0.01, 0.0, 0.98, 0.02),
         risk=RiskConfig(1000.0, 50.0, 50.0, 100.0, 2, 50.0, 1.0, 0.9, 0.9, 1.0, 0.01, 0.99),

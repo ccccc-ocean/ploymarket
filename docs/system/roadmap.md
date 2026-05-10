@@ -24,21 +24,22 @@
 - 组合级回测资金曲线和最大回撤摘要。
 - Paper order 状态机。
 - 市场级真实 fee rate 读取。
+- SQLite 市场和价格历史存储。
 - Taker fee、滑点和安全边际后的净 edge 过滤。
 
 下一步：
 
 - 加入市场分类，区分纯 BTC 价格市场、日内价格范围市场、公司持仓事件市场和间接 BTC 事件市场。
-- 把本地缓存升级为更结构化的数据快照和行情存储。
+- 使用 SQLite 数据做离线回放和长期样本分析。
 - 继续改进回测报告，加入逐 bar mark-to-market 资金曲线。
 - 继续完善费用模型，纳入 maker rebate、reward 和市场实际成交路径。
 
 当前建议顺序：
 
-1. 把缓存升级为 SQLite 行情库。
-2. 逐 bar mark-to-market 组合曲线。
-3. 持续模拟盘 `paper-run` 命令。
-4. Maker/Taker 策略分离。
+1. 逐 bar mark-to-market 组合曲线。
+2. 持续模拟盘 `paper-run` 命令。
+3. Maker/Taker 策略分离。
+4. SQLite 离线回放。
 
 ## 阶段 2：持续模拟盘
 

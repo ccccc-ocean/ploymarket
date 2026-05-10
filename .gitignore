@@ -6,3 +6,5 @@ venv/
 .DS_Store
 .obsidian/
 .cache/
+*.sqlite
+*.sqlite3
