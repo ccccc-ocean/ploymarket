@@ -137,13 +137,14 @@ def _run_backtest(config, markets, storage, prefer_local: bool) -> None:
     results = []
     histories_by_market = {}
     summaries = []
+    btc_candles = load_btc_candles_csv(Path(config.backtest.output_dir) / "btc_price_candles.csv")
     for market in markets:
         history = _safe_history(config, market, storage, prefer_local=prefer_local)
         if not history:
             continue
         histories_by_market[market.id] = history
         storage.save_price_history(market.yes_token_id or "", history)
-        result = backtest_market(market, history, config)
+        result = backtest_market(market, history, config, btc_candles)
         results.append(result)
         path = write_backtest_csv(result, config.backtest.output_dir)
         write_order_events_csv(result, config.backtest.output_dir)

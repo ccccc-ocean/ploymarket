@@ -35,6 +35,14 @@ class BtcPriceConfig:
 
 
 @dataclass(frozen=True)
+class BtcFilterConfig:
+    enabled: bool
+    lookback_hours: int
+    down_threshold: float
+    avoid_yes_price_gte: float
+
+
+@dataclass(frozen=True)
 class UniverseConfig:
     keywords: list[str]
     limit: int
@@ -98,6 +106,7 @@ class AppConfig:
     cache: CacheConfig
     storage: StorageConfig
     btc_price: BtcPriceConfig
+    btc_filter: BtcFilterConfig
     universe: UniverseConfig
     signal: SignalConfig
     execution: ExecutionConfig
@@ -112,6 +121,7 @@ def load_config(path: str | Path) -> AppConfig:
         cache=CacheConfig(**data["cache"]),
         storage=StorageConfig(**data["storage"]),
         btc_price=BtcPriceConfig(**data["btc_price"]),
+        btc_filter=BtcFilterConfig(**data["btc_filter"]),
         universe=UniverseConfig(**data["universe"]),
         signal=SignalConfig(**data["signal"]),
         execution=ExecutionConfig(**data["execution"]),

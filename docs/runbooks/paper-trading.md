@@ -305,6 +305,28 @@ data/edge_report.csv
 
 当前更强的结论是排除坏条件，而不是直接开仓：高 YES 价格市场在 BTC 短线走弱后风险明显更差。
 
+## BTC 动量过滤器
+
+默认配置：
+
+```toml
+[btc_filter]
+enabled = true
+lookback_hours = 1
+down_threshold = -0.0025
+avoid_yes_price_gte = 0.50
+```
+
+含义：如果 YES 价格已经不低，同时 BTC 过去 1 小时下跌超过 `0.25%`，系统不允许做多 YES。
+
+本轮离线回放观察：
+
+- 交易数：从 `14` 降到 `12`。
+- 组合 PnL：从约 `+10.25 USDC` 提升到约 `+17.74 USDC`。
+- 逐 bar mark-to-market 最大回撤：从约 `1.8%` 降到约 `1.2%`。
+
+这仍然只是小样本结果，不能外推为稳定盈利。
+
 输出文件在：
 
 ```text

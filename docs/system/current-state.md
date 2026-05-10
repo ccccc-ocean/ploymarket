@@ -108,6 +108,17 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 - 输出 `data/edge_report.csv`。
 - 分组条件只使用过去/当前信息，避免未来函数。
 
+### BTC 动量过滤器
+
+代码位置：[src/ploymarket_sim/backtest.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/backtest.py)
+
+默认过滤条件：
+
+- `YES >= 0.50`
+- BTC 过去 1 小时收益 `<= -0.25%`
+
+命中时，不允许做多 YES。该过滤器来自 `edge-report` 的坏条件分层，用于先排除明显差的交易环境。
+
 ### 信号生成
 
 代码位置：[src/ploymarket_sim/signals.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/signals.py)

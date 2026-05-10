@@ -1,7 +1,7 @@
 import unittest
 
 from ploymarket_sim.backtest import BacktestResult, Trade
-from ploymarket_sim.config import ApiConfig, AppConfig, BacktestConfig, BtcPriceConfig, CacheConfig, ExecutionConfig, RiskConfig, SignalConfig, StorageConfig, UniverseConfig
+from ploymarket_sim.config import ApiConfig, AppConfig, BacktestConfig, BtcFilterConfig, BtcPriceConfig, CacheConfig, ExecutionConfig, RiskConfig, SignalConfig, StorageConfig, UniverseConfig
 from ploymarket_sim.clob import PricePoint
 from ploymarket_sim.portfolio import build_mark_to_market_curve, build_portfolio_curve, summarize_portfolio
 
@@ -12,6 +12,7 @@ def app_config() -> AppConfig:
         cache=CacheConfig(False, ".cache/http", 60, False),
         storage=StorageConfig(False, "unused.sqlite"),
         btc_price=BtcPriceConfig("coinbase_public", "https://api.coinbase.com", "BTC-USD", "ONE_HOUR"),
+        btc_filter=BtcFilterConfig(False, 1, -0.0025, 0.50),
         universe=UniverseConfig(["btc"], 1, 1, "volume", True, False, 0.0, True),
         signal=SignalConfig("1w", 60, 2, 4, 0.01, 0.01, 0.0, 0.98, 0.02),
         execution=ExecutionConfig(True, 0.01, 0.015, 0.0, 300),

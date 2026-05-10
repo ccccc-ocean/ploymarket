@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .btc_price import BtcCandle
 from .clob import PricePoint
 from .config import AppConfig
 from .costs import fee_amount, taker_fee_rate
@@ -49,7 +50,12 @@ class PendingMakerOrder:
     reason: str
 
 
-def backtest_market(market: Market, history: list[PricePoint], config: AppConfig) -> BacktestResult:
+def backtest_market(
+    market: Market,
+    history: list[PricePoint],
+    config: AppConfig,
+    btc_candles: list[BtcCandle] | None = None,
+) -> BacktestResult:
     portfolio = Portfolio.from_starting_cash(config.risk.starting_cash)
     trades: list[Trade] = []
     order_events: list[OrderEvent] = []
@@ -147,6 +153,8 @@ def backtest_market(market: Market, history: list[PricePoint], config: AppConfig
             continue
 
         signal = build_signal(market, visible_history, config.signal, config.backtest)
+        if _blocked_by_btc_filter(current, config, btc_candles or []):
+            continue
         execution_plan = plan_execution(market, signal, config.signal, config.backtest, config.execution, current.price)
         if execution_plan.mode == "MAKER" and pending_order is None:
             order_sequence += 1
@@ -223,6 +231,24 @@ def backtest_market(market: Market, history: list[PricePoint], config: AppConfig
 
     realized_pnl = sum(trade.pnl for trade in trades)
     return BacktestResult(market.id, market.question, trades, portfolio.cash, realized_pnl, order_events)
+
+
+def _blocked_by_btc_filter(current: PricePoint, config: AppConfig, btc_candles: list[BtcCandle]) -> bool:
+    if not config.btc_filter.enabled:
+        return False
+    if current.price < config.btc_filter.avoid_yes_price_gte:
+        return False
+    now = _latest_btc_candle_at_or_before(btc_candles, current.timestamp)
+    then = _latest_btc_candle_at_or_before(btc_candles, current.timestamp - config.btc_filter.lookback_hours * 3600)
+    if now is None or then is None or then.close == 0:
+        return False
+    btc_return = (now.close - then.close) / then.close
+    return btc_return <= config.btc_filter.down_threshold
+
+
+def _latest_btc_candle_at_or_before(candles: list[BtcCandle], timestamp: int) -> BtcCandle | None:
+    candidates = [candle for candle in candles if candle.timestamp <= timestamp]
+    return candidates[-1] if candidates else None
 
 
 def _create_pending_maker_order(

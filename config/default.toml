@@ -19,6 +19,12 @@ base_url = "https://api.coinbase.com"
 product_id = "BTC-USD"
 granularity = "ONE_HOUR"
 
+[btc_filter]
+enabled = true
+lookback_hours = 1
+down_threshold = -0.0025
+avoid_yes_price_gte = 0.50
+
 [universe]
 keywords = ["bitcoin", "btc"]
 limit = 20
