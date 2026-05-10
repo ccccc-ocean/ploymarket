@@ -90,6 +90,8 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 
 ```text
 data/backtest_<market_id>.csv
+data/backtest_summary.csv
+data/backtest_summary_by_type.csv
 ```
 
 复盘时重点看：
@@ -100,6 +102,30 @@ data/backtest_<market_id>.csv
 - 止盈是否过早。
 - 盈亏是否来自少数偶然交易。
 - 是否有大量 `REJECTED`，说明风控参数可能过紧。
+
+## 回测汇总
+
+`backtest_summary.csv` 是逐市场汇总，适合看每个市场的交易质量。
+
+重点字段：
+
+- `market_type`: 市场分类。
+- `trade_count`: 该市场买入和退出总次数。
+- `entry_count`: 买入次数。
+- `exit_count`: 退出次数。
+- `rejected_count`: 被风控拒绝的次数。
+- `win_rate`: 退出交易胜率。
+- `realized_pnl`: 已实现盈亏。
+- `total_fees`: 估算手续费。
+- `total_slippage`: 估算滑点。
+- `best_trade_pnl` / `worst_trade_pnl`: 最好和最差单笔退出。
+
+`backtest_summary_by_type.csv` 是按市场类型聚合，适合回答：
+
+- 哪一类市场有交易？
+- 哪一类市场贡献了盈亏？
+- 哪一类市场成本最高？
+- 价格目标市场和公司事件市场是否应该分开优化？
 
 ## 查看风控配置说明
 

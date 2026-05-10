@@ -1,0 +1,2 @@
+market_id,market_type,trade_count,entry_count,exit_count,rejected_count,win_count,loss_count,win_rate,realized_pnl,total_fees,total_slippage,average_pnl,best_trade_pnl,worst_trade_pnl,ending_cash,question
+540844,price_target,0,0,0,0,0,0,0.0,0,0,0,0.0,0.0,0.0,1000.0,Will bitcoin hit $1m before GTA VI?

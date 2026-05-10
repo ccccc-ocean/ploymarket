@@ -9,8 +9,16 @@ from .clob import get_price_history
 from .config import load_config
 from .http import HttpError
 from .polymarket import discover_btc_markets
-from .reporting import print_market_table, print_signal, write_backtest_csv
+from .reporting import (
+    print_aggregate_summary,
+    print_market_table,
+    print_signal,
+    write_aggregate_summary_csv,
+    write_backtest_csv,
+    write_summary_csv,
+)
 from .signals import build_signal
+from .summary import aggregate_summaries, summarize_all, summarize_market
 
 
 DEFAULT_CONFIG = "config/default.toml"
@@ -41,12 +49,15 @@ def main() -> None:
                 continue
             print_signal(market, build_signal(market, history, config.signal, config.backtest))
     elif args.command == "backtest":
+        summaries = []
         for market in _filter_markets(discover_btc_markets(config), args.market_type):
             history = _safe_history(config, market)
             if not history:
                 continue
             result = backtest_market(market, history, config)
             path = write_backtest_csv(result, config.backtest.output_dir)
+            summary = summarize_market(market, result)
+            summaries.append(summary)
             trade_count = len([trade for trade in result.trades if trade.action != "REJECTED"])
             total_fees = sum(trade.fee for trade in result.trades)
             total_slippage = sum(trade.slippage for trade in result.trades)
@@ -54,6 +65,15 @@ def main() -> None:
                 f"{market.id} | trades={trade_count} | pnl={result.realized_pnl:.2f} | "
                 f"fees={total_fees:.2f} | slippage={total_slippage:.2f} | ending_cash={result.ending_cash:.2f} | {path}"
             )
+        if summaries:
+            summary_path = write_summary_csv(summaries, config.backtest.output_dir)
+            aggregate_summaries_by_type = aggregate_summaries(summaries)
+            aggregate_path = write_aggregate_summary_csv([summarize_all(summaries)] + aggregate_summaries_by_type, config.backtest.output_dir)
+            print_aggregate_summary(summarize_all(summaries))
+            for aggregate in aggregate_summaries_by_type:
+                print_aggregate_summary(aggregate)
+            print(f"summary_csv={summary_path}")
+            print(f"summary_by_type_csv={aggregate_path}")
     elif args.command == "explain-risk":
         _explain_risk(config)
 

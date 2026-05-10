@@ -81,12 +81,20 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 - 使用风控决定是否允许开仓。
 - 使用止损、止盈和回测结束平仓退出。
 - 输出每个市场一份 CSV，包含费用、滑点、净 edge 和 PnL。
+- 输出逐市场汇总 CSV 和按市场类型聚合汇总 CSV。
 
 当前费用模型：
 
 ```text
 taker_fee = notional * taker_fee_rate * p * (1 - p)
 ```
+
+汇总代码位置：[src/ploymarket_sim/summary.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/summary.py)
+
+汇总输出：
+
+- `data/backtest_summary.csv`
+- `data/backtest_summary_by_type.csv`
 
 ### CLI
 
@@ -112,6 +120,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 - 当前信号很初级，不能直接作为实盘依据。
 - 当前费用模型还是估算值，后续应读取市场真实 fee 设置。
 - 市场分类还是关键词规则，后续要用真实样本不断修正。
+- 汇总统计还没有最大回撤曲线，因为当前回测仍按单市场独立账户计算。
 
 ## 知识库状态
 
