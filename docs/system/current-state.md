@@ -185,13 +185,23 @@ created -> rejected
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discover
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml signals
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml backtest
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-run
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explain-risk
 ```
+
+### Paper Run
+
+代码位置：[src/ploymarket_sim/paper.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/paper.py)
+
+- 执行一轮模拟盘信号扫描。
+- 默认适合按 `price_target` 市场运行。
+- 写入 SQLite 市场和价格历史。
+- 输出 `data/paper_run_<timestamp>.csv`。
 
 ## 当前限制
 
 - 没有真实订单执行。
-- 没有持续运行的模拟盘循环。
+- 有单轮 `paper-run`，但还没有守护进程或自动定时调度。
 - 有本地 SQLite 存储，但还没有用于回放历史采样或离线回测。
 - 没有盘口深度模拟。
 - 没有考虑到期结算和市场 resolution 风险。

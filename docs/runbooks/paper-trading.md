@@ -86,6 +86,31 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 
 注意：`BUY_YES` 只是研究信号，不是实盘建议。
 
+## 单轮模拟盘扫描
+
+`paper-run` 会执行一轮模拟盘信号扫描，并输出 CSV：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml paper-run --market-type price_target
+```
+
+输出文件：
+
+```text
+data/paper_run_<timestamp>.csv
+```
+
+字段包括：
+
+- 市场 ID 和市场类型。
+- YES 当前价格。
+- 市场级 taker fee rate。
+- 信号动作。
+- gross edge / net edge。
+- 信号原因。
+
+这个命令适合未来接定时任务，每隔固定时间跑一轮，形成持续模拟盘记录。
+
 ## 跑回测
 
 ```bash

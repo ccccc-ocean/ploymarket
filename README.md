@@ -34,6 +34,7 @@
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discover
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml signals
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml backtest
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-run
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explain-risk
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-info
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml storage-info
@@ -45,6 +46,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml storag
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discover --market-type price_target
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml signals --market-type company_treasury
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml backtest --market-type price_target
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-run --market-type price_target
 ```
 
 当前仓库还没有安装成包，所以命令里先显式加 `PYTHONPATH=src`。

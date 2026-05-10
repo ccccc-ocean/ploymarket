@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from time import time
 
 from .backtest import backtest_market
 from .cache import CachePolicy, JsonCache
@@ -10,6 +11,7 @@ from .clob import get_price_history
 from .config import load_config
 from .http import HttpError
 from .portfolio import build_mark_to_market_curve, build_portfolio_curve, summarize_portfolio
+from .paper import build_paper_signal_row, summarize_paper_rows
 from .polymarket import discover_btc_markets
 from .reporting import (
     print_aggregate_summary,
@@ -24,6 +26,7 @@ from .reporting import (
     write_order_events_csv,
     write_portfolio_curve_csv,
     write_portfolio_summary_csv,
+    write_paper_signal_rows_csv,
     write_summary_csv,
 )
 from .signals import build_signal
@@ -45,6 +48,8 @@ def main() -> None:
     signals_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
     backtest_parser = subparsers.add_parser("backtest", help="run a simple historical paper-trading backtest")
     backtest_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
+    paper_parser = subparsers.add_parser("paper-run", help="run one paper-trading signal scan")
+    paper_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
     subparsers.add_parser("cache-info", help="show local HTTP cache status")
     subparsers.add_parser("storage-info", help="show local SQLite storage status")
     subparsers.add_parser("explain-risk", help="explain the current risk limits")
@@ -118,6 +123,8 @@ def main() -> None:
             print(f"portfolio_summary_csv={portfolio_summary_path}")
             print(f"portfolio_mtm_curve_csv={mtm_curve_path}")
             print(f"portfolio_mtm_summary_csv={mtm_summary_path}")
+    elif args.command == "paper-run":
+        _run_paper_scan(config, args.market_type)
     elif args.command == "explain-risk":
         _explain_risk(config)
     elif args.command == "cache-info":
@@ -151,6 +158,27 @@ def _safe_history(config, market):
 
 def _filter_markets(markets, market_type):
     return [market for market in markets if is_market_type(market, market_type)]
+
+
+def _run_paper_scan(config, market_type: str) -> None:
+    run_timestamp = int(time())
+    storage = storage_from_config(config)
+    markets = _filter_markets(discover_btc_markets(config), market_type)
+    storage.save_markets(markets)
+    rows = []
+    for market in markets:
+        history = _safe_history(config, market)
+        if not history:
+            continue
+        storage.save_price_history(market.yes_token_id or "", history)
+        signal = build_signal(market, history, config.signal, config.backtest)
+        rows.append(build_paper_signal_row(market, signal, config.backtest.taker_fee_rate, run_timestamp))
+    path = write_paper_signal_rows_csv(rows, config.backtest.output_dir, run_timestamp)
+    summary = summarize_paper_rows(rows)
+    print(
+        f"paper_run | markets={summary['markets']} | buy_yes={summary['buy_yes']} | "
+        f"hold={summary['hold']} | avoid={summary['avoid']} | {path}"
+    )
 
 
 def _print_cache_info(config) -> None:

@@ -6,6 +6,7 @@ from pathlib import Path
 from .backtest import BacktestResult
 from .classifier import classify_market
 from .portfolio import PortfolioPoint, PortfolioSummary
+from .paper import PaperSignalRow
 from .polymarket import Market
 from .signals import Signal
 from .summary import AggregateSummary, BacktestSummary
@@ -261,6 +262,46 @@ def print_portfolio_summary(summary: PortfolioSummary) -> None:
         f"max_drawdown={summary.max_drawdown:.1%} | fees={summary.total_fees:.2f} | "
         f"slippage={summary.total_slippage:.2f} | events={summary.event_count}"
     )
+
+
+def write_paper_signal_rows_csv(rows: list[PaperSignalRow], output_dir: str, run_timestamp: int) -> Path:
+    directory = Path(output_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"paper_run_{run_timestamp}.csv"
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow(
+            [
+                "run_timestamp",
+                "market_id",
+                "market_type",
+                "question",
+                "yes_price",
+                "taker_fee_rate",
+                "action",
+                "confidence",
+                "gross_edge",
+                "net_edge",
+                "reason",
+            ]
+        )
+        for row in rows:
+            writer.writerow(
+                [
+                    row.run_timestamp,
+                    row.market_id,
+                    row.market_type,
+                    row.question,
+                    row.yes_price,
+                    row.taker_fee_rate,
+                    row.action,
+                    row.confidence,
+                    row.gross_edge,
+                    row.net_edge,
+                    row.reason,
+                ]
+            )
+    return path
 
 
 def _write_portfolio_points(path: Path, points: list[PortfolioPoint]) -> None:

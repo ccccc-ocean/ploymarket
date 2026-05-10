@@ -432,3 +432,43 @@ HTTP cache 解决“短时间重复请求”的问题；SQLite 解决“长期�
 ### 下次继续
 
 建议下一步做持续模拟盘 `paper-run` 命令，让系统可以按固定流程扫描、记录信号、写入数据库和输出复盘摘要。
+
+## 2026-05-10：单轮 Paper Run
+
+### 本次目标
+
+让系统能执行一轮标准化模拟盘扫描，为未来 24 小时持续模拟盘做准备。
+
+### 已完成
+
+- 新增 `src/ploymarket_sim/paper.py`。
+- 新增 CLI 命令：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml paper-run --market-type price_target
+```
+
+- 输出 `data/paper_run_<timestamp>.csv`。
+- 每轮扫描会写入 SQLite 市场和价格历史。
+
+### 本轮观察
+
+本轮 `price_target` 扫描：
+
+- 市场数：35。
+- `BUY_YES`: 0。
+- `HOLD`: 35。
+- `AVOID`: 0。
+
+### 当前意义
+
+这说明在当前 fee、滑点和安全边际假设下，本轮没有价格目标市场达到可交易的净 edge 门槛。
+
+### 下次继续
+
+建议下一步做每日复盘报告，把多次 `paper-run` 的输出聚合成：
+
+- 每日信号数量。
+- BUY_YES 候选变化。
+- 市场类型分布。
+- 是否有连续出现的候选机会。
