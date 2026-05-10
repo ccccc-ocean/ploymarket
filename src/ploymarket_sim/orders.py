@@ -53,5 +53,19 @@ def rejected_events(
     ]
 
 
+def canceled_events(
+    timestamp: int,
+    order_id: str,
+    market_id: str,
+    side: OrderSide,
+    price: float,
+    notional: float,
+    reason: str,
+) -> list[OrderEvent]:
+    return [
+        OrderEvent(timestamp, order_id, market_id, side, "canceled", price, notional, reason),
+    ]
+
+
 def make_order_id(market_id: str, timestamp: int, sequence: int) -> str:
     return f"{market_id}-{timestamp}-{sequence}"

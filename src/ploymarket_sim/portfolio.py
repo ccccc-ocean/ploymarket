@@ -40,7 +40,7 @@ def build_portfolio_curve(results: list[BacktestResult], config: AppConfig) -> l
     points: list[PortfolioPoint] = []
 
     for trade in _ordered_trades(results):
-        if trade.action == "BUY_YES":
+        if trade.action in {"BUY_YES", "MAKER_BUY_YES"}:
             cash -= trade.notional + trade.fee + trade.slippage
             invested_by_market[trade.market_id] = invested_by_market.get(trade.market_id, 0.0) + trade.notional
         elif trade.action in {"SELL_YES", "MARK_TO_MARKET_EXIT"}:
@@ -102,7 +102,7 @@ def build_mark_to_market_curve(
             pnl = trade.pnl
             fee = trade.fee
             slippage = trade.slippage
-            if trade.action == "BUY_YES":
+            if trade.action in {"BUY_YES", "MAKER_BUY_YES"}:
                 cash -= trade.notional + trade.fee + trade.slippage
                 positions[market_id] = positions.get(market_id, 0.0) + trade.notional / trade.price
                 latest_prices[market_id] = trade.price

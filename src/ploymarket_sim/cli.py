@@ -20,6 +20,7 @@ from .reporting import (
     print_market_table,
     print_portfolio_summary,
     print_paper_report_summary,
+    print_data_quality_summary,
     print_signal,
     write_aggregate_summary_csv,
     write_all_order_events_csv,
@@ -31,6 +32,7 @@ from .reporting import (
     write_portfolio_summary_csv,
     write_paper_signal_rows_csv,
     write_paper_report_csv,
+    write_data_quality_csv,
     write_summary_csv,
 )
 from .signals import build_signal
@@ -52,6 +54,8 @@ def main() -> None:
     signals_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
     backtest_parser = subparsers.add_parser("backtest", help="run a simple historical paper-trading backtest")
     backtest_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
+    replay_parser = subparsers.add_parser("replay-backtest", help="run a backtest using only local SQLite data")
+    replay_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
     paper_parser = subparsers.add_parser("paper-run", help="run one paper-trading signal scan")
     paper_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
     paper_loop_parser = subparsers.add_parser("paper-loop", help="run repeated paper-trading signal scans")
@@ -61,6 +65,7 @@ def main() -> None:
     subparsers.add_parser("paper-report", help="summarize saved paper-run outputs")
     subparsers.add_parser("cache-info", help="show local HTTP cache status")
     subparsers.add_parser("storage-info", help="show local SQLite storage status")
+    subparsers.add_parser("data-quality", help="summarize local SQLite market/history coverage")
     subparsers.add_parser("explain-risk", help="explain the current risk limits")
 
     args = parser.parse_args()
@@ -84,54 +89,13 @@ def main() -> None:
         storage = storage_from_config(config)
         markets = _filter_markets(discover_btc_markets(config), args.market_type)
         storage.save_markets(markets)
-        results = []
-        histories_by_market = {}
-        summaries = []
-        for market in markets:
-            history = _safe_history(config, market, storage)
-            if not history:
-                continue
-            histories_by_market[market.id] = history
-            storage.save_price_history(market.yes_token_id or "", history)
-            result = backtest_market(market, history, config)
-            results.append(result)
-            path = write_backtest_csv(result, config.backtest.output_dir)
-            write_order_events_csv(result, config.backtest.output_dir)
-            summary = summarize_market(market, result)
-            summaries.append(summary)
-            trade_count = len([trade for trade in result.trades if trade.action != "REJECTED"])
-            total_fees = sum(trade.fee for trade in result.trades)
-            total_slippage = sum(trade.slippage for trade in result.trades)
-            print(
-                f"{market.id} | trades={trade_count} | pnl={result.realized_pnl:.2f} | "
-                f"fees={total_fees:.2f} | slippage={total_slippage:.2f} | ending_cash={result.ending_cash:.2f} | {path}"
-            )
-        if summaries:
-            summary_path = write_summary_csv(summaries, config.backtest.output_dir)
-            aggregate_summaries_by_type = aggregate_summaries(summaries)
-            aggregate_path = write_aggregate_summary_csv([summarize_all(summaries)] + aggregate_summaries_by_type, config.backtest.output_dir)
-            print_aggregate_summary(summarize_all(summaries))
-            for aggregate in aggregate_summaries_by_type:
-                print_aggregate_summary(aggregate)
-            print(f"summary_csv={summary_path}")
-            print(f"summary_by_type_csv={aggregate_path}")
-        if results:
-            orders_path = write_all_order_events_csv(results, config.backtest.output_dir)
-            portfolio_curve = build_portfolio_curve(results, config)
-            portfolio_summary = summarize_portfolio(portfolio_curve, config)
-            curve_path = write_portfolio_curve_csv(portfolio_curve, config.backtest.output_dir)
-            portfolio_summary_path = write_portfolio_summary_csv(portfolio_summary, config.backtest.output_dir)
-            mtm_curve = build_mark_to_market_curve(results, histories_by_market, config)
-            mtm_summary = summarize_portfolio(mtm_curve, config)
-            mtm_curve_path = write_mark_to_market_curve_csv(mtm_curve, config.backtest.output_dir)
-            mtm_summary_path = write_mark_to_market_summary_csv(mtm_summary, config.backtest.output_dir)
-            print_portfolio_summary(portfolio_summary)
-            print(f"mark_to_market | ending_equity={mtm_summary.ending_equity:.2f} | pnl={mtm_summary.realized_pnl:.2f} | max_drawdown={mtm_summary.max_drawdown:.1%} | events={mtm_summary.event_count}")
-            print(f"orders_csv={orders_path}")
-            print(f"portfolio_curve_csv={curve_path}")
-            print(f"portfolio_summary_csv={portfolio_summary_path}")
-            print(f"portfolio_mtm_curve_csv={mtm_curve_path}")
-            print(f"portfolio_mtm_summary_csv={mtm_summary_path}")
+        _run_backtest(config, markets, storage, prefer_local=False)
+    elif args.command == "replay-backtest":
+        storage = storage_from_config(config)
+        markets = _filter_markets(storage.load_markets(), args.market_type)
+        if not markets:
+            raise SystemExit("No local markets found. Run discover or paper-run first.")
+        _run_backtest(config, markets, storage, prefer_local=True)
     elif args.command == "paper-run":
         _run_paper_scan(config, args.market_type)
     elif args.command == "paper-loop":
@@ -144,6 +108,59 @@ def main() -> None:
         _print_cache_info(config)
     elif args.command == "storage-info":
         _print_storage_info(config)
+    elif args.command == "data-quality":
+        _run_data_quality(config)
+
+
+def _run_backtest(config, markets, storage, prefer_local: bool) -> None:
+    results = []
+    histories_by_market = {}
+    summaries = []
+    for market in markets:
+        history = _safe_history(config, market, storage, prefer_local=prefer_local)
+        if not history:
+            continue
+        histories_by_market[market.id] = history
+        storage.save_price_history(market.yes_token_id or "", history)
+        result = backtest_market(market, history, config)
+        results.append(result)
+        path = write_backtest_csv(result, config.backtest.output_dir)
+        write_order_events_csv(result, config.backtest.output_dir)
+        summary = summarize_market(market, result)
+        summaries.append(summary)
+        trade_count = len([trade for trade in result.trades if trade.action != "REJECTED"])
+        total_fees = sum(trade.fee for trade in result.trades)
+        total_slippage = sum(trade.slippage for trade in result.trades)
+        print(
+            f"{market.id} | trades={trade_count} | pnl={result.realized_pnl:.2f} | "
+            f"fees={total_fees:.2f} | slippage={total_slippage:.2f} | ending_cash={result.ending_cash:.2f} | {path}"
+        )
+    if summaries:
+        summary_path = write_summary_csv(summaries, config.backtest.output_dir)
+        aggregate_summaries_by_type = aggregate_summaries(summaries)
+        aggregate_path = write_aggregate_summary_csv([summarize_all(summaries)] + aggregate_summaries_by_type, config.backtest.output_dir)
+        print_aggregate_summary(summarize_all(summaries))
+        for aggregate in aggregate_summaries_by_type:
+            print_aggregate_summary(aggregate)
+        print(f"summary_csv={summary_path}")
+        print(f"summary_by_type_csv={aggregate_path}")
+    if results:
+        orders_path = write_all_order_events_csv(results, config.backtest.output_dir)
+        portfolio_curve = build_portfolio_curve(results, config)
+        portfolio_summary = summarize_portfolio(portfolio_curve, config)
+        curve_path = write_portfolio_curve_csv(portfolio_curve, config.backtest.output_dir)
+        portfolio_summary_path = write_portfolio_summary_csv(portfolio_summary, config.backtest.output_dir)
+        mtm_curve = build_mark_to_market_curve(results, histories_by_market, config)
+        mtm_summary = summarize_portfolio(mtm_curve, config)
+        mtm_curve_path = write_mark_to_market_curve_csv(mtm_curve, config.backtest.output_dir)
+        mtm_summary_path = write_mark_to_market_summary_csv(mtm_summary, config.backtest.output_dir)
+        print_portfolio_summary(portfolio_summary)
+        print(f"mark_to_market | ending_equity={mtm_summary.ending_equity:.2f} | pnl={mtm_summary.realized_pnl:.2f} | max_drawdown={mtm_summary.max_drawdown:.1%} | events={mtm_summary.event_count}")
+        print(f"orders_csv={orders_path}")
+        print(f"portfolio_curve_csv={curve_path}")
+        print(f"portfolio_summary_csv={portfolio_summary_path}")
+        print(f"portfolio_mtm_curve_csv={mtm_curve_path}")
+        print(f"portfolio_mtm_summary_csv={mtm_summary_path}")
 
 
 def _explain_risk(config) -> None:
@@ -264,6 +281,13 @@ def _print_storage_info(config) -> None:
     print(f"- sqlite_path: {stats.sqlite_path}")
     print(f"- markets: {stats.market_count}")
     print(f"- price_points: {stats.price_point_count}")
+
+
+def _run_data_quality(config) -> None:
+    stats = storage_from_config(config).market_history_stats()
+    print_data_quality_summary(stats)
+    path = write_data_quality_csv(stats, config.backtest.output_dir)
+    print(f"data_quality_csv={path}")
 
 
 if __name__ == "__main__":

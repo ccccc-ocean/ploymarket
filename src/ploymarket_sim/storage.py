@@ -18,6 +18,17 @@ class StorageStats:
     price_point_count: int
 
 
+@dataclass(frozen=True)
+class MarketHistoryStats:
+    market_id: str
+    question: str
+    market_type: str
+    yes_token_id: str
+    price_point_count: int
+    first_timestamp: int | None
+    last_timestamp: int | None
+
+
 class Storage:
     def __init__(self, enabled: bool, sqlite_path: str):
         self.enabled = enabled
@@ -197,6 +208,36 @@ class Storage:
             market_count = int(connection.execute("SELECT COUNT(*) FROM markets").fetchone()[0])
             price_point_count = int(connection.execute("SELECT COUNT(*) FROM price_history").fetchone()[0])
         return StorageStats(self.enabled, self.sqlite_path, market_count, price_point_count)
+
+    def market_history_stats(self) -> list[MarketHistoryStats]:
+        if not self.enabled or not Path(self.sqlite_path).exists():
+            return []
+        self.init()
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT m.market_id, m.question, m.market_type, m.yes_token_id,
+                       COUNT(p.timestamp) AS point_count,
+                       MIN(p.timestamp) AS first_timestamp,
+                       MAX(p.timestamp) AS last_timestamp
+                FROM markets m
+                LEFT JOIN price_history p ON p.token_id = m.yes_token_id
+                GROUP BY m.market_id, m.question, m.market_type, m.yes_token_id
+                ORDER BY point_count DESC, m.volume_24hr DESC
+                """
+            ).fetchall()
+        return [
+            MarketHistoryStats(
+                market_id=str(market_id),
+                question=str(question),
+                market_type=str(market_type),
+                yes_token_id=str(yes_token_id or ""),
+                price_point_count=int(point_count),
+                first_timestamp=int(first_timestamp) if first_timestamp is not None else None,
+                last_timestamp=int(last_timestamp) if last_timestamp is not None else None,
+            )
+            for market_id, question, market_type, yes_token_id, point_count, first_timestamp, last_timestamp in rows
+        ]
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.sqlite_path)

@@ -579,3 +579,102 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 ### 下次继续
 
 建议下一步做 SQLite 离线回放，把多次保存的市场和价格历史变成可重复测试样本。之后再做 Maker 成交概率模型，避免把“挂单候选”误当成“必然成交”。
+
+## 2026-05-10：SQLite 离线回放与数据质量报告
+
+### 本次目标
+
+让策略验证不再依赖实时 API。我们需要能用本地 SQLite 中已经保存的市场和价格历史，重复跑同一套回测。
+
+### 已完成
+
+- 新增 CLI 命令：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml replay-backtest --market-type price_target
+```
+
+- `replay-backtest` 复用正式 `backtest` 的输出逻辑。
+- 新增 `data-quality` 命令：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml data-quality
+```
+
+- 输出 `data/data_quality.csv`。
+
+### 本轮离线回放结果
+
+本地 SQLite 样本：
+
+- 市场数：35。
+- 有历史价格市场：35。
+- 至少 24 个价格点市场：35。
+- 价格点总数：5448。
+
+`replay-backtest --market-type price_target`：
+
+- 有交易市场：4。
+- 交易数：14。
+- 胜率：约 `57.1%`。
+- 组合 PnL：约 `+10.25 USDC`。
+- 总费用：约 `5.89 USDC`。
+- 总滑点：约 `0.44 USDC`。
+- 逐 bar mark-to-market 最大回撤：约 `1.8%`。
+
+### 当前判断
+
+这是一个正向小样本，但还不能支持实盘。样本数量、时间跨度和市场类型都太少，而且还没有真实盘口深度、Maker 成交概率、部分成交、结算结果校验。
+
+### 下次继续
+
+建议下一步做 Maker 挂单成交概率模型，让 `MAKER` 候选不再只是记录字段，而是能进入更真实的模拟订单生命周期。
+
+## 2026-05-10：Maker 挂单成交模拟
+
+### 本次目标
+
+让 Maker 不再只是纸面上的“更低买入价”，而是进入订单生命周期：创建挂单、等待成交、超时取消。
+
+### 已完成
+
+- Backtest 支持 `MAKER_BUY_YES`。
+- Maker 挂单路径：
+
+```text
+created -> submitted -> accepted -> matched -> settled
+```
+
+- Maker 超时路径：
+
+```text
+created -> submitted -> accepted -> canceled
+```
+
+- 组合资金曲线已识别 `MAKER_BUY_YES`，避免把 Maker 买入漏算成免费资金。
+- 新增测试覆盖 Maker 成交和组合曲线口径。
+
+### 重要发现
+
+启用 Maker 后，第一次本地回放暴露出组合曲线 bug：逐市场 PnL 为负，但组合曲线错误显示大幅盈利。修复后结果变为：
+
+- 交易数：25。
+- 胜率：约 `27.8%`。
+- 组合 PnL：约 `-52.51 USDC`。
+- 逐 bar mark-to-market 最大回撤：约 `7.1%`。
+
+这说明当前 Maker 候选存在明显逆向选择风险：价格跌到我们的挂单价时，往往不是“捡便宜”，而可能是市场继续走弱。
+
+### 当前决策
+
+默认配置改为：
+
+```toml
+maker_enabled = false
+```
+
+Maker 模型保留用于研究，但不作为默认模拟盘策略。
+
+### 下次继续
+
+建议下一步做盘口深度和外部 BTC 价格源。当前策略只看 Polymarket 自身历史价格，容易把市场内部噪音误判成 edge。

@@ -5,7 +5,8 @@ from dataclasses import dataclass, field
 from .clob import PricePoint
 from .config import AppConfig
 from .costs import fee_amount, taker_fee_rate
-from .orders import OrderEvent, lifecycle_events, make_order_id, rejected_events
+from .execution import ExecutionPlan, plan_execution
+from .orders import OrderEvent, canceled_events, lifecycle_events, make_order_id, rejected_events
 from .polymarket import Market
 from .risk import Portfolio, Position, approve_entry, should_exit
 from .signals import build_signal
@@ -35,6 +36,19 @@ class BacktestResult:
     order_events: list[OrderEvent] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class PendingMakerOrder:
+    order_id: str
+    market_id: str
+    token_id: str
+    limit_price: float
+    notional: float
+    fee: float
+    expires_at: int
+    net_edge: float
+    reason: str
+
+
 def backtest_market(market: Market, history: list[PricePoint], config: AppConfig) -> BacktestResult:
     portfolio = Portfolio.from_starting_cash(config.risk.starting_cash)
     trades: list[Trade] = []
@@ -44,10 +58,76 @@ def backtest_market(market: Market, history: list[PricePoint], config: AppConfig
     if token_id is None:
         return BacktestResult(market.id, market.question, trades, portfolio.cash, 0.0, order_events)
 
+    pending_order: PendingMakerOrder | None = None
     for index in range(config.signal.long_window, len(history)):
         visible_history = history[: index + 1]
         current = visible_history[-1]
         position = portfolio.positions.get(market.id)
+
+        if pending_order:
+            if current.price <= pending_order.limit_price:
+                portfolio.cash -= pending_order.notional + pending_order.fee
+                shares = pending_order.notional / pending_order.limit_price
+                portfolio.positions[market.id] = Position(
+                    market.id,
+                    pending_order.token_id,
+                    pending_order.limit_price,
+                    shares,
+                    pending_order.notional + pending_order.fee,
+                )
+                order_events.append(
+                    OrderEvent(
+                        current.timestamp,
+                        pending_order.order_id,
+                        market.id,
+                        "buy_yes",
+                        "matched",
+                        pending_order.limit_price,
+                        pending_order.notional,
+                        pending_order.reason,
+                    )
+                )
+                order_events.append(
+                    OrderEvent(
+                        current.timestamp,
+                        pending_order.order_id,
+                        market.id,
+                        "buy_yes",
+                        "settled",
+                        pending_order.limit_price,
+                        pending_order.notional,
+                        pending_order.reason,
+                    )
+                )
+                trades.append(
+                    Trade(
+                        current.timestamp,
+                        market.id,
+                        "MAKER_BUY_YES",
+                        pending_order.limit_price,
+                        pending_order.notional,
+                        pending_order.fee,
+                        0.0,
+                        0.0,
+                        pending_order.net_edge,
+                        pending_order.reason,
+                    )
+                )
+                pending_order = None
+                position = portfolio.positions.get(market.id)
+            elif current.timestamp >= pending_order.expires_at:
+                order_events.extend(
+                    canceled_events(
+                        current.timestamp,
+                        pending_order.order_id,
+                        market.id,
+                        "buy_yes",
+                        pending_order.limit_price,
+                        pending_order.notional,
+                        "Maker 挂单超过 TTL 未成交，取消",
+                    )
+                )
+                pending_order = None
 
         if position:
             exit_now, reason = should_exit(position, current.price, config.risk)
@@ -67,7 +147,28 @@ def backtest_market(market: Market, history: list[PricePoint], config: AppConfig
             continue
 
         signal = build_signal(market, visible_history, config.signal, config.backtest)
-        if signal.action != "BUY_YES":
+        execution_plan = plan_execution(market, signal, config.signal, config.backtest, config.execution, current.price)
+        if execution_plan.mode == "MAKER" and pending_order is None:
+            order_sequence += 1
+            pending_order = _create_pending_maker_order(
+                market,
+                token_id,
+                current,
+                execution_plan,
+                portfolio,
+                config,
+                make_order_id(market.id, current.timestamp, order_sequence),
+            )
+            if pending_order:
+                order_events.extend(
+                    [
+                        OrderEvent(current.timestamp, pending_order.order_id, market.id, "buy_yes", "created", pending_order.limit_price, pending_order.notional, pending_order.reason),
+                        OrderEvent(current.timestamp, pending_order.order_id, market.id, "buy_yes", "submitted", pending_order.limit_price, pending_order.notional, pending_order.reason),
+                        OrderEvent(current.timestamp, pending_order.order_id, market.id, "buy_yes", "accepted", pending_order.limit_price, pending_order.notional, pending_order.reason),
+                    ]
+                )
+            continue
+        if execution_plan.mode != "TAKER":
             continue
 
         market_fee_rate = market.effective_taker_fee_rate(config.backtest.taker_fee_rate)
@@ -83,14 +184,28 @@ def backtest_market(market: Market, history: list[PricePoint], config: AppConfig
         order_id = make_order_id(market.id, current.timestamp, order_sequence)
         if not decision.approved:
             order_events.extend(rejected_events(current.timestamp, order_id, market.id, "buy_yes", execution_price, total_cash_needed, decision.reason))
-            trades.append(Trade(current.timestamp, market.id, "REJECTED", execution_price, 0.0, 0.0, 0.0, 0.0, signal.net_edge, decision.reason))
+            trades.append(Trade(current.timestamp, market.id, "REJECTED", execution_price, 0.0, 0.0, 0.0, 0.0, execution_plan.expected_net_edge, decision.reason))
             continue
 
         shares = notional / execution_price
         portfolio.cash -= total_cash_needed
         portfolio.positions[market.id] = Position(market.id, token_id, execution_price, shares, total_cash_needed)
-        order_events.extend(lifecycle_events(current.timestamp, order_id, market.id, "buy_yes", execution_price, notional, signal.reason))
-        trades.append(Trade(current.timestamp, market.id, "BUY_YES", execution_price, notional, entry_fee, slippage, 0.0, signal.net_edge, signal.reason))
+        order_events.extend(lifecycle_events(current.timestamp, order_id, market.id, "buy_yes", execution_price, notional, execution_plan.reason))
+        trades.append(Trade(current.timestamp, market.id, "BUY_YES", execution_price, notional, entry_fee, slippage, 0.0, execution_plan.expected_net_edge, execution_plan.reason))
+
+    if pending_order and history:
+        final = history[-1]
+        order_events.extend(
+            canceled_events(
+                final.timestamp,
+                pending_order.order_id,
+                market.id,
+                "buy_yes",
+                pending_order.limit_price,
+                pending_order.notional,
+                "回测结束取消未成交 Maker 挂单",
+            )
+        )
 
     position = portfolio.positions.get(market.id)
     if position and history:
@@ -108,3 +223,34 @@ def backtest_market(market: Market, history: list[PricePoint], config: AppConfig
 
     realized_pnl = sum(trade.pnl for trade in trades)
     return BacktestResult(market.id, market.question, trades, portfolio.cash, realized_pnl, order_events)
+
+
+def _create_pending_maker_order(
+    market: Market,
+    token_id: str,
+    current: PricePoint,
+    execution_plan: ExecutionPlan,
+    portfolio: Portfolio,
+    config: AppConfig,
+    order_id: str,
+) -> PendingMakerOrder | None:
+    if execution_plan.limit_price is None:
+        return None
+    entry_fee_rate = taker_fee_rate(execution_plan.limit_price, config.execution.maker_fee_rate)
+    notional = min(config.backtest.trade_size_usdc, portfolio.cash / (1 + entry_fee_rate))
+    entry_fee = notional * entry_fee_rate
+    total_cash_needed = notional + entry_fee
+    decision = approve_entry(portfolio, config.risk, market.id, execution_plan.limit_price, total_cash_needed)
+    if not decision.approved:
+        return None
+    return PendingMakerOrder(
+        order_id=order_id,
+        market_id=market.id,
+        token_id=token_id,
+        limit_price=execution_plan.limit_price,
+        notional=notional,
+        fee=entry_fee,
+        expires_at=current.timestamp + config.execution.maker_order_ttl_seconds,
+        net_edge=execution_plan.expected_net_edge,
+        reason=execution_plan.reason,
+    )

@@ -10,6 +10,7 @@ from .paper import PaperSignalRow
 from .paper_report import PaperRunSummary
 from .polymarket import Market
 from .signals import Signal
+from .storage import MarketHistoryStats
 from .summary import AggregateSummary, BacktestSummary
 
 
@@ -370,6 +371,49 @@ def print_paper_report_summary(summaries: list[PaperRunSummary]) -> None:
         f"paper_report | runs={len(summaries)} | latest_markets={latest.market_count} | "
         f"latest_taker={latest.taker_count} | latest_maker={latest.maker_count} | "
         f"best_net_edge={latest.best_net_edge:.4f} | best_market={latest.best_market_id}"
+    )
+
+
+def write_data_quality_csv(stats: list[MarketHistoryStats], output_dir: str) -> Path:
+    directory = Path(output_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / "data_quality.csv"
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow(
+            [
+                "market_id",
+                "market_type",
+                "yes_token_id",
+                "price_point_count",
+                "first_timestamp",
+                "last_timestamp",
+                "question",
+            ]
+        )
+        for item in stats:
+            writer.writerow(
+                [
+                    item.market_id,
+                    item.market_type,
+                    item.yes_token_id,
+                    item.price_point_count,
+                    item.first_timestamp,
+                    item.last_timestamp,
+                    item.question,
+                ]
+            )
+    return path
+
+
+def print_data_quality_summary(stats: list[MarketHistoryStats]) -> None:
+    markets = len(stats)
+    covered = len([item for item in stats if item.price_point_count > 0])
+    tradable_sample = len([item for item in stats if item.price_point_count >= 24])
+    total_points = sum(item.price_point_count for item in stats)
+    print(
+        f"data_quality | markets={markets} | with_history={covered} | "
+        f"with_24plus_points={tradable_sample} | price_points={total_points}"
     )
 
 

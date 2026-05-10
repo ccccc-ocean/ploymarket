@@ -24,8 +24,10 @@ def plan_execution(
     signal_config: SignalConfig,
     backtest_config: BacktestConfig,
     execution_config: ExecutionConfig,
+    current_price: float | None = None,
 ) -> ExecutionPlan:
-    if market.yes_price is None:
+    price = current_price if current_price is not None else market.yes_price
+    if price is None:
         return ExecutionPlan("SKIP", "", None, 0.0, 0.0, "缺少 YES 价格，无法制定执行计划")
 
     if signal.action == "BUY_YES":
@@ -33,13 +35,13 @@ def plan_execution(
         return ExecutionPlan(
             mode="TAKER",
             side="BUY_YES",
-            limit_price=market.yes_price,
+            limit_price=price,
             expected_fee_rate=fee_rate,
             expected_net_edge=signal.net_edge,
             reason="Taker 成本后仍满足最小净优势，允许模拟直接吃单",
         )
 
-    maker_plan = _maker_candidate(market, signal, signal_config, execution_config)
+    maker_plan = _maker_candidate(price, signal, signal_config, execution_config)
     if maker_plan is not None:
         return maker_plan
 
@@ -54,7 +56,7 @@ def plan_execution(
 
 
 def _maker_candidate(
-    market: Market,
+    price: float,
     signal: Signal,
     signal_config: SignalConfig,
     execution_config: ExecutionConfig,
@@ -63,13 +65,11 @@ def _maker_candidate(
         return None
     if signal.action != "HOLD" or signal.edge < signal_config.min_momentum:
         return None
-    if market.yes_price is None:
-        return None
-    if market.yes_price >= signal_config.buy_below or market.yes_price <= signal_config.sell_above:
+    if price >= signal_config.buy_below or price <= signal_config.sell_above:
         return None
 
-    limit_price = max(0.01, market.yes_price - execution_config.maker_price_improvement)
-    price_improvement = market.yes_price - limit_price
+    limit_price = max(0.01, price - execution_config.maker_price_improvement)
+    price_improvement = price - limit_price
     costs = estimate_entry_cost(
         limit_price,
         execution_config.maker_fee_rate,

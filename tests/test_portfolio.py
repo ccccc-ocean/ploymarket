@@ -60,3 +60,21 @@ class PortfolioTests(unittest.TestCase):
         self.assertTrue(any(point.action == "MARK" for point in curve))
         mark = [point for point in curve if point.action == "MARK"][0]
         self.assertLess(mark.equity, 999.85)
+
+    def test_treats_maker_buy_as_open_position(self) -> None:
+        config = app_config()
+        result = BacktestResult(
+            "m1",
+            "Will Bitcoin reach $100,000 in May?",
+            [
+                Trade(1, "m1", "MAKER_BUY_YES", 0.5, 25.0, 0.0, 0.0, 0.0, 0.04, "maker entry"),
+                Trade(2, "m1", "MARK_TO_MARKET_EXIT", 0.4, 20.0, 0.0, 0.0, -5.0, 0.0, "exit"),
+            ],
+            995.0,
+            -5.0,
+        )
+
+        summary = summarize_portfolio(build_portfolio_curve([result], config), config)
+
+        self.assertAlmostEqual(summary.ending_equity, 995.0)
+        self.assertAlmostEqual(summary.realized_pnl, -5.0)

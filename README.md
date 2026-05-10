@@ -35,18 +35,20 @@
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discover
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml signals
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml backtest
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml replay-backtest
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-run
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-loop --iterations 3 --interval-seconds 300
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-report
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explain-risk
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-info
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml storage-info
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml data-quality
 ```
 
 `paper-run` 输出里的 `execution_mode` 含义：
 
 - `TAKER`: 净 edge 扣除 taker fee、滑点、安全边际后仍过线，可以作为模拟吃单候选。
-- `MAKER`: gross edge 为正，但 taker 成本后不过线，只能作为更低限价的挂单候选。
+- `MAKER`: gross edge 为正，但 taker 成本后不过线，只能作为更低限价的挂单候选。默认关闭，需在 `[execution]` 中显式启用后研究。
 - `SKIP`: 不满足交易条件，继续观察。
 
 可以用 `--market-type` 只观察某一类市场：
@@ -55,6 +57,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml storag
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discover --market-type price_target
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml signals --market-type company_treasury
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml backtest --market-type price_target
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml replay-backtest --market-type price_target
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-run --market-type price_target
 ```
 
@@ -98,9 +101,16 @@ data/ploymarket.sqlite
 
 ```bash
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml storage-info
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml data-quality
 ```
 
 SQLite 文件不会提交到 GitHub，用于本地长期研究样本积累。
+
+离线回放只使用 SQLite 本地数据，不依赖实时 API：
+
+```bash
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml replay-backtest --market-type price_target
+```
 
 默认值偏保守，是为了先观察策略行为。等我们看过几轮模拟盘结果，再逐步回答：
 

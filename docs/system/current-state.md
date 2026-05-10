@@ -42,6 +42,8 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-
 - 可以从 SQLite 读取已存市场和价格历史。
 - `discover`、`signals`、`backtest` 会自动写入。
 - `paper-run` 优先使用本地 SQLite 市场和历史价格；本地没有数据时再尝试网络发现/拉取。
+- `replay-backtest` 可以只使用 SQLite 本地数据离线回放。
+- `data-quality` 输出本地市场和历史价格覆盖情况。
 - 默认路径：`data/ploymarket.sqlite`
 - SQLite 文件已加入 `.gitignore`。
 
@@ -49,6 +51,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-
 
 ```bash
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml storage-info
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml data-quality
 ```
 
 ### 市场分类
@@ -100,7 +103,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 - `MAKER`: gross edge 为正，但 taker 成本后不达标，只适合作为更低限价的挂单候选。
 - `SKIP`: 不交易。
 
-Maker 参数位于 `config/default.toml` 的 `[execution]` 区块。
+Maker 参数位于 `config/default.toml` 的 `[execution]` 区块。当前默认 `maker_enabled = false`，因为本地小样本中启用 Maker 成交模拟会显著恶化回测结果。
 
 ### 风控
 
@@ -159,6 +162,7 @@ fee rate 来源：
 - 使用保守口径：持仓按投入本金计值，费用和滑点立即降低净值。
 - 输出组合级最大回撤和账户级 PnL。
 - 输出逐 bar mark-to-market 资金曲线，用价格历史重估未平仓仓位。
+- `replay-backtest` 复用同一套回测逻辑，但只读取 SQLite 本地数据。
 
 输出：
 
@@ -183,6 +187,12 @@ created -> submitted -> accepted -> matched -> settled
 created -> rejected
 ```
 
+当前 Maker 未成交路径：
+
+```text
+created -> submitted -> accepted -> canceled
+```
+
 输出：
 
 - `data/orders_<market_id>.csv`
@@ -200,6 +210,7 @@ created -> rejected
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discover
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml signals
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml backtest
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml replay-backtest
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-run
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explain-risk
 ```
@@ -228,13 +239,13 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 
 - 没有真实订单执行。
 - 有持续 `paper-loop`，但还没有系统级守护进程、告警和自动日报。
-- SQLite 已用于 paper-run 本地读取，但还没有完整离线回放框架。
+- SQLite 已用于 paper-run 本地读取和 replay-backtest 离线回放，但样本数量仍然很小。
 - 没有盘口深度模拟。
 - 没有考虑到期结算和市场 resolution 风险。
 - 没有接 BTC 现货/永续价格源。
 - 当前信号很初级，不能直接作为实盘依据。
 - 当前费用模型已经读取市场级 fee rate，但仍然没有读取更复杂的 maker rebate、reward 和真实成交路径费用。
-- Maker/Taker 已在执行计划层分离，但 Maker 还没有成交概率、排队位置、撤单和部分成交模拟。
+- Maker/Taker 已在执行计划层分离，Maker 已支持限价挂单、TTL 取消和价格触及成交；但还没有盘口排队位置、部分成交和更真实的成交概率。
 - 市场分类还是关键词规则，后续要用真实样本不断修正。
 - 逐 bar mark-to-market 已实现，但仍基于当前 CLOB 历史价格，不包含盘口深度和成交概率。
 - 订单状态机还没有真实的失败、撤单、部分成交和链上 settlement 查询。
@@ -253,6 +264,7 @@ Obsidian 入口是：[00-home.md](/Users/pizza_yang/code/ploymarket/docs/00-home
 进入实盘之前，必须先满足：
 
 - 模拟盘稳定运行至少数周。
+- 本地样本覆盖足够多的市场、行情阶段和结算结果。
 - 每笔交易有可解释原因。
 - 每次亏损都能归类。
 - 风控能自动阻止继续扩大亏损。

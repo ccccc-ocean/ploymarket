@@ -171,6 +171,62 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml backtest --market-type price_target
 ```
 
+## 离线回放
+
+`replay-backtest` 只使用 SQLite 本地保存的市场和价格历史，不访问实时 API：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml replay-backtest --market-type price_target
+```
+
+这适合做可重复实验。若同一份 SQLite 数据不变，回放结果也应该保持一致。
+
+本轮本地样本观察：
+
+- 市场数：35。
+- 有交易市场：4。
+- 交易数：14。
+- 组合 PnL：约 `+10.25 USDC`。
+- 逐 bar mark-to-market 最大回撤：约 `1.8%`。
+
+这个结果只能说明当前小样本回放为正，不能说明已经可以实盘。
+
+## 数据质量
+
+查看本地样本覆盖：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml data-quality
+```
+
+输出文件：
+
+```text
+data/data_quality.csv
+```
+
+优先关注：
+
+- `with_history`: 有价格历史的市场数量。
+- `with_24plus_points`: 至少有 24 个价格点的市场数量。
+- `price_points`: 总价格点数。
+
+## Maker 研究开关
+
+默认配置里 `maker_enabled = false`。原因是当前本地小样本显示：如果把 Maker 候选纳入“触价成交 + TTL 取消”的模拟，回测结果会从小幅盈利变成明显亏损。
+
+如果要研究 Maker，可以临时把 `config/default.toml` 的 `[execution]` 改为：
+
+```toml
+maker_enabled = true
+```
+
+开启后重点检查：
+
+- `orders_all.csv` 里有多少 `canceled`。
+- `MAKER_BUY_YES` 是否常常成交后继续下跌。
+- Maker 改善的价格是否足以弥补逆向选择风险。
+
 输出文件在：
 
 ```text
