@@ -678,3 +678,33 @@ Maker 模型保留用于研究，但不作为默认模拟盘策略。
 ### 下次继续
 
 建议下一步做盘口深度和外部 BTC 价格源。当前策略只看 Polymarket 自身历史价格，容易把市场内部噪音误判成 edge。
+
+## 2026-05-10：外部 BTC 现货价格源
+
+### 本次目标
+
+接入一个公开 BTC 现货价格源，为后续判断 Polymarket 是否滞后或过度反应做准备。
+
+### 已完成
+
+- 新增 `src/ploymarket_sim/btc_price.py`。
+- 新增 CLI 命令：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml btc-price
+```
+
+- 输出 `data/btc_price_candles.csv`。
+- 当前默认来源：Coinbase public BTC-USD candles。
+- 当前默认粒度：`ONE_HOUR`。
+
+### 本轮观察
+
+本轮抓取：
+
+- K 线数量：345。
+- 最新 close：约 `80947.94`。
+
+### 当前判断
+
+外部价格源暂时只作为研究数据，不直接进入交易信号。下一步应该做时间对齐，比较 BTC 现货价格变化和 Polymarket YES 价格变化。

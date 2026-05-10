@@ -79,6 +79,15 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
   - `interval = 1w`
   - `fidelity = 60` 分钟
 
+### 外部 BTC 现货价格
+
+代码位置：[src/ploymarket_sim/btc_price.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/btc_price.py)
+
+- 使用 Coinbase 公开 BTC-USD candles。
+- 当前默认粒度：`ONE_HOUR`。
+- 输出 `data/btc_price_candles.csv`。
+- 当前只用于研究，不直接进入交易决策。
+
 ### 信号生成
 
 代码位置：[src/ploymarket_sim/signals.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/signals.py)
@@ -212,6 +221,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml signal
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml backtest
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml replay-backtest
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-run
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml btc-price
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explain-risk
 ```
 
@@ -242,7 +252,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 - SQLite 已用于 paper-run 本地读取和 replay-backtest 离线回放，但样本数量仍然很小。
 - 没有盘口深度模拟。
 - 没有考虑到期结算和市场 resolution 风险。
-- 没有接 BTC 现货/永续价格源。
+- 已接 BTC 现货 K 线，但还没有把外部价格源纳入信号模型。
 - 当前信号很初级，不能直接作为实盘依据。
 - 当前费用模型已经读取市场级 fee rate，但仍然没有读取更复杂的 maker rebate、reward 和真实成交路径费用。
 - Maker/Taker 已在执行计划层分离，Maker 已支持限价挂单、TTL 取消和价格触及成交；但还没有盘口排队位置、部分成交和更真实的成交概率。

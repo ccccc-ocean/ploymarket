@@ -4,6 +4,7 @@ import csv
 from pathlib import Path
 
 from .backtest import BacktestResult
+from .btc_price import BtcCandle
 from .classifier import classify_market
 from .portfolio import PortfolioPoint, PortfolioSummary
 from .paper import PaperSignalRow
@@ -403,6 +404,18 @@ def write_data_quality_csv(stats: list[MarketHistoryStats], output_dir: str) -> 
                     item.question,
                 ]
             )
+    return path
+
+
+def write_btc_candles_csv(candles: list[BtcCandle], output_dir: str) -> Path:
+    directory = Path(output_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / "btc_price_candles.csv"
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow(["timestamp", "low", "high", "open", "close"])
+        for candle in candles:
+            writer.writerow([candle.timestamp, candle.low, candle.high, candle.open, candle.close])
     return path
 
 

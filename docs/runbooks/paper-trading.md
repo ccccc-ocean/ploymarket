@@ -227,6 +227,26 @@ maker_enabled = true
 - `MAKER_BUY_YES` 是否常常成交后继续下跌。
 - Maker 改善的价格是否足以弥补逆向选择风险。
 
+## 外部 BTC 现货价格
+
+抓取 Coinbase 公开 BTC-USD K 线：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml btc-price
+```
+
+输出文件：
+
+```text
+data/btc_price_candles.csv
+```
+
+本数据源目前只用于研究。下一步可以用它比较：
+
+- BTC 现货价格变化。
+- Polymarket YES 价格变化。
+- 是否存在预测市场价格滞后或过度反应。
+
 输出文件在：
 
 ```text

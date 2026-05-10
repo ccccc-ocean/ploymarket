@@ -27,6 +27,14 @@ class StorageConfig:
 
 
 @dataclass(frozen=True)
+class BtcPriceConfig:
+    provider: str
+    base_url: str
+    product_id: str
+    granularity: str
+
+
+@dataclass(frozen=True)
 class UniverseConfig:
     keywords: list[str]
     limit: int
@@ -89,6 +97,7 @@ class AppConfig:
     api: ApiConfig
     cache: CacheConfig
     storage: StorageConfig
+    btc_price: BtcPriceConfig
     universe: UniverseConfig
     signal: SignalConfig
     execution: ExecutionConfig
@@ -102,6 +111,7 @@ def load_config(path: str | Path) -> AppConfig:
         api=ApiConfig(**data["api"]),
         cache=CacheConfig(**data["cache"]),
         storage=StorageConfig(**data["storage"]),
+        btc_price=BtcPriceConfig(**data["btc_price"]),
         universe=UniverseConfig(**data["universe"]),
         signal=SignalConfig(**data["signal"]),
         execution=ExecutionConfig(**data["execution"]),

@@ -13,6 +13,12 @@ stale_if_error = true
 enabled = true
 sqlite_path = "data/ploymarket.sqlite"
 
+[btc_price]
+provider = "coinbase_public"
+base_url = "https://api.coinbase.com"
+product_id = "BTC-USD"
+granularity = "ONE_HOUR"
+
 [universe]
 keywords = ["bitcoin", "btc"]
 limit = 20

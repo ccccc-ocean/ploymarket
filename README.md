@@ -11,6 +11,7 @@
 - 生成逐 bar mark-to-market 组合曲线，用价格历史观察持仓期间回撤。
 - 生成模拟订单状态机 CSV，为未来持续模拟盘和实盘订单生命周期做准备。
 - `paper-run` 已区分 `TAKER`、`MAKER`、`SKIP` 执行计划，并优先使用本地 SQLite 历史数据避免网络慢请求拖死扫描。
+- 可抓取 Coinbase 公开 BTC-USD 现货 K 线，作为后续外部价格锚点。
 
 ## 学习和项目文档
 
@@ -43,6 +44,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-info
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml storage-info
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml data-quality
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml btc-price
 ```
 
 `paper-run` 输出里的 `execution_mode` 含义：
@@ -111,6 +113,22 @@ SQLite 文件不会提交到 GitHub，用于本地长期研究样本积累。
 ```bash
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml replay-backtest --market-type price_target
 ```
+
+## 外部 BTC 价格
+
+当前外部 BTC 价格源使用 Coinbase 公开 market candles：
+
+```bash
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml btc-price
+```
+
+输出：
+
+```text
+data/btc_price_candles.csv
+```
+
+这个数据源目前只用于研究，不直接触发交易。
 
 默认值偏保守，是为了先观察策略行为。等我们看过几轮模拟盘结果，再逐步回答：
 

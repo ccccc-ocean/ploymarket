@@ -5,6 +5,7 @@ import sys
 from time import sleep, time
 
 from .backtest import backtest_market
+from .btc_price import get_btc_candles
 from .cache import CachePolicy, JsonCache
 from .classifier import MARKET_TYPES, is_market_type
 from .clob import get_price_history
@@ -32,6 +33,7 @@ from .reporting import (
     write_portfolio_summary_csv,
     write_paper_signal_rows_csv,
     write_paper_report_csv,
+    write_btc_candles_csv,
     write_data_quality_csv,
     write_summary_csv,
 )
@@ -66,6 +68,7 @@ def main() -> None:
     subparsers.add_parser("cache-info", help="show local HTTP cache status")
     subparsers.add_parser("storage-info", help="show local SQLite storage status")
     subparsers.add_parser("data-quality", help="summarize local SQLite market/history coverage")
+    subparsers.add_parser("btc-price", help="fetch external BTC spot candles")
     subparsers.add_parser("explain-risk", help="explain the current risk limits")
 
     args = parser.parse_args()
@@ -110,6 +113,8 @@ def main() -> None:
         _print_storage_info(config)
     elif args.command == "data-quality":
         _run_data_quality(config)
+    elif args.command == "btc-price":
+        _run_btc_price(config)
 
 
 def _run_backtest(config, markets, storage, prefer_local: bool) -> None:
@@ -288,6 +293,19 @@ def _run_data_quality(config) -> None:
     print_data_quality_summary(stats)
     path = write_data_quality_csv(stats, config.backtest.output_dir)
     print(f"data_quality_csv={path}")
+
+
+def _run_btc_price(config) -> None:
+    candles = get_btc_candles(config)
+    path = write_btc_candles_csv(candles, config.backtest.output_dir)
+    latest = candles[-1] if candles else None
+    if latest is None:
+        print(f"btc_price | candles=0 | {path}")
+        return
+    print(
+        f"btc_price | provider={config.btc_price.provider} | product={config.btc_price.product_id} | "
+        f"candles={len(candles)} | latest_close={latest.close:.2f} | {path}"
+    )
 
 
 if __name__ == "__main__":

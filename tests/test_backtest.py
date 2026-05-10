@@ -2,7 +2,7 @@ import unittest
 
 from ploymarket_sim.backtest import backtest_market
 from ploymarket_sim.clob import PricePoint
-from ploymarket_sim.config import ApiConfig, AppConfig, BacktestConfig, CacheConfig, ExecutionConfig, RiskConfig, SignalConfig, StorageConfig, UniverseConfig
+from ploymarket_sim.config import ApiConfig, AppConfig, BacktestConfig, BtcPriceConfig, CacheConfig, ExecutionConfig, RiskConfig, SignalConfig, StorageConfig, UniverseConfig
 from ploymarket_sim.polymarket import Market
 
 
@@ -12,6 +12,7 @@ class BacktestTests(unittest.TestCase):
             api=ApiConfig("", "", 1),
             cache=CacheConfig(False, ".cache/http", 60, False),
             storage=StorageConfig(False, "unused.sqlite"),
+            btc_price=BtcPriceConfig("coinbase_public", "https://api.coinbase.com", "BTC-USD", "ONE_HOUR"),
             universe=UniverseConfig(["btc"], 1, 1, "volume", True, False, 0.0, True),
             signal=SignalConfig("1w", 60, 2, 4, 0.01, 0.01, 0.0, 0.98, 0.02),
             execution=ExecutionConfig(True, 0.01, 0.015, 0.0, 300),
@@ -31,6 +32,7 @@ class BacktestTests(unittest.TestCase):
             api=ApiConfig("", "", 1),
             cache=CacheConfig(False, ".cache/http", 60, False),
             storage=StorageConfig(False, "unused.sqlite"),
+            btc_price=BtcPriceConfig("coinbase_public", "https://api.coinbase.com", "BTC-USD", "ONE_HOUR"),
             universe=UniverseConfig(["btc"], 1, 1, "volume", True, False, 0.0, True),
             signal=SignalConfig("1w", 60, 2, 4, 0.01, 0.05, 0.02, 0.98, 0.02),
             execution=ExecutionConfig(True, 0.05, 0.015, 0.0, 7200),
