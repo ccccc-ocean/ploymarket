@@ -44,6 +44,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-
 - `paper-run` 优先使用本地 SQLite 市场和历史价格；本地没有数据时再尝试网络发现/拉取。
 - `replay-backtest` 可以只使用 SQLite 本地数据离线回放。
 - `data-quality` 输出本地市场和历史价格覆盖情况。
+- `paper_snapshots` 保存每轮模拟盘信号和执行计划。
 - 默认路径：`data/ploymarket.sqlite`
 - SQLite 文件已加入 `.gitignore`。
 
@@ -87,6 +88,16 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 - 当前默认粒度：`ONE_HOUR`。
 - 输出 `data/btc_price_candles.csv`。
 - 当前只用于研究，不直接进入交易决策。
+
+### 时间对齐报告
+
+代码位置：[src/ploymarket_sim/alignment.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/alignment.py)
+
+- 将本地 Polymarket YES 历史价格与 BTC-USD K 线对齐。
+- 默认计算未来 `1h`、`3h`、`6h` 的 YES 变化和 BTC 收益率。
+- 输出：
+  - `data/alignment_report.csv`
+  - `data/alignment_summary.csv`
 
 ### 信号生成
 
@@ -222,6 +233,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml backte
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml replay-backtest
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-run
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml btc-price
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml alignment-report
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explain-risk
 ```
 
@@ -250,6 +262,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 - 没有真实订单执行。
 - 有持续 `paper-loop`，但还没有系统级守护进程、告警和自动日报。
 - SQLite 已用于 paper-run 本地读取和 replay-backtest 离线回放，但样本数量仍然很小。
+- 已有 BTC/Polymarket 时间对齐报告，但还没有按信号、市场类型、流动性分层评估 edge。
 - 没有盘口深度模拟。
 - 没有考虑到期结算和市场 resolution 风险。
 - 已接 BTC 现货 K 线，但还没有把外部价格源纳入信号模型。

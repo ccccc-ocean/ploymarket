@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
+from .alignment import AlignmentRow, AlignmentSummary
 from .backtest import BacktestResult
 from .btc_price import BtcCandle
 from .classifier import classify_market
@@ -417,6 +418,74 @@ def write_btc_candles_csv(candles: list[BtcCandle], output_dir: str) -> Path:
         for candle in candles:
             writer.writerow([candle.timestamp, candle.low, candle.high, candle.open, candle.close])
     return path
+
+
+def write_alignment_rows_csv(rows: list[AlignmentRow], output_dir: str) -> Path:
+    directory = Path(output_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / "alignment_report.csv"
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow(
+            [
+                "market_id",
+                "timestamp",
+                "horizon_hours",
+                "yes_price",
+                "future_yes_price",
+                "yes_change",
+                "btc_close",
+                "future_btc_close",
+                "btc_return",
+                "question",
+            ]
+        )
+        for row in rows:
+            writer.writerow(
+                [
+                    row.market_id,
+                    row.timestamp,
+                    row.horizon_hours,
+                    row.yes_price,
+                    row.future_yes_price,
+                    row.yes_change,
+                    row.btc_close,
+                    row.future_btc_close,
+                    row.btc_return,
+                    row.question,
+                ]
+            )
+    return path
+
+
+def write_alignment_summary_csv(summaries: list[AlignmentSummary], output_dir: str) -> Path:
+    directory = Path(output_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / "alignment_summary.csv"
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow(["horizon_hours", "sample_count", "average_yes_change", "average_btc_return"])
+        for summary in summaries:
+            writer.writerow(
+                [
+                    summary.horizon_hours,
+                    summary.sample_count,
+                    summary.average_yes_change,
+                    summary.average_btc_return,
+                ]
+            )
+    return path
+
+
+def print_alignment_summary(summaries: list[AlignmentSummary]) -> None:
+    if not summaries:
+        print("alignment | samples=0")
+        return
+    for summary in summaries:
+        print(
+            f"alignment[{summary.horizon_hours}h] | samples={summary.sample_count} | "
+            f"avg_yes_change={summary.average_yes_change:.4f} | avg_btc_return={summary.average_btc_return:.4%}"
+        )
 
 
 def print_data_quality_summary(stats: list[MarketHistoryStats]) -> None:

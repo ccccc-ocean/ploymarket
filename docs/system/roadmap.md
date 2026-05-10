@@ -36,17 +36,19 @@
 - `data-quality` 本地样本覆盖报告。
 - Maker 限价挂单 TTL、触价成交和取消模拟。
 - Coinbase BTC-USD 外部现货 K 线抓取。
+- `paper_snapshots` 信号快照表。
+- BTC/Polymarket 时间对齐报告。
 
 下一步：
 
 - 使用 SQLite 数据做更长期样本分析。
 - 继续改进回测报告，加入 Maker 排队位置、盘口深度和更细粒度资金占用。
-- 把外部 BTC 价格和 Polymarket YES 价格做对齐分析。
+- 按信号、市场类型、流动性和 BTC 涨跌区间分层评估 edge。
 - 继续完善费用模型，纳入 maker rebate、reward 和市场实际成交路径。
 
 当前建议顺序：
 
-1. BTC 现货价格与 Polymarket YES 价格对齐分析。
+1. 按信号和市场条件分层评估 alignment edge。
 2. Maker 排队位置和部分成交建模。
 3. 盘口深度建模。
 4. 长期模拟盘日报和停机告警。

@@ -45,6 +45,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml storage-info
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml data-quality
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml btc-price
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml alignment-report
 ```
 
 `paper-run` 输出里的 `execution_mode` 含义：
@@ -129,6 +130,17 @@ data/btc_price_candles.csv
 ```
 
 这个数据源目前只用于研究，不直接触发交易。
+
+## 样本验证
+
+`paper-run` 会把每轮信号写入 SQLite 的 `paper_snapshots` 表。`alignment-report` 会把本地 Polymarket YES 价格历史与 BTC-USD K 线对齐，输出：
+
+```text
+data/alignment_report.csv
+data/alignment_summary.csv
+```
+
+当前默认统计未来 `1h`、`3h`、`6h` 的 YES 价格变化和 BTC 收益率，用来判断信号是否真的有可重复 edge。
 
 默认值偏保守，是为了先观察策略行为。等我们看过几轮模拟盘结果，再逐步回答：
 

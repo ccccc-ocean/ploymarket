@@ -247,6 +247,35 @@ data/btc_price_candles.csv
 - Polymarket YES 价格变化。
 - 是否存在预测市场价格滞后或过度反应。
 
+## BTC/Polymarket 时间对齐
+
+生成对齐报告：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml alignment-report --market-type price_target
+```
+
+输出：
+
+```text
+data/alignment_report.csv
+data/alignment_summary.csv
+```
+
+当前统计：
+
+- `1h`: 未来 1 小时 YES 价格变化和 BTC 收益率。
+- `3h`: 未来 3 小时 YES 价格变化和 BTC 收益率。
+- `6h`: 未来 6 小时 YES 价格变化和 BTC 收益率。
+
+本轮样本：
+
+- `1h`: 5377 条，平均 YES 变化约 `-0.0005`，平均 BTC 收益约 `0.0321%`。
+- `3h`: 5307 条，平均 YES 变化约 `-0.0011`，平均 BTC 收益约 `0.0605%`。
+- `6h`: 5202 条，平均 YES 变化约 `-0.0021`，平均 BTC 收益约 `0.0986%`。
+
+这不是交易信号，只是基础统计。后续需要按 `BUY_YES`、`HOLD`、市场流动性、到期时间和 BTC 涨跌区间分层。
+
 输出文件在：
 
 ```text

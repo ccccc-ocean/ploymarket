@@ -7,6 +7,7 @@ from time import time
 
 from .classifier import classify_market
 from .clob import PricePoint
+from .paper import PaperSignalRow
 from .polymarket import Market
 
 
@@ -25,6 +26,13 @@ class MarketHistoryStats:
     market_type: str
     yes_token_id: str
     price_point_count: int
+    first_timestamp: int | None
+    last_timestamp: int | None
+
+
+@dataclass(frozen=True)
+class SnapshotStats:
+    snapshot_count: int
     first_timestamp: int | None
     last_timestamp: int | None
 
@@ -67,6 +75,28 @@ class Storage:
                     price REAL NOT NULL,
                     observed_at REAL NOT NULL,
                     PRIMARY KEY (token_id, timestamp)
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS paper_snapshots (
+                    run_timestamp INTEGER NOT NULL,
+                    market_id TEXT NOT NULL,
+                    market_type TEXT NOT NULL,
+                    yes_price REAL,
+                    taker_fee_rate REAL NOT NULL,
+                    action TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    gross_edge REAL NOT NULL,
+                    net_edge REAL NOT NULL,
+                    execution_mode TEXT NOT NULL,
+                    execution_side TEXT NOT NULL,
+                    limit_price REAL,
+                    expected_net_edge REAL NOT NULL,
+                    reason TEXT NOT NULL,
+                    execution_reason TEXT NOT NULL,
+                    PRIMARY KEY (run_timestamp, market_id)
                 )
                 """
             )
@@ -184,6 +214,55 @@ class Storage:
                 [(token_id, point.timestamp, point.price, observed_at) for point in history],
             )
 
+    def save_paper_snapshots(self, rows: list[PaperSignalRow]) -> None:
+        if not self.enabled or not rows:
+            return
+        self.init()
+        with self._connect() as connection:
+            connection.executemany(
+                """
+                INSERT INTO paper_snapshots (
+                    run_timestamp, market_id, market_type, yes_price, taker_fee_rate,
+                    action, confidence, gross_edge, net_edge, execution_mode,
+                    execution_side, limit_price, expected_net_edge, reason, execution_reason
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(run_timestamp, market_id) DO UPDATE SET
+                    market_type=excluded.market_type,
+                    yes_price=excluded.yes_price,
+                    taker_fee_rate=excluded.taker_fee_rate,
+                    action=excluded.action,
+                    confidence=excluded.confidence,
+                    gross_edge=excluded.gross_edge,
+                    net_edge=excluded.net_edge,
+                    execution_mode=excluded.execution_mode,
+                    execution_side=excluded.execution_side,
+                    limit_price=excluded.limit_price,
+                    expected_net_edge=excluded.expected_net_edge,
+                    reason=excluded.reason,
+                    execution_reason=excluded.execution_reason
+                """,
+                [
+                    (
+                        row.run_timestamp,
+                        row.market_id,
+                        row.market_type,
+                        row.yes_price,
+                        row.taker_fee_rate,
+                        row.action,
+                        row.confidence,
+                        row.gross_edge,
+                        row.net_edge,
+                        row.execution_mode,
+                        row.execution_side,
+                        row.limit_price,
+                        row.expected_net_edge,
+                        row.reason,
+                        row.execution_reason,
+                    )
+                    for row in rows
+                ],
+            )
+
     def load_price_history(self, token_id: str) -> list[PricePoint]:
         if not self.enabled or not token_id or not Path(self.sqlite_path).exists():
             return []
@@ -208,6 +287,23 @@ class Storage:
             market_count = int(connection.execute("SELECT COUNT(*) FROM markets").fetchone()[0])
             price_point_count = int(connection.execute("SELECT COUNT(*) FROM price_history").fetchone()[0])
         return StorageStats(self.enabled, self.sqlite_path, market_count, price_point_count)
+
+    def snapshot_stats(self) -> SnapshotStats:
+        if not self.enabled or not Path(self.sqlite_path).exists():
+            return SnapshotStats(0, None, None)
+        self.init()
+        with self._connect() as connection:
+            count, first_timestamp, last_timestamp = connection.execute(
+                """
+                SELECT COUNT(*), MIN(run_timestamp), MAX(run_timestamp)
+                FROM paper_snapshots
+                """
+            ).fetchone()
+        return SnapshotStats(
+            int(count),
+            int(first_timestamp) if first_timestamp is not None else None,
+            int(last_timestamp) if last_timestamp is not None else None,
+        )
 
     def market_history_stats(self) -> list[MarketHistoryStats]:
         if not self.enabled or not Path(self.sqlite_path).exists():

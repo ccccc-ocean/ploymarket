@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from ploymarket_sim.clob import PricePoint
+from ploymarket_sim.paper import PaperSignalRow
 from ploymarket_sim.polymarket import Market
 from ploymarket_sim.storage import Storage
 
@@ -43,6 +44,29 @@ class StorageTests(unittest.TestCase):
             self.assertEqual(quality[0].price_point_count, 2)
             self.assertEqual(quality[0].first_timestamp, 1)
             self.assertEqual(quality[0].last_timestamp, 2)
+            storage.save_paper_snapshots(
+                [
+                    PaperSignalRow(
+                        123,
+                        "m1",
+                        "price_target",
+                        "Q",
+                        0.5,
+                        0.02,
+                        "HOLD",
+                        0.0,
+                        0.01,
+                        -0.01,
+                        "wait",
+                        "SKIP",
+                        "",
+                        None,
+                        -0.01,
+                        "skip",
+                    )
+                ]
+            )
+            self.assertEqual(storage.snapshot_stats().snapshot_count, 1)
 
     def test_disabled_storage_reports_zero_counts(self) -> None:
         storage = Storage(False, "unused.sqlite")

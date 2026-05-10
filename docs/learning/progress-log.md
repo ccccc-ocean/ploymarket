@@ -708,3 +708,42 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 ### 当前判断
 
 外部价格源暂时只作为研究数据，不直接进入交易信号。下一步应该做时间对齐，比较 BTC 现货价格变化和 Polymarket YES 价格变化。
+
+## 2026-05-10：信号快照与 BTC/Polymarket 对齐报告
+
+### 本次目标
+
+提升样本验证能力。每轮模拟盘不只输出 CSV，还要写入 SQLite 快照；同时把 Polymarket YES 历史价格和 BTC 现货 K 线对齐，观察未来 1h/3h/6h 的变化。
+
+### 已完成
+
+- SQLite 新增 `paper_snapshots` 表。
+- `paper-run` 会保存每轮信号和执行计划快照。
+- 新增 `src/ploymarket_sim/alignment.py`。
+- 新增 CLI 命令：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml alignment-report --market-type price_target
+```
+
+- 输出：
+  - `data/alignment_report.csv`
+  - `data/alignment_summary.csv`
+
+### 本轮结果
+
+SQLite 当前状态：
+
+- 市场数：35。
+- 价格点：5448。
+- paper snapshots：35。
+
+对齐报告：
+
+- `1h`: 5377 条，平均 YES 变化约 `-0.0005`，平均 BTC 收益约 `0.0321%`。
+- `3h`: 5307 条，平均 YES 变化约 `-0.0011`，平均 BTC 收益约 `0.0605%`。
+- `6h`: 5202 条，平均 YES 变化约 `-0.0021`，平均 BTC 收益约 `0.0986%`。
+
+### 当前判断
+
+整体平均值不能直接用于交易。下一步要按信号动作、市场类型、流动性、YES 价格区间、BTC 涨跌区间分层，寻找是否存在稳定 edge。

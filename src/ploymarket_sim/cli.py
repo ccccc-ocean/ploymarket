@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 from time import sleep, time
 
+from .alignment import build_alignment_rows, summarize_alignment
 from .backtest import backtest_market
-from .btc_price import get_btc_candles
+from .btc_price import get_btc_candles, load_btc_candles_csv
 from .cache import CachePolicy, JsonCache
 from .classifier import MARKET_TYPES, is_market_type
 from .clob import get_price_history
@@ -22,6 +24,7 @@ from .reporting import (
     print_portfolio_summary,
     print_paper_report_summary,
     print_data_quality_summary,
+    print_alignment_summary,
     print_signal,
     write_aggregate_summary_csv,
     write_all_order_events_csv,
@@ -34,6 +37,8 @@ from .reporting import (
     write_paper_signal_rows_csv,
     write_paper_report_csv,
     write_btc_candles_csv,
+    write_alignment_rows_csv,
+    write_alignment_summary_csv,
     write_data_quality_csv,
     write_summary_csv,
 )
@@ -69,6 +74,8 @@ def main() -> None:
     subparsers.add_parser("storage-info", help="show local SQLite storage status")
     subparsers.add_parser("data-quality", help="summarize local SQLite market/history coverage")
     subparsers.add_parser("btc-price", help="fetch external BTC spot candles")
+    alignment_parser = subparsers.add_parser("alignment-report", help="align local Polymarket YES history with BTC candles")
+    alignment_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
     subparsers.add_parser("explain-risk", help="explain the current risk limits")
 
     args = parser.parse_args()
@@ -115,6 +122,8 @@ def main() -> None:
         _run_data_quality(config)
     elif args.command == "btc-price":
         _run_btc_price(config)
+    elif args.command == "alignment-report":
+        _run_alignment_report(config, args.market_type)
 
 
 def _run_backtest(config, markets, storage, prefer_local: bool) -> None:
@@ -219,6 +228,7 @@ def _run_paper_scan(config, market_type: str) -> None:
         signal = build_signal(market, history, config.signal, config.backtest)
         execution_plan = plan_execution(market, signal, config.signal, config.backtest, config.execution)
         rows.append(build_paper_signal_row(market, signal, config.backtest.taker_fee_rate, run_timestamp, execution_plan))
+    storage.save_paper_snapshots(rows)
     path = write_paper_signal_rows_csv(rows, config.backtest.output_dir, run_timestamp)
     summary = summarize_paper_rows(rows)
     print(
@@ -281,11 +291,13 @@ def _print_cache_info(config) -> None:
 
 def _print_storage_info(config) -> None:
     stats = storage_from_config(config).stats()
+    snapshot_stats = storage_from_config(config).snapshot_stats()
     print("local SQLite storage")
     print(f"- enabled: {stats.enabled}")
     print(f"- sqlite_path: {stats.sqlite_path}")
     print(f"- markets: {stats.market_count}")
     print(f"- price_points: {stats.price_point_count}")
+    print(f"- paper_snapshots: {snapshot_stats.snapshot_count}")
 
 
 def _run_data_quality(config) -> None:
@@ -306,6 +318,22 @@ def _run_btc_price(config) -> None:
         f"btc_price | provider={config.btc_price.provider} | product={config.btc_price.product_id} | "
         f"candles={len(candles)} | latest_close={latest.close:.2f} | {path}"
     )
+
+
+def _run_alignment_report(config, market_type: str) -> None:
+    storage = storage_from_config(config)
+    markets = _filter_markets(storage.load_markets(), market_type)
+    candles = load_btc_candles_csv(Path(config.backtest.output_dir) / "btc_price_candles.csv")
+    if not candles:
+        candles = get_btc_candles(config)
+        write_btc_candles_csv(candles, config.backtest.output_dir)
+    rows = build_alignment_rows(markets, storage, candles, [1, 3, 6])
+    summaries = summarize_alignment(rows)
+    rows_path = write_alignment_rows_csv(rows, config.backtest.output_dir)
+    summary_path = write_alignment_summary_csv(summaries, config.backtest.output_dir)
+    print_alignment_summary(summaries)
+    print(f"alignment_csv={rows_path}")
+    print(f"alignment_summary_csv={summary_path}")
 
 
 if __name__ == "__main__":

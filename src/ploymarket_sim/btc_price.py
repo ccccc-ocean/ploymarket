@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import csv
+from pathlib import Path
 from typing import Any
 
 from .cache import CachePolicy, JsonCache
@@ -30,6 +32,27 @@ def get_btc_candles(config: AppConfig) -> list[BtcCandle]:
     return sorted(candles, key=lambda candle: candle.timestamp)
 
 
+def load_btc_candles_csv(path: str | Path) -> list[BtcCandle]:
+    csv_path = Path(path)
+    if not csv_path.exists():
+        return []
+    with csv_path.open("r", newline="", encoding="utf-8") as file:
+        rows = csv.DictReader(file)
+        candles = [
+            _parse_coinbase_candle(
+                {
+                    "start": row.get("timestamp"),
+                    "low": row.get("low"),
+                    "high": row.get("high"),
+                    "open": row.get("open"),
+                    "close": row.get("close"),
+                }
+            )
+            for row in rows
+        ]
+    return [candle for candle in candles if candle is not None]
+
+
 def _parse_coinbase_candle(item: Any) -> BtcCandle | None:
     try:
         if isinstance(item, dict):
@@ -47,7 +70,7 @@ def _parse_coinbase_candle(item: Any) -> BtcCandle | None:
             open=float(open_price),
             close=float(close),
         )
-    except (TypeError, ValueError):
+    except (KeyError, TypeError, ValueError):
         return None
 
 
