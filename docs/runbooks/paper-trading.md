@@ -111,6 +111,29 @@ data/paper_run_<timestamp>.csv
 
 这个命令适合未来接定时任务，每隔固定时间跑一轮，形成持续模拟盘记录。
 
+## 模拟盘复盘报告
+
+`paper-report` 会聚合已有的 `paper_run_*.csv`：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml paper-report
+```
+
+输出文件：
+
+```text
+data/paper_report.csv
+```
+
+它会记录每一轮：
+
+- 市场数量。
+- `BUY_YES` / `HOLD` / `AVOID` 数量。
+- 本轮最佳 net edge。
+- 本轮最佳候选市场。
+
+这个报告用于观察信号是否持续出现，而不是只看单轮偶然结果。
+
 ## 跑回测
 
 ```bash

@@ -472,3 +472,34 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 - BUY_YES 候选变化。
 - 市场类型分布。
 - 是否有连续出现的候选机会。
+
+## 2026-05-10：Paper Report
+
+### 本次目标
+
+把多轮 `paper-run` 聚合成复盘报告，观察信号是否持续出现。
+
+### 已完成
+
+- 新增 `src/ploymarket_sim/paper_report.py`。
+- 新增 CLI 命令：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml paper-report
+```
+
+- 输出 `data/paper_report.csv`。
+
+### 当前观察
+
+当前只有 1 轮 paper-run：
+
+- 市场数：35。
+- `BUY_YES`: 0。
+- 最佳 net edge：约 `-0.0110`。
+
+这说明在当前成本模型和安全边际下，系统没有强行产生交易机会。
+
+### 下次继续
+
+建议下一步做定时运行方式，让 `paper-run` 可以每隔固定时间自动执行。

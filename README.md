@@ -35,6 +35,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml signals
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml backtest
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-run
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-report
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explain-risk
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-info
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml storage-info

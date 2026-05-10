@@ -12,11 +12,13 @@ from .config import load_config
 from .http import HttpError
 from .portfolio import build_mark_to_market_curve, build_portfolio_curve, summarize_portfolio
 from .paper import build_paper_signal_row, summarize_paper_rows
+from .paper_report import load_paper_run_summaries
 from .polymarket import discover_btc_markets
 from .reporting import (
     print_aggregate_summary,
     print_market_table,
     print_portfolio_summary,
+    print_paper_report_summary,
     print_signal,
     write_aggregate_summary_csv,
     write_all_order_events_csv,
@@ -27,6 +29,7 @@ from .reporting import (
     write_portfolio_curve_csv,
     write_portfolio_summary_csv,
     write_paper_signal_rows_csv,
+    write_paper_report_csv,
     write_summary_csv,
 )
 from .signals import build_signal
@@ -50,6 +53,7 @@ def main() -> None:
     backtest_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
     paper_parser = subparsers.add_parser("paper-run", help="run one paper-trading signal scan")
     paper_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
+    subparsers.add_parser("paper-report", help="summarize saved paper-run outputs")
     subparsers.add_parser("cache-info", help="show local HTTP cache status")
     subparsers.add_parser("storage-info", help="show local SQLite storage status")
     subparsers.add_parser("explain-risk", help="explain the current risk limits")
@@ -125,6 +129,8 @@ def main() -> None:
             print(f"portfolio_mtm_summary_csv={mtm_summary_path}")
     elif args.command == "paper-run":
         _run_paper_scan(config, args.market_type)
+    elif args.command == "paper-report":
+        _run_paper_report(config)
     elif args.command == "explain-risk":
         _explain_risk(config)
     elif args.command == "cache-info":
@@ -179,6 +185,13 @@ def _run_paper_scan(config, market_type: str) -> None:
         f"paper_run | markets={summary['markets']} | buy_yes={summary['buy_yes']} | "
         f"hold={summary['hold']} | avoid={summary['avoid']} | {path}"
     )
+
+
+def _run_paper_report(config) -> None:
+    summaries = load_paper_run_summaries(config.backtest.output_dir)
+    path = write_paper_report_csv(summaries, config.backtest.output_dir)
+    print_paper_report_summary(summaries)
+    print(f"paper_report_csv={path}")
 
 
 def _print_cache_info(config) -> None:

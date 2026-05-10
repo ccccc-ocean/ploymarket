@@ -198,6 +198,14 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 - 写入 SQLite 市场和价格历史。
 - 输出 `data/paper_run_<timestamp>.csv`。
 
+### Paper Report
+
+代码位置：[src/ploymarket_sim/paper_report.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/paper_report.py)
+
+- 聚合已有 `paper_run_*.csv`。
+- 输出 `data/paper_report.csv`。
+- 跟踪每轮信号数量、最佳 net edge 和最佳候选市场。
+
 ## 当前限制
 
 - 没有真实订单执行。

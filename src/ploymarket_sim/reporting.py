@@ -7,6 +7,7 @@ from .backtest import BacktestResult
 from .classifier import classify_market
 from .portfolio import PortfolioPoint, PortfolioSummary
 from .paper import PaperSignalRow
+from .paper_report import PaperRunSummary
 from .polymarket import Market
 from .signals import Signal
 from .summary import AggregateSummary, BacktestSummary
@@ -302,6 +303,56 @@ def write_paper_signal_rows_csv(rows: list[PaperSignalRow], output_dir: str, run
                 ]
             )
     return path
+
+
+def write_paper_report_csv(summaries: list[PaperRunSummary], output_dir: str) -> Path:
+    directory = Path(output_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / "paper_report.csv"
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow(
+            [
+                "run_timestamp",
+                "market_count",
+                "buy_yes_count",
+                "hold_count",
+                "avoid_count",
+                "best_market_id",
+                "best_market_type",
+                "best_net_edge",
+                "best_action",
+                "best_question",
+            ]
+        )
+        for summary in summaries:
+            writer.writerow(
+                [
+                    summary.run_timestamp,
+                    summary.market_count,
+                    summary.buy_yes_count,
+                    summary.hold_count,
+                    summary.avoid_count,
+                    summary.best_market_id,
+                    summary.best_market_type,
+                    summary.best_net_edge,
+                    summary.best_action,
+                    summary.best_question,
+                ]
+            )
+    return path
+
+
+def print_paper_report_summary(summaries: list[PaperRunSummary]) -> None:
+    if not summaries:
+        print("paper_report | runs=0")
+        return
+    latest = summaries[-1]
+    print(
+        f"paper_report | runs={len(summaries)} | latest_markets={latest.market_count} | "
+        f"latest_buy_yes={latest.buy_yes_count} | best_net_edge={latest.best_net_edge:.4f} | "
+        f"best_market={latest.best_market_id}"
+    )
 
 
 def _write_portfolio_points(path: Path, points: list[PortfolioPoint]) -> None:

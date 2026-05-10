@@ -27,6 +27,7 @@
 - 市场级真实 fee rate 读取。
 - SQLite 市场和价格历史存储。
 - 单轮持续模拟盘扫描 `paper-run`。
+- 多轮模拟盘复盘报告 `paper-report`。
 - Taker fee、滑点和安全边际后的净 edge 过滤。
 
 下一步：
@@ -38,7 +39,7 @@
 
 当前建议顺序：
 
-1. 定时运行 `paper-run` 并生成每日复盘。
+1. 定时运行 `paper-run`。
 2. Maker/Taker 策略分离。
 3. SQLite 离线回放。
 4. 盘口深度和成交概率建模。
