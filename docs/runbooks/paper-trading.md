@@ -20,6 +20,12 @@ pwd
 env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m unittest discover tests
 ```
 
+查看本地缓存状态：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml cache-info
+```
+
 ## 发现市场
 
 ```bash
@@ -137,7 +143,14 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 
 ### API 偶尔报 IncompleteRead 或 RemoteDisconnected
 
-这是公共接口或网络连接不稳定导致的。当前代码已经做了重试和单市场跳过。后续会加入本地缓存，降低重复请求。
+这是公共接口或网络连接不稳定导致的。当前代码已经做了重试、单市场跳过和本地缓存。
+
+缓存行为：
+
+- 成功的 GET JSON 响应会写入 `.cache/http/`。
+- 默认 `15` 分钟内重复请求会直接读缓存。
+- 如果远程请求失败，且本地有旧缓存，会用旧缓存继续运行。
+- `.cache/` 不提交到 GitHub。
 
 ### 找到的 BTC 市场太少或太杂
 

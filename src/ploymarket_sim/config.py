@@ -13,6 +13,14 @@ class ApiConfig:
 
 
 @dataclass(frozen=True)
+class CacheConfig:
+    enabled: bool
+    directory: str
+    ttl_seconds: int
+    stale_if_error: bool
+
+
+@dataclass(frozen=True)
 class UniverseConfig:
     keywords: list[str]
     limit: int
@@ -64,6 +72,7 @@ class BacktestConfig:
 @dataclass(frozen=True)
 class AppConfig:
     api: ApiConfig
+    cache: CacheConfig
     universe: UniverseConfig
     signal: SignalConfig
     risk: RiskConfig
@@ -74,6 +83,7 @@ def load_config(path: str | Path) -> AppConfig:
     data = parse_simple_toml(Path(path).read_text(encoding="utf-8"))
     return AppConfig(
         api=ApiConfig(**data["api"]),
+        cache=CacheConfig(**data["cache"]),
         universe=UniverseConfig(**data["universe"]),
         signal=SignalConfig(**data["signal"]),
         risk=RiskConfig(**data["risk"]),

@@ -33,6 +33,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml signals
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml backtest
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explain-risk
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-info
 ```
 
 可以用 `--market-type` 只观察某一类市场：
@@ -58,6 +59,18 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml backte
 - `stop_loss_pct`: 单笔买入后亏到这个比例退出。
 - `take_profit_pct`: 单笔买入后赚到这个比例退出。
 - `max_spread`: 流动性太差时不交易。
+
+## 本地缓存
+
+公开 API 响应会缓存到 `.cache/http/`，默认 `15` 分钟有效。缓存目录不会提交到 Git。
+
+查看缓存状态：
+
+```bash
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-info
+```
+
+相关配置在 `config/default.toml` 的 `[cache]` 区块。
 
 默认值偏保守，是为了先观察策略行为。等我们看过几轮模拟盘结果，再逐步回答：
 

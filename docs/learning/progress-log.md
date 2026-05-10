@@ -201,3 +201,41 @@
 - API 请求结果落盘。
 - 同一轮学习里重复运行不反复打公共接口。
 - 回测样本更稳定。
+
+## 2026-05-10：本地 HTTP 缓存
+
+### 本次目标
+
+减少公共 API 慢、截断和重复请求对学习/回测的影响。
+
+### 已完成
+
+- 新增 `src/ploymarket_sim/cache.py`。
+- 新增 `[cache]` 配置区块。
+- `Gamma` 市场发现和 `CLOB prices-history` 都接入缓存。
+- 成功响应写入 `.cache/http/`。
+- 默认 TTL 为 `900` 秒。
+- 如果远程请求失败，且存在旧缓存，会使用 stale cache。
+- 新增 `cache-info` 命令。
+- `.cache/` 已加入 `.gitignore`。
+
+### 使用方式
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml cache-info
+```
+
+### 当前观察
+
+第一次运行会请求远程 API 并写入缓存。第二次运行相同 URL 时会复用已缓存响应；没有成功缓存过的分页仍会继续请求远程。
+
+### 下次继续
+
+下一步建议做组合级回测资金曲线，因为现在已有：
+
+- 市场分类。
+- net edge 成本模型。
+- 汇总统计。
+- 本地缓存。
+
+组合级资金曲线可以帮助我们看真正的账户级回撤。

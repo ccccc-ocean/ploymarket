@@ -3,6 +3,12 @@ gamma_base_url = "https://gamma-api.polymarket.com"
 clob_base_url = "https://clob.polymarket.com"
 request_timeout_seconds = 12
 
+[cache]
+enabled = true
+directory = ".cache/http"
+ttl_seconds = 900
+stale_if_error = true
+
 [universe]
 keywords = ["bitcoin", "btc"]
 limit = 20

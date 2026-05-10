@@ -16,6 +16,22 @@
 - 过滤活跃、未关闭、有订单簿、达到最低流动性的市场。
 - 提取市场问题、slug、流动性、24 小时成交量、YES 价格、CLOB token id。
 
+### 本地缓存
+
+代码位置：[src/ploymarket_sim/cache.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/cache.py)
+
+- 缓存公开 GET JSON 响应。
+- 默认目录：`.cache/http`
+- 默认 TTL：`900` 秒。
+- 远程请求失败时，如果存在旧缓存，可以使用 stale cache。
+- 缓存目录已加入 `.gitignore`。
+
+查看缓存：
+
+```bash
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-info
+```
+
 ### 市场分类
 
 代码位置：[src/ploymarket_sim/classifier.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/classifier.py)
@@ -113,7 +129,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 
 - 没有真实订单执行。
 - 没有持续运行的模拟盘循环。
-- 没有数据库或本地行情缓存。
+- 没有数据库；当前只有文件级 HTTP 响应缓存。
 - 没有盘口深度模拟。
 - 没有考虑到期结算和市场 resolution 风险。
 - 没有接 BTC 现货/永续价格源。

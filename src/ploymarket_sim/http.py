@@ -8,16 +8,23 @@ from urllib.error import URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from .cache import JsonCache
+
 
 class HttpError(RuntimeError):
     pass
 
 
-def get_json(base_url: str, path: str, params: dict[str, Any], timeout: int) -> Any:
+def get_json(base_url: str, path: str, params: dict[str, Any], timeout: int, cache: JsonCache | None = None) -> Any:
     query = urlencode({key: value for key, value in params.items() if value is not None})
     url = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
     if query:
         url = f"{url}?{query}"
+
+    if cache:
+        cached = cache.get_fresh(url)
+        if cached is not None:
+            return cached
 
     request = Request(
         url,
@@ -32,10 +39,17 @@ def get_json(base_url: str, path: str, params: dict[str, Any], timeout: int) -> 
     for attempt in range(3):
         try:
             with urlopen(request, timeout=timeout) as response:
-                return json.loads(response.read().decode("utf-8"))
+                payload = json.loads(response.read().decode("utf-8"))
+                if cache:
+                    cache.set(url, payload)
+                return payload
         except (IncompleteRead, RemoteDisconnected, URLError, TimeoutError) as exc:
             last_error = exc
             sleep(0.5 * (attempt + 1))
         except Exception as exc:
             raise HttpError(f"GET {url} failed: {exc}") from exc
+    if cache and cache.policy.stale_if_error:
+        stale = cache.get_stale(url)
+        if stale is not None:
+            return stale
     raise HttpError(f"GET {url} failed after retries: {last_error}") from last_error

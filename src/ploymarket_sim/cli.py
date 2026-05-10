@@ -4,6 +4,7 @@ import argparse
 import sys
 
 from .backtest import backtest_market
+from .cache import CachePolicy, JsonCache
 from .classifier import MARKET_TYPES, is_market_type
 from .clob import get_price_history
 from .config import load_config
@@ -35,6 +36,7 @@ def main() -> None:
     signals_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
     backtest_parser = subparsers.add_parser("backtest", help="run a simple historical paper-trading backtest")
     backtest_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
+    subparsers.add_parser("cache-info", help="show local HTTP cache status")
     subparsers.add_parser("explain-risk", help="explain the current risk limits")
 
     args = parser.parse_args()
@@ -76,6 +78,8 @@ def main() -> None:
             print(f"summary_by_type_csv={aggregate_path}")
     elif args.command == "explain-risk":
         _explain_risk(config)
+    elif args.command == "cache-info":
+        _print_cache_info(config)
 
 
 def _explain_risk(config) -> None:
@@ -103,6 +107,25 @@ def _safe_history(config, market):
 
 def _filter_markets(markets, market_type):
     return [market for market in markets if is_market_type(market, market_type)]
+
+
+def _print_cache_info(config) -> None:
+    cache = JsonCache(
+        CachePolicy(
+            enabled=config.cache.enabled,
+            directory=config.cache.directory,
+            ttl_seconds=config.cache.ttl_seconds,
+            stale_if_error=config.cache.stale_if_error,
+        )
+    )
+    stats = cache.stats()
+    print("local HTTP cache")
+    print(f"- enabled: {stats.enabled}")
+    print(f"- directory: {stats.directory}")
+    print(f"- ttl_seconds: {config.cache.ttl_seconds}")
+    print(f"- stale_if_error: {config.cache.stale_if_error}")
+    print(f"- files: {stats.file_count}")
+    print(f"- size_bytes: {stats.total_bytes}")
 
 
 if __name__ == "__main__":

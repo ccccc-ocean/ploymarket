@@ -5,6 +5,7 @@ import json
 import sys
 from typing import Any
 
+from .cache import CachePolicy, JsonCache
 from .config import AppConfig
 from .http import HttpError
 from .http import get_json
@@ -39,12 +40,13 @@ class Market:
 
 
 def discover_btc_markets(config: AppConfig) -> list[Market]:
-    markets = _discover_with_search(config)
-    markets.extend(_discover_with_market_pages(config))
+    cache = _cache_from_config(config)
+    markets = _discover_with_search(config, cache)
+    markets.extend(_discover_with_market_pages(config, cache))
     return _dedupe(markets)
 
 
-def _discover_with_search(config: AppConfig) -> list[Market]:
+def _discover_with_search(config: AppConfig, cache: JsonCache) -> list[Market]:
     markets: list[Market] = []
     for keyword in config.universe.keywords:
         try:
@@ -61,6 +63,7 @@ def _discover_with_search(config: AppConfig) -> list[Market]:
                     "ascending": "false",
                 },
                 timeout=config.api.request_timeout_seconds,
+                cache=cache,
             )
         except HttpError as exc:
             print(f"warning: search failed for {keyword}: {exc}", file=sys.stderr)
@@ -73,7 +76,7 @@ def _discover_with_search(config: AppConfig) -> list[Market]:
     return markets
 
 
-def _discover_with_market_pages(config: AppConfig) -> list[Market]:
+def _discover_with_market_pages(config: AppConfig, cache: JsonCache) -> list[Market]:
     markets: list[Market] = []
     for page in range(config.universe.max_pages):
         try:
@@ -89,6 +92,7 @@ def _discover_with_market_pages(config: AppConfig) -> list[Market]:
                     "ascending": "false",
                 },
                 timeout=config.api.request_timeout_seconds,
+                cache=cache,
             )
         except HttpError as exc:
             print(f"warning: market page {page} failed: {exc}", file=sys.stderr)
@@ -156,3 +160,14 @@ def _dedupe(markets: list[Market]) -> list[Market]:
             unique.append(market)
             seen.add(key)
     return unique
+
+
+def _cache_from_config(config: AppConfig) -> JsonCache:
+    return JsonCache(
+        CachePolicy(
+            enabled=config.cache.enabled,
+            directory=config.cache.directory,
+            ttl_seconds=config.cache.ttl_seconds,
+            stale_if_error=config.cache.stale_if_error,
+        )
+    )
