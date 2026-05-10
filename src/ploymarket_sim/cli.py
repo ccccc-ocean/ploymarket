@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from time import time
+from time import sleep, time
 
 from .backtest import backtest_market
 from .cache import CachePolicy, JsonCache
@@ -53,6 +53,10 @@ def main() -> None:
     backtest_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
     paper_parser = subparsers.add_parser("paper-run", help="run one paper-trading signal scan")
     paper_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
+    paper_loop_parser = subparsers.add_parser("paper-loop", help="run repeated paper-trading signal scans")
+    paper_loop_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
+    paper_loop_parser.add_argument("--interval-seconds", type=int, default=300)
+    paper_loop_parser.add_argument("--iterations", type=int, default=1, help="0 means run until interrupted")
     subparsers.add_parser("paper-report", help="summarize saved paper-run outputs")
     subparsers.add_parser("cache-info", help="show local HTTP cache status")
     subparsers.add_parser("storage-info", help="show local SQLite storage status")
@@ -129,6 +133,8 @@ def main() -> None:
             print(f"portfolio_mtm_summary_csv={mtm_summary_path}")
     elif args.command == "paper-run":
         _run_paper_scan(config, args.market_type)
+    elif args.command == "paper-loop":
+        _run_paper_loop(config, args.market_type, args.interval_seconds, args.iterations)
     elif args.command == "paper-report":
         _run_paper_report(config)
     elif args.command == "explain-risk":
@@ -185,6 +191,22 @@ def _run_paper_scan(config, market_type: str) -> None:
         f"paper_run | markets={summary['markets']} | buy_yes={summary['buy_yes']} | "
         f"hold={summary['hold']} | avoid={summary['avoid']} | {path}"
     )
+
+
+def _run_paper_loop(config, market_type: str, interval_seconds: int, iterations: int) -> None:
+    if interval_seconds < 0:
+        raise SystemExit("--interval-seconds must be >= 0")
+    if iterations < 0:
+        raise SystemExit("--iterations must be >= 0")
+
+    completed = 0
+    while iterations == 0 or completed < iterations:
+        completed += 1
+        print(f"paper_loop | iteration={completed}")
+        _run_paper_scan(config, market_type)
+        if iterations != 0 and completed >= iterations:
+            break
+        sleep(interval_seconds)
 
 
 def _run_paper_report(config) -> None:

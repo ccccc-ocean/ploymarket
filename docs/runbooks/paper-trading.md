@@ -111,6 +111,24 @@ data/paper_run_<timestamp>.csv
 
 这个命令适合未来接定时任务，每隔固定时间跑一轮，形成持续模拟盘记录。
 
+持续运行多轮：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml paper-loop --market-type price_target --interval-seconds 300 --iterations 0
+```
+
+参数说明：
+
+- `--interval-seconds`: 每轮间隔秒数。
+- `--iterations`: 运行轮数，`0` 表示一直运行直到手动停止。
+
+也可以直接运行脚本：
+
+```bash
+scripts/paper_run_once.sh
+scripts/paper_loop.sh
+```
+
 ## 模拟盘复盘报告
 
 `paper-report` 会聚合已有的 `paper_run_*.csv`：

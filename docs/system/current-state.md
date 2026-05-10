@@ -197,6 +197,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 - 默认适合按 `price_target` 市场运行。
 - 写入 SQLite 市场和价格历史。
 - 输出 `data/paper_run_<timestamp>.csv`。
+- `paper-loop` 可以按固定间隔重复执行 `paper-run`。
 
 ### Paper Report
 

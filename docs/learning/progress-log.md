@@ -503,3 +503,30 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 ### 下次继续
 
 建议下一步做定时运行方式，让 `paper-run` 可以每隔固定时间自动执行。
+
+## 2026-05-10：Paper Loop
+
+### 本次目标
+
+让模拟盘可以按固定间隔连续运行多轮。
+
+### 已完成
+
+- 新增 CLI 命令 `paper-loop`。
+- 新增脚本：
+  - `scripts/paper_run_once.sh`
+  - `scripts/paper_loop.sh`
+
+### 使用方式
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml paper-loop --market-type price_target --interval-seconds 300 --iterations 0
+```
+
+### 安全设计
+
+`paper-loop` 默认只运行 1 轮，避免误开无限循环。只有显式传 `--iterations 0` 才会一直运行。
+
+### 下次继续
+
+建议下一步做 Maker/Taker 策略分离。当前系统仍然把所有 `BUY_YES` 当作 Taker 买入处理。
