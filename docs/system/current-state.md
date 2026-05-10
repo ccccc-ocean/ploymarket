@@ -123,6 +123,29 @@ taker_fee = notional * taker_fee_rate * p * (1 - p)
 - 使用保守口径：持仓按投入本金计值，费用和滑点立即降低净值。
 - 输出组合级最大回撤和账户级 PnL。
 
+### Paper Order 状态机
+
+代码位置：[src/ploymarket_sim/orders.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/orders.py)
+
+当前模拟成交路径：
+
+```text
+created -> submitted -> accepted -> matched -> settled
+```
+
+当前风控拒绝路径：
+
+```text
+created -> rejected
+```
+
+输出：
+
+- `data/orders_<market_id>.csv`
+- `data/orders_all.csv`
+
+这个状态机目前只服务模拟盘，但字段设计为未来实盘订单生命周期预留空间。
+
 ### CLI
 
 代码位置：[src/ploymarket_sim/cli.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/cli.py)
@@ -148,6 +171,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 - 当前费用模型还是估算值，后续应读取市场真实 fee 设置。
 - 市场分类还是关键词规则，后续要用真实样本不断修正。
 - 组合曲线还不是逐 bar mark-to-market，只基于交易事件更新。
+- 订单状态机还没有真实的失败、撤单、部分成交和链上 settlement 查询。
 
 ## 知识库状态
 

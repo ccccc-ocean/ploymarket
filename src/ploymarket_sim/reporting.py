@@ -56,6 +56,68 @@ def write_backtest_csv(result: BacktestResult, output_dir: str) -> Path:
     return path
 
 
+def write_order_events_csv(result: BacktestResult, output_dir: str) -> Path:
+    directory = Path(output_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"orders_{result.market_id}.csv"
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow(["timestamp", "order_id", "market_id", "side", "status", "price", "notional", "reason"])
+        for event in result.order_events:
+            writer.writerow(
+                [
+                    event.timestamp,
+                    event.order_id,
+                    event.market_id,
+                    event.side,
+                    event.status,
+                    event.price,
+                    event.notional,
+                    event.reason,
+                ]
+            )
+    return path
+
+
+def write_all_order_events_csv(results: list[BacktestResult], output_dir: str) -> Path:
+    directory = Path(output_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / "orders_all.csv"
+    events = [event for result in results for event in result.order_events]
+    events.sort(key=lambda event: (event.timestamp, event.order_id, _order_status_rank(event.status)))
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow(["timestamp", "order_id", "market_id", "side", "status", "price", "notional", "reason"])
+        for event in events:
+            writer.writerow(
+                [
+                    event.timestamp,
+                    event.order_id,
+                    event.market_id,
+                    event.side,
+                    event.status,
+                    event.price,
+                    event.notional,
+                    event.reason,
+                ]
+            )
+    return path
+
+
+def _order_status_rank(status: str) -> int:
+    ranks = {
+        "created": 0,
+        "submitted": 1,
+        "accepted": 2,
+        "matched": 3,
+        "settled": 4,
+        "rejected": 5,
+        "failed": 6,
+        "canceled": 7,
+    }
+    return ranks.get(status, 99)
+
+
 def write_summary_csv(summaries: list[BacktestSummary], output_dir: str) -> Path:
     directory = Path(output_dir)
     directory.mkdir(parents=True, exist_ok=True)

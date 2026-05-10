@@ -17,7 +17,9 @@ from .reporting import (
     print_portfolio_summary,
     print_signal,
     write_aggregate_summary_csv,
+    write_all_order_events_csv,
     write_backtest_csv,
+    write_order_events_csv,
     write_portfolio_curve_csv,
     write_portfolio_summary_csv,
     write_summary_csv,
@@ -64,6 +66,7 @@ def main() -> None:
             result = backtest_market(market, history, config)
             results.append(result)
             path = write_backtest_csv(result, config.backtest.output_dir)
+            write_order_events_csv(result, config.backtest.output_dir)
             summary = summarize_market(market, result)
             summaries.append(summary)
             trade_count = len([trade for trade in result.trades if trade.action != "REJECTED"])
@@ -83,11 +86,13 @@ def main() -> None:
             print(f"summary_csv={summary_path}")
             print(f"summary_by_type_csv={aggregate_path}")
         if results:
+            orders_path = write_all_order_events_csv(results, config.backtest.output_dir)
             portfolio_curve = build_portfolio_curve(results, config)
             portfolio_summary = summarize_portfolio(portfolio_curve, config)
             curve_path = write_portfolio_curve_csv(portfolio_curve, config.backtest.output_dir)
             portfolio_summary_path = write_portfolio_summary_csv(portfolio_summary, config.backtest.output_dir)
             print_portfolio_summary(portfolio_summary)
+            print(f"orders_csv={orders_path}")
             print(f"portfolio_curve_csv={curve_path}")
             print(f"portfolio_summary_csv={portfolio_summary_path}")
     elif args.command == "explain-risk":

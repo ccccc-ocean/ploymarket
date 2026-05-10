@@ -283,3 +283,42 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 ### 下次继续
 
 建议下一步做 paper order 状态机，为未来持续模拟盘和实盘订单生命周期打基础。
+
+## 2026-05-10：Paper Order 状态机
+
+### 本次目标
+
+让模拟盘开始记录订单生命周期，而不只是记录最终交易结果。
+
+### 已完成
+
+- 新增 `src/ploymarket_sim/orders.py`。
+- 回测买入、卖出、回测结束平仓都会生成订单事件。
+- 风控拒绝会生成拒绝事件。
+- 新增输出：
+  - `data/orders_<market_id>.csv`
+  - `data/orders_all.csv`
+
+### 当前状态路径
+
+正常模拟成交：
+
+```text
+created -> submitted -> accepted -> matched -> settled
+```
+
+风控拒绝：
+
+```text
+created -> rejected
+```
+
+### 为什么重要
+
+Polymarket 真实下单不是“API 返回成功就等于最终成交”。未来实盘系统需要区分 submitted、matched、settled、failed、canceled 等状态。
+
+我们现在先在模拟盘里建立这个习惯，之后接真实订单时不会重构整个账本。
+
+### 下次继续
+
+建议下一步读取市场真实 fee 设置，替换当前默认的 `taker_fee_rate = 0.02` 估算值。

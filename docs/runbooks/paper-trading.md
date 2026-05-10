@@ -100,6 +100,8 @@ data/backtest_summary.csv
 data/backtest_summary_by_type.csv
 data/portfolio_curve.csv
 data/portfolio_summary.csv
+data/orders_<market_id>.csv
+data/orders_all.csv
 ```
 
 复盘时重点看：
@@ -157,6 +159,33 @@ data/portfolio_summary.csv
 - `event_count`: 交易事件数量。
 
 注意：当前组合曲线使用“持仓按投入本金计值”的保守口径，费用和滑点会立即降低净值；它还不是逐 bar mark-to-market 的精细资金曲线。
+
+## 订单状态机
+
+`orders_<market_id>.csv` 和 `orders_all.csv` 记录模拟订单生命周期。
+
+当前模拟成交路径：
+
+```text
+created -> submitted -> accepted -> matched -> settled
+```
+
+风控拒绝路径：
+
+```text
+created -> rejected
+```
+
+重点字段：
+
+- `order_id`: 本地生成的模拟订单 ID。
+- `side`: `buy_yes` 或 `sell_yes`。
+- `status`: 当前订单状态。
+- `price`: 模拟执行价格。
+- `notional`: 模拟订单名义金额。
+- `reason`: 触发订单或拒绝订单的原因。
+
+这一步是为了未来实盘做准备。真实 Polymarket 下单不是“发出请求就等于最终成交”，所以我们从模拟盘阶段就开始记录订单生命周期。
 
 ## 查看风控配置说明
 

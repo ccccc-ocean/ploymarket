@@ -22,6 +22,7 @@
 - CSV 回测输出。
 - 回测逐市场汇总和按市场类型聚合汇总。
 - 组合级回测资金曲线和最大回撤摘要。
+- Paper order 状态机。
 - Taker fee、滑点和安全边际后的净 edge 过滤。
 
 下一步：
@@ -33,10 +34,10 @@
 
 当前建议顺序：
 
-1. paper order 状态机。
-2. 读取市场真实 fee 设置。
-3. 把缓存升级为 SQLite 行情库。
-4. 逐 bar mark-to-market 组合曲线。
+1. 读取市场真实 fee 设置。
+2. 把缓存升级为 SQLite 行情库。
+3. 逐 bar mark-to-market 组合曲线。
+4. 持续模拟盘 `paper-run` 命令。
 
 ## 阶段 2：持续模拟盘
 
