@@ -127,6 +127,13 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 - 输出 `data/daily_report.csv`。
 - 给出 `not_ready` / `candidate` 状态和原因。
 
+### 一键研究流水线
+
+脚本位置：[scripts/research_cycle.sh](/Users/pizza_yang/code/ploymarket/scripts/research_cycle.sh)
+
+- 依次运行模拟盘扫描、复盘、BTC 价格更新、alignment、edge、离线回放、数据质量和日报。
+- 适合后续接入 cron 或其他本地调度器。
+
 ### 信号生成
 
 代码位置：[src/ploymarket_sim/signals.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/signals.py)

@@ -50,6 +50,14 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml edge-r
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml daily-report
 ```
 
+一键跑完整研究流水线：
+
+```bash
+scripts/research_cycle.sh
+```
+
+它会依次执行 paper-run、paper-report、BTC 价格更新、alignment、edge、离线回放、data-quality 和 daily-report。
+
 `paper-run` 输出里的 `execution_mode` 含义：
 
 - `TAKER`: 净 edge 扣除 taker fee、滑点、安全边际后仍过线，可以作为模拟吃单候选。

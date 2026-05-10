@@ -850,3 +850,40 @@ readiness = not_ready
 ### 下次继续
 
 建议开始长期模拟盘采样流程：让 `paper-loop` 以固定频率运行，并每天生成 `paper-report`、`alignment-report`、`edge-report` 和 `daily-report`。
+
+## 2026-05-10：一键研究流水线
+
+### 本次目标
+
+把每天需要手动执行的一串命令收束成一个脚本，方便长期模拟盘采样。
+
+### 已完成
+
+新增脚本：
+
+```bash
+scripts/research_cycle.sh
+```
+
+它会依次运行：
+
+- `paper-run`
+- `paper-report`
+- `btc-price`
+- `alignment-report`
+- `edge-report`
+- `replay-backtest`
+- `data-quality`
+- `daily-report`
+
+### 当前状态
+
+本轮运行后：
+
+- paper-run 轮数：5。
+- 离线回放交易数：12。
+- 回放 PnL：约 `+17.74 USDC`。
+- 逐 bar 最大回撤：约 `1.2%`。
+- readiness：`not_ready`。
+
+原因仍是样本不足。

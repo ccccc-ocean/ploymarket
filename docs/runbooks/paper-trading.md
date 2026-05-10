@@ -351,6 +351,27 @@ data/daily_report.csv
 
 当前状态：`not_ready`，主要原因是 paper-run 样本太少。
 
+## 一键研究流水线
+
+运行：
+
+```bash
+scripts/research_cycle.sh
+```
+
+它会按顺序执行：
+
+- `paper-run`
+- `paper-report`
+- `btc-price`
+- `alignment-report`
+- `edge-report`
+- `replay-backtest`
+- `data-quality`
+- `daily-report`
+
+这个脚本适合接入本地定时任务。当前运行后仍然是 `not_ready`，原因是长期 paper-run 样本不足。
+
 输出文件在：
 
 ```text
