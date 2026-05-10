@@ -9,6 +9,7 @@ from .cache import CachePolicy, JsonCache
 from .classifier import MARKET_TYPES, is_market_type
 from .clob import get_price_history
 from .config import load_config
+from .execution import plan_execution
 from .http import HttpError
 from .portfolio import build_mark_to_market_curve, build_portfolio_curve, summarize_portfolio
 from .paper import build_paper_signal_row, summarize_paper_rows
@@ -74,7 +75,7 @@ def main() -> None:
         storage = storage_from_config(config)
         storage.save_markets(markets)
         for market in markets:
-            history = _safe_history(config, market)
+            history = _safe_history(config, market, storage)
             if not history:
                 continue
             storage.save_price_history(market.yes_token_id or "", history)
@@ -87,7 +88,7 @@ def main() -> None:
         histories_by_market = {}
         summaries = []
         for market in markets:
-            history = _safe_history(config, market)
+            history = _safe_history(config, market, storage)
             if not history:
                 continue
             histories_by_market[market.id] = history
@@ -160,11 +161,22 @@ def _explain_risk(config) -> None:
     print(f"- max_spread: 买卖价差高于 {risk.max_spread:.2f} 不交易")
 
 
-def _safe_history(config, market):
+def _safe_history(config, market, storage=None, prefer_local: bool = False):
+    token_id = market.yes_token_id or ""
+    if prefer_local and storage is not None:
+        local_history = storage.load_price_history(token_id)
+        if local_history:
+            return local_history
     try:
-        return get_price_history(config, market.yes_token_id or "")
+        history = get_price_history(config, token_id)
+        return history
     except HttpError as exc:
         print(f"warning: skip {market.id} history: {exc}", file=sys.stderr)
+        if storage is not None:
+            local_history = storage.load_price_history(token_id)
+            if local_history:
+                print(f"warning: using local SQLite history for {market.id}", file=sys.stderr)
+                return local_history
         return []
 
 
@@ -175,22 +187,32 @@ def _filter_markets(markets, market_type):
 def _run_paper_scan(config, market_type: str) -> None:
     run_timestamp = int(time())
     storage = storage_from_config(config)
-    markets = _filter_markets(discover_btc_markets(config), market_type)
-    storage.save_markets(markets)
+    markets = _filter_markets(_paper_markets(config, storage), market_type)
     rows = []
     for market in markets:
-        history = _safe_history(config, market)
+        history = _safe_history(config, market, storage, prefer_local=True)
         if not history:
             continue
         storage.save_price_history(market.yes_token_id or "", history)
         signal = build_signal(market, history, config.signal, config.backtest)
-        rows.append(build_paper_signal_row(market, signal, config.backtest.taker_fee_rate, run_timestamp))
+        execution_plan = plan_execution(market, signal, config.signal, config.backtest, config.execution)
+        rows.append(build_paper_signal_row(market, signal, config.backtest.taker_fee_rate, run_timestamp, execution_plan))
     path = write_paper_signal_rows_csv(rows, config.backtest.output_dir, run_timestamp)
     summary = summarize_paper_rows(rows)
     print(
         f"paper_run | markets={summary['markets']} | buy_yes={summary['buy_yes']} | "
-        f"hold={summary['hold']} | avoid={summary['avoid']} | {path}"
+        f"hold={summary['hold']} | avoid={summary['avoid']} | taker={summary['taker']} | "
+        f"maker={summary['maker']} | skip={summary['skip']} | {path}"
     )
+
+
+def _paper_markets(config, storage):
+    local_markets = storage.load_markets()
+    if local_markets:
+        return local_markets
+    markets = discover_btc_markets(config)
+    storage.save_markets(markets)
+    return markets
 
 
 def _run_paper_loop(config, market_type: str, interval_seconds: int, iterations: int) -> None:

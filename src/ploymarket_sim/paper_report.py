@@ -12,10 +12,14 @@ class PaperRunSummary:
     buy_yes_count: int
     hold_count: int
     avoid_count: int
+    taker_count: int
+    maker_count: int
+    skip_count: int
     best_market_id: str
     best_market_type: str
     best_net_edge: float
     best_action: str
+    best_execution_mode: str
     best_question: str
 
 
@@ -42,10 +46,14 @@ def _summarize_rows(rows: list[dict[str, str]]) -> PaperRunSummary:
         buy_yes_count=len([row for row in rows if row["action"] == "BUY_YES"]),
         hold_count=len([row for row in rows if row["action"] == "HOLD"]),
         avoid_count=len([row for row in rows if row["action"] == "AVOID"]),
+        taker_count=len([row for row in rows if row.get("execution_mode") == "TAKER"]),
+        maker_count=len([row for row in rows if row.get("execution_mode") == "MAKER"]),
+        skip_count=len([row for row in rows if row.get("execution_mode", "SKIP") == "SKIP"]),
         best_market_id=best["market_id"],
         best_market_type=best["market_type"],
         best_net_edge=_float(best.get("net_edge")),
         best_action=best["action"],
+        best_execution_mode=best.get("execution_mode", "UNKNOWN"),
         best_question=best["question"],
     )
 

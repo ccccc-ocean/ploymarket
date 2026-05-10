@@ -34,6 +34,13 @@ safety_margin = 0.01
 buy_below = 0.92
 sell_above = 0.08
 
+[execution]
+maker_enabled = true
+maker_price_improvement = 0.01
+maker_min_edge = 0.015
+maker_fee_rate = 0.0
+maker_order_ttl_seconds = 300
+
 [risk]
 starting_cash = 1000.0
 max_position_usdc = 50.0

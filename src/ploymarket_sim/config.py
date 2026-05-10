@@ -52,6 +52,15 @@ class SignalConfig:
 
 
 @dataclass(frozen=True)
+class ExecutionConfig:
+    maker_enabled: bool
+    maker_price_improvement: float
+    maker_min_edge: float
+    maker_fee_rate: float
+    maker_order_ttl_seconds: int
+
+
+@dataclass(frozen=True)
 class RiskConfig:
     starting_cash: float
     max_position_usdc: float
@@ -82,6 +91,7 @@ class AppConfig:
     storage: StorageConfig
     universe: UniverseConfig
     signal: SignalConfig
+    execution: ExecutionConfig
     risk: RiskConfig
     backtest: BacktestConfig
 
@@ -94,6 +104,7 @@ def load_config(path: str | Path) -> AppConfig:
         storage=StorageConfig(**data["storage"]),
         universe=UniverseConfig(**data["universe"]),
         signal=SignalConfig(**data["signal"]),
+        execution=ExecutionConfig(**data["execution"]),
         risk=RiskConfig(**data["risk"]),
         backtest=BacktestConfig(**data["backtest"]),
     )

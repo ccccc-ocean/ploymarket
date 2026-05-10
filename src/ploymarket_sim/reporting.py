@@ -284,6 +284,11 @@ def write_paper_signal_rows_csv(rows: list[PaperSignalRow], output_dir: str, run
                 "gross_edge",
                 "net_edge",
                 "reason",
+                "execution_mode",
+                "execution_side",
+                "limit_price",
+                "expected_net_edge",
+                "execution_reason",
             ]
         )
         for row in rows:
@@ -300,6 +305,11 @@ def write_paper_signal_rows_csv(rows: list[PaperSignalRow], output_dir: str, run
                     row.gross_edge,
                     row.net_edge,
                     row.reason,
+                    row.execution_mode,
+                    row.execution_side,
+                    row.limit_price,
+                    row.expected_net_edge,
+                    row.execution_reason,
                 ]
             )
     return path
@@ -318,10 +328,14 @@ def write_paper_report_csv(summaries: list[PaperRunSummary], output_dir: str) ->
                 "buy_yes_count",
                 "hold_count",
                 "avoid_count",
+                "taker_count",
+                "maker_count",
+                "skip_count",
                 "best_market_id",
                 "best_market_type",
                 "best_net_edge",
                 "best_action",
+                "best_execution_mode",
                 "best_question",
             ]
         )
@@ -333,10 +347,14 @@ def write_paper_report_csv(summaries: list[PaperRunSummary], output_dir: str) ->
                     summary.buy_yes_count,
                     summary.hold_count,
                     summary.avoid_count,
+                    summary.taker_count,
+                    summary.maker_count,
+                    summary.skip_count,
                     summary.best_market_id,
                     summary.best_market_type,
                     summary.best_net_edge,
                     summary.best_action,
+                    summary.best_execution_mode,
                     summary.best_question,
                 ]
             )
@@ -350,8 +368,8 @@ def print_paper_report_summary(summaries: list[PaperRunSummary]) -> None:
     latest = summaries[-1]
     print(
         f"paper_report | runs={len(summaries)} | latest_markets={latest.market_count} | "
-        f"latest_buy_yes={latest.buy_yes_count} | best_net_edge={latest.best_net_edge:.4f} | "
-        f"best_market={latest.best_market_id}"
+        f"latest_taker={latest.taker_count} | latest_maker={latest.maker_count} | "
+        f"best_net_edge={latest.best_net_edge:.4f} | best_market={latest.best_market_id}"
     )
 
 

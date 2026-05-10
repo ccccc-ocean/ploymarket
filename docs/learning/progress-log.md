@@ -530,3 +530,52 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 ### 下次继续
 
 建议下一步做 Maker/Taker 策略分离。当前系统仍然把所有 `BUY_YES` 当作 Taker 买入处理。
+
+## 2026-05-10：Maker/Taker 执行计划分离
+
+### 本次目标
+
+把“信号是否有 edge”和“用什么方式下单”拆开，避免模拟盘把所有机会都粗暴当成 Taker 吃单。
+
+### 已完成
+
+- 新增 `src/ploymarket_sim/execution.py`。
+- 新增配置区块 `[execution]`：
+  - `maker_enabled`
+  - `maker_price_improvement`
+  - `maker_min_edge`
+  - `maker_fee_rate`
+  - `maker_order_ttl_seconds`
+- `paper-run` 输出新增：
+  - `execution_mode`
+  - `execution_side`
+  - `limit_price`
+  - `expected_net_edge`
+  - `execution_reason`
+- `paper-report` 新增 `TAKER` / `MAKER` / `SKIP` 数量汇总。
+
+### 本轮观察
+
+本轮本地 `price_target` 扫描：
+
+- 市场数：35。
+- `BUY_YES`: 0。
+- `HOLD`: 35。
+- `AVOID`: 0。
+- `TAKER`: 0。
+- `MAKER`: 0。
+- `SKIP`: 35。
+- 最佳 net edge：约 `-0.0110`。
+
+结论：当前市场没有通过成本和安全边际过滤的交易机会，系统保持不交易。
+
+### 工程改进
+
+本轮发现外部 API 慢请求会拖住整轮扫描，因此顺手完成两项稳定性改进：
+
+- HTTP 请求增加运行级硬截止时间。
+- `paper-run` 优先使用 SQLite 里的本地市场和历史价格，网络只作为缺失数据时的补充来源。
+
+### 下次继续
+
+建议下一步做 SQLite 离线回放，把多次保存的市场和价格历史变成可重复测试样本。之后再做 Maker 成交概率模型，避免把“挂单候选”误当成“必然成交”。

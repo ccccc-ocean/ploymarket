@@ -1,6 +1,6 @@
 # 当前系统状态
 
-最后更新：2026-05-07
+最后更新：2026-05-10
 
 ## 项目定位
 
@@ -24,6 +24,7 @@
 - 默认目录：`.cache/http`
 - 默认 TTL：`900` 秒。
 - 远程请求失败时，如果存在旧缓存，可以使用 stale cache。
+- HTTP 请求增加运行级硬截止时间，避免外部 API 慢请求让模拟盘长期卡住。
 - 缓存目录已加入 `.gitignore`。
 
 查看缓存：
@@ -38,7 +39,9 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-
 
 - 存储市场快照。
 - 存储价格历史点。
+- 可以从 SQLite 读取已存市场和价格历史。
 - `discover`、`signals`、`backtest` 会自动写入。
+- `paper-run` 优先使用本地 SQLite 市场和历史价格；本地没有数据时再尝试网络发现/拉取。
 - 默认路径：`data/ploymarket.sqlite`
 - SQLite 文件已加入 `.gitignore`。
 
@@ -86,6 +89,18 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 - 其他情况为 `HOLD`。
 
 成本估算代码位置：[src/ploymarket_sim/costs.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/costs.py)
+
+### 执行计划
+
+代码位置：[src/ploymarket_sim/execution.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/execution.py)
+
+`paper-run` 现在会在信号之后生成执行计划：
+
+- `TAKER`: `BUY_YES` 信号已经在扣除 taker fee、滑点和安全边际后达标。
+- `MAKER`: gross edge 为正，但 taker 成本后不达标，只适合作为更低限价的挂单候选。
+- `SKIP`: 不交易。
+
+Maker 参数位于 `config/default.toml` 的 `[execution]` 区块。
 
 ### 风控
 
@@ -195,9 +210,10 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 
 - 执行一轮模拟盘信号扫描。
 - 默认适合按 `price_target` 市场运行。
-- 写入 SQLite 市场和价格历史。
+- 优先使用 SQLite 里的本地市场和历史价格，减少对外部 API 的依赖。
 - 输出 `data/paper_run_<timestamp>.csv`。
 - `paper-loop` 可以按固定间隔重复执行 `paper-run`。
+- CSV 包含 `execution_mode`、`execution_side`、`limit_price`、`expected_net_edge` 和 `execution_reason`。
 
 ### Paper Report
 
@@ -206,17 +222,19 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 - 聚合已有 `paper_run_*.csv`。
 - 输出 `data/paper_report.csv`。
 - 跟踪每轮信号数量、最佳 net edge 和最佳候选市场。
+- 跟踪每轮 `TAKER`、`MAKER`、`SKIP` 数量。
 
 ## 当前限制
 
 - 没有真实订单执行。
-- 有单轮 `paper-run`，但还没有守护进程或自动定时调度。
-- 有本地 SQLite 存储，但还没有用于回放历史采样或离线回测。
+- 有持续 `paper-loop`，但还没有系统级守护进程、告警和自动日报。
+- SQLite 已用于 paper-run 本地读取，但还没有完整离线回放框架。
 - 没有盘口深度模拟。
 - 没有考虑到期结算和市场 resolution 风险。
 - 没有接 BTC 现货/永续价格源。
 - 当前信号很初级，不能直接作为实盘依据。
 - 当前费用模型已经读取市场级 fee rate，但仍然没有读取更复杂的 maker rebate、reward 和真实成交路径费用。
+- Maker/Taker 已在执行计划层分离，但 Maker 还没有成交概率、排队位置、撤单和部分成交模拟。
 - 市场分类还是关键词规则，后续要用真实样本不断修正。
 - 逐 bar mark-to-market 已实现，但仍基于当前 CLOB 历史价格，不包含盘口深度和成交概率。
 - 订单状态机还没有真实的失败、撤单、部分成交和链上 settlement 查询。

@@ -10,6 +10,7 @@
 - 输出包含费用、滑点和 PnL 的回测交易 CSV，并生成逐市场、按类型聚合和组合级资金曲线 CSV。
 - 生成逐 bar mark-to-market 组合曲线，用价格历史观察持仓期间回撤。
 - 生成模拟订单状态机 CSV，为未来持续模拟盘和实盘订单生命周期做准备。
+- `paper-run` 已区分 `TAKER`、`MAKER`、`SKIP` 执行计划，并优先使用本地 SQLite 历史数据避免网络慢请求拖死扫描。
 
 ## 学习和项目文档
 
@@ -41,6 +42,12 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-info
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml storage-info
 ```
+
+`paper-run` 输出里的 `execution_mode` 含义：
+
+- `TAKER`: 净 edge 扣除 taker fee、滑点、安全边际后仍过线，可以作为模拟吃单候选。
+- `MAKER`: gross edge 为正，但 taker 成本后不过线，只能作为更低限价的挂单候选。
+- `SKIP`: 不满足交易条件，继续观察。
 
 可以用 `--market-type` 只观察某一类市场：
 

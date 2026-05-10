@@ -108,6 +108,12 @@ data/paper_run_<timestamp>.csv
 - 信号动作。
 - gross edge / net edge。
 - 信号原因。
+- `execution_mode`: `TAKER`、`MAKER` 或 `SKIP`。
+- `limit_price`: 执行计划里的模拟限价。
+- `expected_net_edge`: 对应执行方式下的预期净 edge。
+- `execution_reason`: 为什么选择这种执行方式。
+
+`paper-run` 会优先使用 SQLite 里已有的市场和价格历史。这样网络变慢时，模拟盘仍能用本地样本完成一轮扫描；如果本地没有数据，才会尝试走公开 API。
 
 这个命令适合未来接定时任务，每隔固定时间跑一轮，形成持续模拟盘记录。
 
@@ -147,6 +153,7 @@ data/paper_report.csv
 
 - 市场数量。
 - `BUY_YES` / `HOLD` / `AVOID` 数量。
+- `TAKER` / `MAKER` / `SKIP` 数量。
 - 本轮最佳 net edge。
 - 本轮最佳候选市场。
 

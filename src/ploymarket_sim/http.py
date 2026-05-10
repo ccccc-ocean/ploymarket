@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import signal
+import threading
+from contextlib import contextmanager
 from http.client import IncompleteRead, RemoteDisconnected
 from time import sleep
 from typing import Any
@@ -38,11 +41,12 @@ def get_json(base_url: str, path: str, params: dict[str, Any], timeout: int, cac
     last_error: Exception | None = None
     for attempt in range(3):
         try:
-            with urlopen(request, timeout=timeout) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-                if cache:
-                    cache.set(url, payload)
-                return payload
+            with _request_deadline(timeout + 2):
+                with urlopen(request, timeout=timeout) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                    if cache:
+                        cache.set(url, payload)
+                    return payload
         except (IncompleteRead, RemoteDisconnected, URLError, TimeoutError) as exc:
             last_error = exc
             sleep(0.5 * (attempt + 1))
@@ -53,3 +57,24 @@ def get_json(base_url: str, path: str, params: dict[str, Any], timeout: int, cac
         if stale is not None:
             return stale
     raise HttpError(f"GET {url} failed after retries: {last_error}") from last_error
+
+
+@contextmanager
+def _request_deadline(seconds: int):
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+
+    previous_handler = signal.getsignal(signal.SIGALRM)
+    previous_timer = signal.setitimer(signal.ITIMER_REAL, 0)
+
+    def _raise_timeout(_signum, _frame):
+        raise TimeoutError(f"request exceeded {seconds}s deadline")
+
+    signal.signal(signal.SIGALRM, _raise_timeout)
+    signal.setitimer(signal.ITIMER_REAL, max(1, seconds))
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, previous_timer[0], previous_timer[1])
+        signal.signal(signal.SIGALRM, previous_handler)

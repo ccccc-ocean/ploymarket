@@ -1,3 +1,4 @@
-run_timestamp,market_count,buy_yes_count,hold_count,avoid_count,best_market_id,best_market_type,best_net_edge,best_action,best_question
-1778399158,35,0,35,0,573655,price_target,-0.011049613333333333,HOLD,"Will Bitcoin hit $150k by June 30, 2026?"
-1778399363,35,0,35,0,573655,price_target,-0.011049613333333333,HOLD,"Will Bitcoin hit $150k by June 30, 2026?"
+run_timestamp,market_count,buy_yes_count,hold_count,avoid_count,taker_count,maker_count,skip_count,best_market_id,best_market_type,best_net_edge,best_action,best_execution_mode,best_question
+1778399158,35,0,35,0,0,0,35,573655,price_target,-0.011049613333333333,HOLD,UNKNOWN,"Will Bitcoin hit $150k by June 30, 2026?"
+1778399363,35,0,35,0,0,0,35,573655,price_target,-0.011049613333333333,HOLD,UNKNOWN,"Will Bitcoin hit $150k by June 30, 2026?"
+1778418707,35,0,35,0,0,0,35,573655,price_target,-0.011049613333333333,HOLD,SKIP,"Will Bitcoin hit $150k by June 30, 2026?"

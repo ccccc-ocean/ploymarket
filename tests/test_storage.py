@@ -33,6 +33,11 @@ class StorageTests(unittest.TestCase):
 
             self.assertEqual(stats.market_count, 1)
             self.assertEqual(stats.price_point_count, 2)
+            markets = storage.load_markets()
+            self.assertEqual(len(markets), 1)
+            self.assertEqual(markets[0].yes_token_id, "yes-token")
+            history = storage.load_price_history("yes-token")
+            self.assertEqual([point.price for point in history], [0.5, 0.6])
 
     def test_disabled_storage_reports_zero_counts(self) -> None:
         storage = Storage(False, "unused.sqlite")

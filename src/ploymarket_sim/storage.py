@@ -106,6 +106,56 @@ class Storage:
                 ],
             )
 
+    def load_markets(self) -> list[Market]:
+        if not self.enabled or not Path(self.sqlite_path).exists():
+            return []
+        self.init()
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT market_id, question, slug, end_date, liquidity, volume_24hr,
+                       yes_price, yes_token_id, fees_enabled, taker_fee_rate, fee_type
+                FROM markets
+                ORDER BY volume_24hr DESC
+                """
+            ).fetchall()
+        markets = []
+        for row in rows:
+            (
+                market_id,
+                question,
+                slug,
+                end_date,
+                liquidity,
+                volume_24hr,
+                yes_price,
+                yes_token_id,
+                fees_enabled,
+                taker_fee_rate,
+                fee_type,
+            ) = row
+            prices = [float(yes_price)] if yes_price is not None else []
+            if yes_price is not None:
+                prices.append(max(0.0, 1.0 - float(yes_price)))
+            markets.append(
+                Market(
+                    str(market_id),
+                    str(question),
+                    str(slug),
+                    str(end_date) if end_date else None,
+                    float(liquidity),
+                    float(volume_24hr),
+                    True,
+                    ["Yes", "No"],
+                    prices,
+                    [str(yes_token_id), ""] if yes_token_id else [],
+                    bool(fees_enabled),
+                    float(taker_fee_rate) if taker_fee_rate is not None else None,
+                    str(fee_type) if fee_type else None,
+                )
+            )
+        return markets
+
     def save_price_history(self, token_id: str, history: list[PricePoint]) -> None:
         if not self.enabled or not token_id:
             return
@@ -122,6 +172,22 @@ class Storage:
                 """,
                 [(token_id, point.timestamp, point.price, observed_at) for point in history],
             )
+
+    def load_price_history(self, token_id: str) -> list[PricePoint]:
+        if not self.enabled or not token_id or not Path(self.sqlite_path).exists():
+            return []
+        self.init()
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT timestamp, price
+                FROM price_history
+                WHERE token_id = ?
+                ORDER BY timestamp
+                """,
+                (token_id,),
+            ).fetchall()
+        return [PricePoint(int(timestamp), float(price)) for timestamp, price in rows]
 
     def stats(self) -> StorageStats:
         if not self.enabled or not Path(self.sqlite_path).exists():
