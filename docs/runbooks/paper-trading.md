@@ -106,6 +106,8 @@ data/backtest_summary.csv
 data/backtest_summary_by_type.csv
 data/portfolio_curve.csv
 data/portfolio_summary.csv
+data/portfolio_mtm_curve.csv
+data/portfolio_mtm_summary.csv
 data/orders_<market_id>.csv
 data/orders_all.csv
 ```
@@ -168,6 +170,15 @@ data/orders_all.csv
 - `event_count`: 交易事件数量。
 
 注意：当前组合曲线使用“持仓按投入本金计值”的保守口径，费用和滑点会立即降低净值；它还不是逐 bar mark-to-market 的精细资金曲线。
+
+`portfolio_mtm_curve.csv` 是逐 bar mark-to-market 组合曲线。它会在持仓期间用价格历史持续重估未平仓仓位。
+
+`portfolio_mtm_summary.csv` 是逐 bar 重估后的组合摘要。
+
+两者区别：
+
+- `portfolio_curve.csv`: 只在交易事件时更新。
+- `portfolio_mtm_curve.csv`: 在交易事件和价格历史点都更新，更适合观察持仓期间真实回撤。
 
 ## 订单状态机
 

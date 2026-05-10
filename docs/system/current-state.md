@@ -143,6 +143,14 @@ fee rate 来源：
 - 模拟组合账户现金、已投入本金、净值、峰值净值和回撤。
 - 使用保守口径：持仓按投入本金计值，费用和滑点立即降低净值。
 - 输出组合级最大回撤和账户级 PnL。
+- 输出逐 bar mark-to-market 资金曲线，用价格历史重估未平仓仓位。
+
+输出：
+
+- `data/portfolio_curve.csv`
+- `data/portfolio_summary.csv`
+- `data/portfolio_mtm_curve.csv`
+- `data/portfolio_mtm_summary.csv`
 
 ### Paper Order 状态机
 
@@ -191,7 +199,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 - 当前信号很初级，不能直接作为实盘依据。
 - 当前费用模型已经读取市场级 fee rate，但仍然没有读取更复杂的 maker rebate、reward 和真实成交路径费用。
 - 市场分类还是关键词规则，后续要用真实样本不断修正。
-- 组合曲线还不是逐 bar mark-to-market，只基于交易事件更新。
+- 逐 bar mark-to-market 已实现，但仍基于当前 CLOB 历史价格，不包含盘口深度和成交概率。
 - 订单状态机还没有真实的失败、撤单、部分成交和链上 settlement 查询。
 
 ## 知识库状态

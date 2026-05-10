@@ -9,7 +9,7 @@ from .classifier import MARKET_TYPES, is_market_type
 from .clob import get_price_history
 from .config import load_config
 from .http import HttpError
-from .portfolio import build_portfolio_curve, summarize_portfolio
+from .portfolio import build_mark_to_market_curve, build_portfolio_curve, summarize_portfolio
 from .polymarket import discover_btc_markets
 from .reporting import (
     print_aggregate_summary,
@@ -19,6 +19,8 @@ from .reporting import (
     write_aggregate_summary_csv,
     write_all_order_events_csv,
     write_backtest_csv,
+    write_mark_to_market_curve_csv,
+    write_mark_to_market_summary_csv,
     write_order_events_csv,
     write_portfolio_curve_csv,
     write_portfolio_summary_csv,
@@ -69,11 +71,13 @@ def main() -> None:
         markets = _filter_markets(discover_btc_markets(config), args.market_type)
         storage.save_markets(markets)
         results = []
+        histories_by_market = {}
         summaries = []
         for market in markets:
             history = _safe_history(config, market)
             if not history:
                 continue
+            histories_by_market[market.id] = history
             storage.save_price_history(market.yes_token_id or "", history)
             result = backtest_market(market, history, config)
             results.append(result)
@@ -103,10 +107,17 @@ def main() -> None:
             portfolio_summary = summarize_portfolio(portfolio_curve, config)
             curve_path = write_portfolio_curve_csv(portfolio_curve, config.backtest.output_dir)
             portfolio_summary_path = write_portfolio_summary_csv(portfolio_summary, config.backtest.output_dir)
+            mtm_curve = build_mark_to_market_curve(results, histories_by_market, config)
+            mtm_summary = summarize_portfolio(mtm_curve, config)
+            mtm_curve_path = write_mark_to_market_curve_csv(mtm_curve, config.backtest.output_dir)
+            mtm_summary_path = write_mark_to_market_summary_csv(mtm_summary, config.backtest.output_dir)
             print_portfolio_summary(portfolio_summary)
+            print(f"mark_to_market | ending_equity={mtm_summary.ending_equity:.2f} | pnl={mtm_summary.realized_pnl:.2f} | max_drawdown={mtm_summary.max_drawdown:.1%} | events={mtm_summary.event_count}")
             print(f"orders_csv={orders_path}")
             print(f"portfolio_curve_csv={curve_path}")
             print(f"portfolio_summary_csv={portfolio_summary_path}")
+            print(f"portfolio_mtm_curve_csv={mtm_curve_path}")
+            print(f"portfolio_mtm_summary_csv={mtm_summary_path}")
     elif args.command == "explain-risk":
         _explain_risk(config)
     elif args.command == "cache-info":

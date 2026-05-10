@@ -400,3 +400,35 @@ HTTP cache 解决“短时间重复请求”的问题；SQLite 解决“长期�
 ### 下次继续
 
 建议下一步做逐 bar mark-to-market 组合曲线，让回测组合净值不只在交易事件时更新。
+
+## 2026-05-10：逐 bar Mark-to-Market 组合曲线
+
+### 本次目标
+
+让组合资金曲线在持仓期间根据价格历史持续重估，而不是只在买入/卖出事件时更新。
+
+### 已完成
+
+- 新增逐 bar mark-to-market 曲线。
+- 新增输出：
+  - `data/portfolio_mtm_curve.csv`
+  - `data/portfolio_mtm_summary.csv`
+- `backtest` 终端输出新增 `mark_to_market` 摘要。
+
+### 本轮 price_target 回测观察
+
+同一轮 `backtest --market-type price_target`：
+
+- 交易事件曲线最大回撤：约 `1.5%`。
+- 逐 bar mark-to-market 最大回撤：约 `1.8%`。
+- 逐 bar 事件数：`292`。
+
+这说明仅看交易事件会低估持仓期间的波动风险。
+
+### 当前限制
+
+逐 bar mark-to-market 仍然只用 CLOB 历史价格，不模拟盘口深度、成交概率、部分成交或真实退出难度。
+
+### 下次继续
+
+建议下一步做持续模拟盘 `paper-run` 命令，让系统可以按固定流程扫描、记录信号、写入数据库和输出复盘摘要。

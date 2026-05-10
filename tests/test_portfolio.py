@@ -2,7 +2,8 @@ import unittest
 
 from ploymarket_sim.backtest import BacktestResult, Trade
 from ploymarket_sim.config import ApiConfig, AppConfig, BacktestConfig, CacheConfig, RiskConfig, SignalConfig, StorageConfig, UniverseConfig
-from ploymarket_sim.portfolio import build_portfolio_curve, summarize_portfolio
+from ploymarket_sim.clob import PricePoint
+from ploymarket_sim.portfolio import build_mark_to_market_curve, build_portfolio_curve, summarize_portfolio
 
 
 def app_config() -> AppConfig:
@@ -39,3 +40,22 @@ class PortfolioTests(unittest.TestCase):
         self.assertAlmostEqual(summary.ending_equity, 1004.85)
         self.assertAlmostEqual(summary.realized_pnl, 4.85)
         self.assertGreater(summary.max_drawdown, 0.0)
+
+    def test_builds_mark_to_market_curve_from_price_history(self) -> None:
+        config = app_config()
+        result = BacktestResult(
+            "m1",
+            "Will Bitcoin reach $100,000 in May?",
+            [
+                Trade(1, "m1", "BUY_YES", 0.5, 25.0, 0.1, 0.05, 0.0, 0.04, "entry"),
+                Trade(3, "m1", "MARK_TO_MARKET_EXIT", 0.6, 30.0, 0.1, 0.0, 4.75, 0.0, "exit"),
+            ],
+            1004.75,
+            4.75,
+        )
+
+        curve = build_mark_to_market_curve([result], {"m1": [PricePoint(2, 0.4)]}, config)
+
+        self.assertTrue(any(point.action == "MARK" for point in curve))
+        mark = [point for point in curve if point.action == "MARK"][0]
+        self.assertLess(mark.equity, 999.85)

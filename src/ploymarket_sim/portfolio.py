@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .backtest import BacktestResult, Trade
+from .clob import PricePoint
 from .config import AppConfig
 
 
@@ -71,6 +72,71 @@ def build_portfolio_curve(results: list[BacktestResult], config: AppConfig) -> l
     return points
 
 
+def build_mark_to_market_curve(
+    results: list[BacktestResult],
+    histories_by_market: dict[str, list[PricePoint]],
+    config: AppConfig,
+) -> list[PortfolioPoint]:
+    cash = config.risk.starting_cash
+    positions: dict[str, float] = {}
+    latest_prices: dict[str, float] = {}
+    peak_equity = cash
+    points: list[PortfolioPoint] = []
+
+    for event in _ordered_portfolio_events(results, histories_by_market):
+        event_type = event[0]
+        timestamp = event[1]
+        market_id = event[2]
+        trade = event[3] if len(event) > 3 else None
+        price_point = event[4] if len(event) > 4 else None
+
+        action = "MARK"
+        pnl = 0.0
+        fee = 0.0
+        slippage = 0.0
+
+        if event_type == "price" and price_point is not None:
+            latest_prices[market_id] = price_point.price
+        elif event_type == "trade" and trade is not None:
+            action = trade.action
+            pnl = trade.pnl
+            fee = trade.fee
+            slippage = trade.slippage
+            if trade.action == "BUY_YES":
+                cash -= trade.notional + trade.fee + trade.slippage
+                positions[market_id] = positions.get(market_id, 0.0) + trade.notional / trade.price
+                latest_prices[market_id] = trade.price
+            elif trade.action in {"SELL_YES", "MARK_TO_MARKET_EXIT"}:
+                cash += trade.notional
+                positions.pop(market_id, None)
+                latest_prices[market_id] = trade.price
+
+        if not positions and action == "MARK":
+            continue
+
+        invested = sum(shares * latest_prices.get(open_market_id, 0.0) for open_market_id, shares in positions.items())
+        equity = cash + invested
+        peak_equity = max(peak_equity, equity)
+        drawdown = 0.0 if peak_equity == 0 else (peak_equity - equity) / peak_equity
+        points.append(
+            PortfolioPoint(
+                timestamp=timestamp,
+                market_id=market_id,
+                action=action,
+                cash=cash,
+                invested=invested,
+                equity=equity,
+                peak_equity=peak_equity,
+                drawdown=drawdown,
+                pnl=pnl,
+                fee=fee,
+                slippage=slippage,
+            )
+        )
+
+    return points
+
+
 def summarize_portfolio(points: list[PortfolioPoint], config: AppConfig) -> PortfolioSummary:
     ending_equity = points[-1].equity if points else config.risk.starting_cash
     return PortfolioSummary(
@@ -87,3 +153,17 @@ def summarize_portfolio(points: list[PortfolioPoint], config: AppConfig) -> Port
 def _ordered_trades(results: list[BacktestResult]) -> list[Trade]:
     trades = [trade for result in results for trade in result.trades if trade.action != "REJECTED"]
     return sorted(trades, key=lambda trade: (trade.timestamp, trade.market_id, trade.action))
+
+
+def _ordered_portfolio_events(
+    results: list[BacktestResult],
+    histories_by_market: dict[str, list[PricePoint]],
+):
+    events = []
+    traded_market_ids = {trade.market_id for result in results for trade in result.trades if trade.action != "REJECTED"}
+    for market_id in traded_market_ids:
+        for point in histories_by_market.get(market_id, []):
+            events.append(("price", point.timestamp, market_id, None, point))
+    for trade in _ordered_trades(results):
+        events.append(("trade", trade.timestamp, trade.market_id, trade, None))
+    return sorted(events, key=lambda event: (event[1], 0 if event[0] == "price" else 1, event[2]))
