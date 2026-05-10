@@ -134,6 +134,15 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 - 依次运行模拟盘扫描、复盘、BTC 价格更新、alignment、edge、离线回放、数据质量和日报。
 - 适合后续接入 cron 或其他本地调度器。
 
+### macOS 定时任务
+
+脚本位置：
+
+- [scripts/install_research_cycle_launchd.sh](/Users/pizza_yang/code/ploymarket/scripts/install_research_cycle_launchd.sh)
+- [scripts/uninstall_research_cycle_launchd.sh](/Users/pizza_yang/code/ploymarket/scripts/uninstall_research_cycle_launchd.sh)
+
+默认每 30 分钟运行一次 `research_cycle.sh`，日志写入 `logs/`。
+
 ### 信号生成
 
 代码位置：[src/ploymarket_sim/signals.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/signals.py)

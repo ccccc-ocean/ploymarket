@@ -887,3 +887,47 @@ scripts/research_cycle.sh
 - readiness：`not_ready`。
 
 原因仍是样本不足。
+
+## 2026-05-10：macOS 定时运行脚本
+
+### 本次目标
+
+让研究流水线可以在本机后台定时运行，持续积累 paper-run 样本。
+
+### 已完成
+
+新增：
+
+```bash
+scripts/install_research_cycle_launchd.sh
+scripts/uninstall_research_cycle_launchd.sh
+```
+
+默认每 30 分钟运行一次：
+
+```bash
+scripts/install_research_cycle_launchd.sh
+```
+
+每 15 分钟运行一次：
+
+```bash
+scripts/install_research_cycle_launchd.sh 900
+```
+
+停止：
+
+```bash
+scripts/uninstall_research_cycle_launchd.sh
+```
+
+日志：
+
+```text
+logs/research_cycle.out.log
+logs/research_cycle.err.log
+```
+
+### 当前建议
+
+先用 30 分钟间隔运行 1-2 天，确认没有错误和 API 卡顿，再决定是否提高频率。

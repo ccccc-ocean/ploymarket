@@ -58,6 +58,26 @@ scripts/research_cycle.sh
 
 它会依次执行 paper-run、paper-report、BTC 价格更新、alignment、edge、离线回放、data-quality 和 daily-report。
 
+在 macOS 上定时运行，默认每 30 分钟执行一次：
+
+```bash
+scripts/install_research_cycle_launchd.sh
+```
+
+改成每 15 分钟：
+
+```bash
+scripts/install_research_cycle_launchd.sh 900
+```
+
+停止定时任务：
+
+```bash
+scripts/uninstall_research_cycle_launchd.sh
+```
+
+日志写入 `logs/`，该目录不会提交到 Git。
+
 `paper-run` 输出里的 `execution_mode` 含义：
 
 - `TAKER`: 净 edge 扣除 taker fee、滑点、安全边际后仍过线，可以作为模拟吃单候选。

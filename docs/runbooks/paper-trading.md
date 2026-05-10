@@ -372,6 +372,43 @@ scripts/research_cycle.sh
 
 这个脚本适合接入本地定时任务。当前运行后仍然是 `not_ready`，原因是长期 paper-run 样本不足。
 
+## macOS 定时运行
+
+推荐使用 `launchd`，它比手动开终端更适合长期后台运行。
+
+默认每 30 分钟运行一次：
+
+```bash
+scripts/install_research_cycle_launchd.sh
+```
+
+指定间隔秒数，例如每 15 分钟：
+
+```bash
+scripts/install_research_cycle_launchd.sh 900
+```
+
+检查是否已加载：
+
+```bash
+launchctl list | grep com.ploymarket.research-cycle
+```
+
+查看日志：
+
+```bash
+tail -f logs/research_cycle.out.log
+tail -f logs/research_cycle.err.log
+```
+
+停止定时任务：
+
+```bash
+scripts/uninstall_research_cycle_launchd.sh
+```
+
+当前建议：先用 `1800` 秒，也就是 30 分钟。等稳定运行 1-2 天后，再考虑缩短到 15 分钟。
+
 输出文件在：
 
 ```text
