@@ -4,6 +4,7 @@ import argparse
 import sys
 
 from .backtest import backtest_market
+from .classifier import MARKET_TYPES, is_market_type
 from .clob import get_price_history
 from .config import load_config
 from .http import HttpError
@@ -20,24 +21,27 @@ def main() -> None:
     parser.add_argument("--config", default=DEFAULT_CONFIG)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    subparsers.add_parser("discover", help="find active BTC-related prediction markets")
-    subparsers.add_parser("signals", help="print current signals for discovered markets")
-    subparsers.add_parser("backtest", help="run a simple historical paper-trading backtest")
+    discover_parser = subparsers.add_parser("discover", help="find active BTC-related prediction markets")
+    discover_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
+    signals_parser = subparsers.add_parser("signals", help="print current signals for discovered markets")
+    signals_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
+    backtest_parser = subparsers.add_parser("backtest", help="run a simple historical paper-trading backtest")
+    backtest_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
     subparsers.add_parser("explain-risk", help="explain the current risk limits")
 
     args = parser.parse_args()
     config = load_config(args.config)
 
     if args.command == "discover":
-        print_market_table(discover_btc_markets(config))
+        print_market_table(_filter_markets(discover_btc_markets(config), args.market_type))
     elif args.command == "signals":
-        for market in discover_btc_markets(config):
+        for market in _filter_markets(discover_btc_markets(config), args.market_type):
             history = _safe_history(config, market)
             if not history:
                 continue
             print_signal(market, build_signal(market, history, config.signal, config.backtest))
     elif args.command == "backtest":
-        for market in discover_btc_markets(config):
+        for market in _filter_markets(discover_btc_markets(config), args.market_type):
             history = _safe_history(config, market)
             if not history:
                 continue
@@ -75,6 +79,10 @@ def _safe_history(config, market):
     except HttpError as exc:
         print(f"warning: skip {market.id} history: {exc}", file=sys.stderr)
         return []
+
+
+def _filter_markets(markets, market_type):
+    return [market for market in markets if is_market_type(market, market_type)]
 
 
 if __name__ == "__main__":

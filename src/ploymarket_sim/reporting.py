@@ -4,6 +4,7 @@ import csv
 from pathlib import Path
 
 from .backtest import BacktestResult
+from .classifier import classify_market
 from .polymarket import Market
 from .signals import Signal
 
@@ -11,15 +12,17 @@ from .signals import Signal
 def print_market_table(markets: list[Market]) -> None:
     print(f"found {len(markets)} BTC-related markets")
     for market in markets:
+        classification = classify_market(market)
         print(
             f"- {market.id} | yes={market.yes_price:.3f} | liq={market.liquidity:.0f} | "
-            f"vol24h={market.volume_24hr:.0f} | {market.question}"
+            f"vol24h={market.volume_24hr:.0f} | type={classification.market_type} | {market.question}"
         )
 
 
 def print_signal(market: Market, signal: Signal) -> None:
+    classification = classify_market(market)
     print(
-        f"{market.id} | {signal.action} | gross_edge={signal.edge:.4f} | "
+        f"{market.id} | {classification.market_type} | {signal.action} | gross_edge={signal.edge:.4f} | "
         f"net_edge={signal.net_edge:.4f} | confidence={signal.confidence:.2f}"
     )
     print(f"  {market.question}")

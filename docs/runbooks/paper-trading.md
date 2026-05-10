@@ -33,10 +33,30 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 - `liq` 是否太低。
 - 问题是否真的和 BTC 价格相关，还是只是公司、人物或其他间接事件。
 
+只看某一类市场：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml discover --market-type price_target
+```
+
+可用类型：
+
+- `price_target`
+- `price_range_daily`
+- `company_treasury`
+- `indirect_event`
+- `unknown`
+
 ## 查看当前信号
 
 ```bash
 env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml signals
+```
+
+建议学习时先过滤：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml signals --market-type price_target
 ```
 
 信号含义：
@@ -58,6 +78,12 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 
 ```bash
 env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml backtest
+```
+
+只回测价格目标类市场：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml backtest --market-type price_target
 ```
 
 输出文件在：

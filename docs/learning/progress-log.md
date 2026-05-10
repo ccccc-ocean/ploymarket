@@ -118,3 +118,48 @@
 2. 给回测输出汇总统计：胜率、平均盈亏、最大回撤、总费用、总滑点。
 3. 把 BTC 纯价格市场和 MicroStrategy / 公司事件类市场分开，不要混在同一个策略里评估。
 4. 设计 paper order 状态机，但先不接实盘。
+
+## 2026-05-10：引入 Obsidian 知识库工作流
+
+### 本次目标
+
+把本地安装的 Obsidian 用起来，让项目不只是代码仓库，也成为可持续学习的知识库。
+
+### 已完成
+
+- 把 `docs/` 明确作为 Obsidian vault。
+- 新增知识库主页：[[../00-home|Ploymarket Knowledge Vault]]
+- 新增学习地图：[[learning-map|学习地图]]
+- 新增今日计划：[[2026-05-10-session-plan|2026-05-10 学习与构建计划]]
+- 新增决策日志：[[../system/decision-log|决策日志]]
+- 新增市场分类笔记：[[../strategy/market-taxonomy|预测市场分类笔记]]
+- 新增 Obsidian 模板：
+  - [[../templates/daily-learning-note|daily-learning-note]]
+  - [[../templates/strategy-note|strategy-note]]
+- 实现第一版市场分类器：
+  - `price_target`
+  - `price_range_daily`
+  - `company_treasury`
+  - `indirect_event`
+  - `unknown`
+- CLI 支持 `--market-type` 过滤。
+
+### 今天的关键判断
+
+下一步代码优先做“市场分类”，再做“本地缓存”。
+
+原因：
+
+- 当前系统会抓到纯 BTC 价格市场、MicroStrategy 事件市场和间接 BTC 市场。
+- 它们不能用同一个策略信号评估。
+- 如果不先分类，回测统计会混在一起，容易形成错误结论。
+
+### 下次继续
+
+从 [[2026-05-10-session-plan|2026-05-10 学习与构建计划]] 继续。
+
+建议下一步：
+
+1. 用 `--market-type price_target` 只跑价格目标市场。
+2. 给回测增加汇总统计。
+3. 再做本地缓存，减少 API 截断和等待。

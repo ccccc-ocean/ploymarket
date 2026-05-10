@@ -40,9 +40,8 @@ class Market:
 
 def discover_btc_markets(config: AppConfig) -> list[Market]:
     markets = _discover_with_search(config)
-    if markets:
-        return _dedupe(markets)
-    return _discover_with_market_pages(config)
+    markets.extend(_discover_with_market_pages(config))
+    return _dedupe(markets)
 
 
 def _discover_with_search(config: AppConfig) -> list[Market]:

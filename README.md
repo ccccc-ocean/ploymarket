@@ -13,8 +13,15 @@
 
 持续学习、系统状态、风控笔记和模拟盘记录都放在 [docs/](docs/README.md)。
 
+如果使用 Obsidian，可以把 [docs/](docs/00-home.md) 作为 vault 打开：
+
+```text
+/Users/pizza_yang/code/ploymarket/docs
+```
+
 下次重新打开项目时，建议先读：
 
+- [Obsidian 主页](docs/00-home.md)
 - [当前系统状态](docs/system/current-state.md)
 - [学习进度记录](docs/learning/progress-log.md)
 - [模拟盘运行手册](docs/runbooks/paper-trading.md)
@@ -26,6 +33,14 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml signals
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml backtest
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explain-risk
+```
+
+可以用 `--market-type` 只观察某一类市场：
+
+```bash
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discover --market-type price_target
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml signals --market-type company_treasury
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml backtest --market-type price_target
 ```
 
 当前仓库还没有安装成包，所以命令里先显式加 `PYTHONPATH=src`。

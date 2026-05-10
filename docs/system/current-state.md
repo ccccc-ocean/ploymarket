@@ -16,6 +16,22 @@
 - 过滤活跃、未关闭、有订单簿、达到最低流动性的市场。
 - 提取市场问题、slug、流动性、24 小时成交量、YES 价格、CLOB token id。
 
+### 市场分类
+
+代码位置：[src/ploymarket_sim/classifier.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/classifier.py)
+
+- `price_target`: BTC 价格目标市场。
+- `price_range_daily`: 日内或短周期价格范围市场。
+- `company_treasury`: MicroStrategy / MSTR / 公司 BTC 持仓事件市场。
+- `indirect_event`: 只和 BTC 间接相关的市场。
+- `unknown`: 第一版规则无法判断的市场。
+
+CLI 支持：
+
+```bash
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discover --market-type price_target
+```
+
 ### 价格历史
 
 代码位置：[src/ploymarket_sim/clob.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/clob.py)
@@ -95,6 +111,16 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 - 没有接 BTC 现货/永续价格源。
 - 当前信号很初级，不能直接作为实盘依据。
 - 当前费用模型还是估算值，后续应读取市场真实 fee 设置。
+- 市场分类还是关键词规则，后续要用真实样本不断修正。
+
+## 知识库状态
+
+`docs/` 现在同时承担两个角色：
+
+- GitHub 文档目录。
+- Obsidian vault。
+
+Obsidian 入口是：[00-home.md](/Users/pizza_yang/code/ploymarket/docs/00-home.md)
 
 ## 重要原则
 
