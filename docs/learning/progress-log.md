@@ -239,3 +239,47 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 - 本地缓存。
 
 组合级资金曲线可以帮助我们看真正的账户级回撤。
+
+## 2026-05-10：组合级回测资金曲线
+
+### 本次目标
+
+把单市场回测结果合并成一个组合账户视角，开始观察账户级 PnL、费用、滑点和最大回撤。
+
+### 已完成
+
+- 新增 `src/ploymarket_sim/portfolio.py`。
+- `backtest` 命令新增输出：
+  - `data/portfolio_curve.csv`
+  - `data/portfolio_summary.csv`
+- 组合曲线字段包括：
+  - 现金。
+  - 已投入本金。
+  - 账户净值。
+  - 峰值净值。
+  - 回撤。
+  - 单事件费用和滑点。
+- 新增组合级终端摘要。
+
+### 本轮 price_target 回测观察
+
+本轮 `backtest --market-type price_target`：
+
+- 参与回测市场：33 个。
+- 有交易市场：5 个。
+- 交易事件：20 个。
+- 胜率：40.0%。
+- 组合 PnL：`-0.87`。
+- 最大回撤：`2.8%`。
+- 总费用：`2.30`。
+- 总滑点：`0.62`。
+
+### 当前口径
+
+组合曲线目前是交易事件级别，不是逐 bar mark-to-market。
+
+持仓按投入本金计值，费用和滑点立即降低净值。这是一个保守但还不够精细的口径。
+
+### 下次继续
+
+建议下一步做 paper order 状态机，为未来持续模拟盘和实盘订单生命周期打基础。

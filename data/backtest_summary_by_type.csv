@@ -1,3 +1,3 @@
 market_type,market_count,traded_market_count,trade_count,win_count,loss_count,win_rate,realized_pnl,total_fees,total_slippage,average_pnl_per_market,average_pnl_per_trade
-all,1,0,0,0,0,0.0,0,0,0,0.0,0.0
-price_target,1,0,0,0,0,0.0,0,0,0,0.0,0.0
+all,33,5,20,4,6,0.4,-0.8720049726193047,2.2983233996188943,0.625,-0.026424393109675898,-0.08720049726193047
+price_target,33,5,20,4,6,0.4,-0.8720049726193047,2.2983233996188943,0.625,-0.026424393109675898,-0.08720049726193047

@@ -98,6 +98,8 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 data/backtest_<market_id>.csv
 data/backtest_summary.csv
 data/backtest_summary_by_type.csv
+data/portfolio_curve.csv
+data/portfolio_summary.csv
 ```
 
 复盘时重点看：
@@ -132,6 +134,29 @@ data/backtest_summary_by_type.csv
 - 哪一类市场贡献了盈亏？
 - 哪一类市场成本最高？
 - 价格目标市场和公司事件市场是否应该分开优化？
+
+## 组合级资金曲线
+
+`portfolio_curve.csv` 会把所有市场里的交易事件按时间排序，模拟一个账户的现金、已投入资金、账户净值和回撤。
+
+重点字段：
+
+- `cash`: 当前现金。
+- `invested`: 当前仍在持仓里的投入本金。
+- `equity`: `cash + invested` 的保守净值。
+- `peak_equity`: 历史最高净值。
+- `drawdown`: 相对历史最高净值的回撤。
+
+`portfolio_summary.csv` 是组合级摘要：
+
+- `ending_equity`: 回测结束净值。
+- `realized_pnl`: 组合级盈亏。
+- `total_fees`: 总手续费。
+- `total_slippage`: 总滑点。
+- `max_drawdown`: 最大回撤。
+- `event_count`: 交易事件数量。
+
+注意：当前组合曲线使用“持仓按投入本金计值”的保守口径，费用和滑点会立即降低净值；它还不是逐 bar mark-to-market 的精细资金曲线。
 
 ## 查看风控配置说明
 

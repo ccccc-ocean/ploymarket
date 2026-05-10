@@ -111,6 +111,17 @@ taker_fee = notional * taker_fee_rate * p * (1 - p)
 
 - `data/backtest_summary.csv`
 - `data/backtest_summary_by_type.csv`
+- `data/portfolio_curve.csv`
+- `data/portfolio_summary.csv`
+
+### 组合级资金曲线
+
+代码位置：[src/ploymarket_sim/portfolio.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/portfolio.py)
+
+- 将多个市场的交易事件按时间排序。
+- 模拟组合账户现金、已投入本金、净值、峰值净值和回撤。
+- 使用保守口径：持仓按投入本金计值，费用和滑点立即降低净值。
+- 输出组合级最大回撤和账户级 PnL。
 
 ### CLI
 
@@ -136,7 +147,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 - 当前信号很初级，不能直接作为实盘依据。
 - 当前费用模型还是估算值，后续应读取市场真实 fee 设置。
 - 市场分类还是关键词规则，后续要用真实样本不断修正。
-- 汇总统计还没有最大回撤曲线，因为当前回测仍按单市场独立账户计算。
+- 组合曲线还不是逐 bar mark-to-market，只基于交易事件更新。
 
 ## 知识库状态
 

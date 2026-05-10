@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .backtest import BacktestResult
 from .classifier import classify_market
+from .portfolio import PortfolioPoint, PortfolioSummary
 from .polymarket import Market
 from .signals import Signal
 from .summary import AggregateSummary, BacktestSummary
@@ -154,4 +155,83 @@ def print_aggregate_summary(summary: AggregateSummary) -> None:
         f"summary[{summary.market_type}] | markets={summary.market_count} | traded={summary.traded_market_count} | "
         f"trades={summary.trade_count} | win_rate={summary.win_rate:.1%} | pnl={summary.realized_pnl:.2f} | "
         f"fees={summary.total_fees:.2f} | slippage={summary.total_slippage:.2f}"
+    )
+
+
+def write_portfolio_curve_csv(points: list[PortfolioPoint], output_dir: str) -> Path:
+    directory = Path(output_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / "portfolio_curve.csv"
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow(
+            [
+                "timestamp",
+                "market_id",
+                "action",
+                "cash",
+                "invested",
+                "equity",
+                "peak_equity",
+                "drawdown",
+                "pnl",
+                "fee",
+                "slippage",
+            ]
+        )
+        for point in points:
+            writer.writerow(
+                [
+                    point.timestamp,
+                    point.market_id,
+                    point.action,
+                    point.cash,
+                    point.invested,
+                    point.equity,
+                    point.peak_equity,
+                    point.drawdown,
+                    point.pnl,
+                    point.fee,
+                    point.slippage,
+                ]
+            )
+    return path
+
+
+def write_portfolio_summary_csv(summary: PortfolioSummary, output_dir: str) -> Path:
+    directory = Path(output_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / "portfolio_summary.csv"
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow(
+            [
+                "starting_cash",
+                "ending_equity",
+                "realized_pnl",
+                "total_fees",
+                "total_slippage",
+                "max_drawdown",
+                "event_count",
+            ]
+        )
+        writer.writerow(
+            [
+                summary.starting_cash,
+                summary.ending_equity,
+                summary.realized_pnl,
+                summary.total_fees,
+                summary.total_slippage,
+                summary.max_drawdown,
+                summary.event_count,
+            ]
+        )
+    return path
+
+
+def print_portfolio_summary(summary: PortfolioSummary) -> None:
+    print(
+        f"portfolio | ending_equity={summary.ending_equity:.2f} | pnl={summary.realized_pnl:.2f} | "
+        f"max_drawdown={summary.max_drawdown:.1%} | fees={summary.total_fees:.2f} | "
+        f"slippage={summary.total_slippage:.2f} | events={summary.event_count}"
     )

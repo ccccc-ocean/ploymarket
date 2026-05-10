@@ -9,13 +9,17 @@ from .classifier import MARKET_TYPES, is_market_type
 from .clob import get_price_history
 from .config import load_config
 from .http import HttpError
+from .portfolio import build_portfolio_curve, summarize_portfolio
 from .polymarket import discover_btc_markets
 from .reporting import (
     print_aggregate_summary,
     print_market_table,
+    print_portfolio_summary,
     print_signal,
     write_aggregate_summary_csv,
     write_backtest_csv,
+    write_portfolio_curve_csv,
+    write_portfolio_summary_csv,
     write_summary_csv,
 )
 from .signals import build_signal
@@ -51,12 +55,14 @@ def main() -> None:
                 continue
             print_signal(market, build_signal(market, history, config.signal, config.backtest))
     elif args.command == "backtest":
+        results = []
         summaries = []
         for market in _filter_markets(discover_btc_markets(config), args.market_type):
             history = _safe_history(config, market)
             if not history:
                 continue
             result = backtest_market(market, history, config)
+            results.append(result)
             path = write_backtest_csv(result, config.backtest.output_dir)
             summary = summarize_market(market, result)
             summaries.append(summary)
@@ -76,6 +82,14 @@ def main() -> None:
                 print_aggregate_summary(aggregate)
             print(f"summary_csv={summary_path}")
             print(f"summary_by_type_csv={aggregate_path}")
+        if results:
+            portfolio_curve = build_portfolio_curve(results, config)
+            portfolio_summary = summarize_portfolio(portfolio_curve, config)
+            curve_path = write_portfolio_curve_csv(portfolio_curve, config.backtest.output_dir)
+            portfolio_summary_path = write_portfolio_summary_csv(portfolio_summary, config.backtest.output_dir)
+            print_portfolio_summary(portfolio_summary)
+            print(f"portfolio_curve_csv={curve_path}")
+            print(f"portfolio_summary_csv={portfolio_summary_path}")
     elif args.command == "explain-risk":
         _explain_risk(config)
     elif args.command == "cache-info":
