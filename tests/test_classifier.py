@@ -5,7 +5,7 @@ from ploymarket_sim.polymarket import Market
 
 
 def market(question: str, slug: str = "btc") -> Market:
-    return Market("1", question, slug, None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"])
+    return Market("1", question, slug, None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
 
 
 class ClassifierTests(unittest.TestCase):

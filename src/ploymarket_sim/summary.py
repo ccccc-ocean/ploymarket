@@ -11,6 +11,7 @@ from .polymarket import Market
 class BacktestSummary:
     market_id: str
     market_type: str
+    taker_fee_rate: float
     question: str
     trade_count: int
     entry_count: int
@@ -56,6 +57,7 @@ def summarize_market(market: Market, result: BacktestResult) -> BacktestSummary:
     return BacktestSummary(
         market_id=result.market_id,
         market_type=classify_market(market).market_type,
+        taker_fee_rate=market.effective_taker_fee_rate(0.0),
         question=result.question,
         trade_count=trade_count,
         entry_count=entry_count,

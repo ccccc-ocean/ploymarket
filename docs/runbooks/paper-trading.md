@@ -120,6 +120,7 @@ data/orders_all.csv
 重点字段：
 
 - `market_type`: 市场分类。
+- `taker_fee_rate`: 市场级 Taker fee rate；如果市场没有提供则可能为默认/回退值。
 - `trade_count`: 该市场买入和退出总次数。
 - `entry_count`: 买入次数。
 - `exit_count`: 退出次数。
@@ -136,6 +137,8 @@ data/orders_all.csv
 - 哪一类市场贡献了盈亏？
 - 哪一类市场成本最高？
 - 价格目标市场和公司事件市场是否应该分开优化？
+
+注意：系统会优先使用 Polymarket 市场对象里的 `feeSchedule.rate`，没有该字段时才回退到 `config/default.toml` 里的 `taker_fee_rate`。
 
 ## 组合级资金曲线
 

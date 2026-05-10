@@ -16,7 +16,7 @@ class BacktestTests(unittest.TestCase):
             risk=RiskConfig(10.0, 50.0, 50.0, 50.0, 1, 10.0, 1.0, 0.9, 0.9, 1.0, 0.01, 0.99),
             backtest=BacktestConfig(10.0, 0.02, 25, "data"),
         )
-        market = Market("m1", "Will BTC be above X?", "btc-x", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"])
+        market = Market("m1", "Will BTC be above X?", "btc-x", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
         history = [PricePoint(i, 0.40) for i in range(4)] + [PricePoint(4 + i, 0.60) for i in range(4)]
 
         result = backtest_market(market, history, config)

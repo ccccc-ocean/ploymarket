@@ -19,6 +19,9 @@ class SignalTests(unittest.TestCase):
             ["Yes", "No"],
             [0.5, 0.5],
             ["yes", "no"],
+            False,
+            None,
+            None,
         )
         history = [PricePoint(i, 0.45) for i in range(24)] + [PricePoint(24 + i, 0.52) for i in range(6)]
         config = SignalConfig("1w", 60, 6, 24, 0.01, 0.015, 0.0, 0.92, 0.08)

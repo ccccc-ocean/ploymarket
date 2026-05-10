@@ -32,7 +32,7 @@ def build_signal(
     short_avg = mean(prices[-config.short_window :])
     long_avg = mean(prices[-config.long_window :])
     momentum = short_avg - long_avg
-    net_edge = _net_edge(momentum, current, config, backtest_config)
+    net_edge = _net_edge(market, momentum, current, config, backtest_config)
 
     if current >= config.buy_below:
         return Signal("HOLD", 0.0, momentum, net_edge, "YES 价格太接近 1，盈亏比不够")
@@ -51,6 +51,7 @@ def build_signal(
 
 
 def _net_edge(
+    market: Market,
     momentum: float,
     price: float,
     signal_config: SignalConfig,
@@ -58,9 +59,10 @@ def _net_edge(
 ) -> float:
     if backtest_config is None:
         return momentum
+    fee_rate = market.effective_taker_fee_rate(backtest_config.taker_fee_rate)
     costs = estimate_entry_cost(
         price,
-        backtest_config.taker_fee_rate,
+        fee_rate,
         backtest_config.slippage_bps,
         signal_config.safety_margin,
     )

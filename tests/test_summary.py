@@ -6,7 +6,7 @@ from ploymarket_sim.summary import aggregate_summaries, summarize_all, summarize
 
 
 def market(question: str = "Will Bitcoin reach $100,000 in May?") -> Market:
-    return Market("m1", question, "btc", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"])
+    return Market("m1", question, "btc", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
 
 
 class SummaryTests(unittest.TestCase):
@@ -25,6 +25,7 @@ class SummaryTests(unittest.TestCase):
         summary = summarize_market(market(), result)
 
         self.assertEqual(summary.market_type, "price_target")
+        self.assertEqual(summary.taker_fee_rate, 0.0)
         self.assertEqual(summary.entry_count, 1)
         self.assertEqual(summary.exit_count, 1)
         self.assertEqual(summary.win_count, 1)

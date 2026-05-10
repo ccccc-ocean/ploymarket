@@ -15,9 +15,10 @@ def print_market_table(markets: list[Market]) -> None:
     print(f"found {len(markets)} BTC-related markets")
     for market in markets:
         classification = classify_market(market)
+        fee_label = f"{market.taker_fee_rate:.3f}" if market.taker_fee_rate is not None else "default"
         print(
             f"- {market.id} | yes={market.yes_price:.3f} | liq={market.liquidity:.0f} | "
-            f"vol24h={market.volume_24hr:.0f} | type={classification.market_type} | {market.question}"
+            f"vol24h={market.volume_24hr:.0f} | type={classification.market_type} | fee={fee_label} | {market.question}"
         )
 
 
@@ -128,6 +129,7 @@ def write_summary_csv(summaries: list[BacktestSummary], output_dir: str) -> Path
             [
                 "market_id",
                 "market_type",
+                "taker_fee_rate",
                 "trade_count",
                 "entry_count",
                 "exit_count",
@@ -150,6 +152,7 @@ def write_summary_csv(summaries: list[BacktestSummary], output_dir: str) -> Path
                 [
                     summary.market_id,
                     summary.market_type,
+                    summary.taker_fee_rate,
                     summary.trade_count,
                     summary.entry_count,
                     summary.exit_count,

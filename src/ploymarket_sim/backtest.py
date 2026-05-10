@@ -55,7 +55,7 @@ def backtest_market(market: Market, history: list[PricePoint], config: AppConfig
                 order_sequence += 1
                 order_id = make_order_id(market.id, current.timestamp, order_sequence)
                 gross_proceeds = position.shares * current.price
-                fee = fee_amount(gross_proceeds, current.price, config.backtest.taker_fee_rate)
+                fee = fee_amount(gross_proceeds, current.price, market.effective_taker_fee_rate(config.backtest.taker_fee_rate))
                 proceeds = gross_proceeds - fee
                 pnl = proceeds - position.notional
                 portfolio.cash += proceeds
@@ -70,7 +70,8 @@ def backtest_market(market: Market, history: list[PricePoint], config: AppConfig
         if signal.action != "BUY_YES":
             continue
 
-        entry_fee_rate = taker_fee_rate(current.price, config.backtest.taker_fee_rate)
+        market_fee_rate = market.effective_taker_fee_rate(config.backtest.taker_fee_rate)
+        entry_fee_rate = taker_fee_rate(current.price, market_fee_rate)
         slippage_rate = config.backtest.slippage_bps / 10_000
         notional = min(config.backtest.trade_size_usdc, portfolio.cash / (1 + entry_fee_rate + slippage_rate))
         slippage = notional * slippage_rate
@@ -97,7 +98,7 @@ def backtest_market(market: Market, history: list[PricePoint], config: AppConfig
         order_sequence += 1
         order_id = make_order_id(market.id, final.timestamp, order_sequence)
         gross_proceeds = position.shares * final.price
-        fee = fee_amount(gross_proceeds, final.price, config.backtest.taker_fee_rate)
+        fee = fee_amount(gross_proceeds, final.price, market.effective_taker_fee_rate(config.backtest.taker_fee_rate))
         proceeds = gross_proceeds - fee
         pnl = proceeds - position.notional
         portfolio.cash += proceeds

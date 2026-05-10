@@ -322,3 +322,44 @@ Polymarket 真实下单不是“API 返回成功就等于最终成交”。未�
 ### 下次继续
 
 建议下一步读取市场真实 fee 设置，替换当前默认的 `taker_fee_rate = 0.02` 估算值。
+
+## 2026-05-10：市场级真实 fee rate
+
+### 本次目标
+
+把费用模型从固定默认值推进到市场级 fee rate，降低回测成本低估的风险。
+
+### 已完成
+
+- `Market` 新增：
+  - `fees_enabled`
+  - `taker_fee_rate`
+  - `fee_type`
+- 从 Polymarket market 对象解析 `feeSchedule.rate`。
+- 信号和回测优先使用市场级 fee rate。
+- 如果市场没有 fee schedule，则回退到配置里的 `backtest.taker_fee_rate`。
+- `discover` 输出显示 `fee=...`。
+- `backtest_summary.csv` 新增 `taker_fee_rate` 字段。
+
+### 本轮 price_target 回测观察
+
+市场级 fee rate 接入后，很多价格目标市场显示 `fee=0.070`，明显高于之前默认的 `0.020`。
+
+本轮 `backtest --market-type price_target`：
+
+- 参与回测市场：35 个。
+- 有交易市场：4 个。
+- 交易事件：14 个。
+- 胜率：57.1%。
+- 组合 PnL：`+10.25`。
+- 最大回撤：`1.5%`。
+- 总费用：`5.89`。
+- 总滑点：`0.44`。
+
+### 当前理解
+
+更真实的费用并不只是让 PnL 下降，它还会改变哪些交易能通过 `net_edge` 门槛。也就是说，费用模型会改变策略行为本身。
+
+### 下次继续
+
+建议下一步做 SQLite 行情库，把 HTTP cache 升级成结构化 market/history 存储，为长期模拟盘积累数据。

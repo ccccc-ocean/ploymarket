@@ -23,6 +23,9 @@ class Market:
     outcomes: list[str]
     outcome_prices: list[float]
     clob_token_ids: list[str]
+    fees_enabled: bool
+    taker_fee_rate: float | None
+    fee_type: str | None
 
     @property
     def yes_token_id(self) -> str | None:
@@ -37,6 +40,11 @@ class Market:
             if outcome.lower() == "yes":
                 return price
         return self.outcome_prices[0] if self.outcome_prices else None
+
+    def effective_taker_fee_rate(self, fallback: float) -> float:
+        if self.fees_enabled and self.taker_fee_rate is not None:
+            return self.taker_fee_rate
+        return fallback
 
 
 def discover_btc_markets(config: AppConfig) -> list[Market]:
@@ -135,6 +143,9 @@ def _parse_market(item: dict[str, Any]) -> Market | None:
             outcomes=[str(value) for value in outcomes],
             outcome_prices=prices,
             clob_token_ids=token_ids,
+            fees_enabled=bool(item.get("feesEnabled")),
+            taker_fee_rate=_parse_taker_fee_rate(item),
+            fee_type=str(item.get("feeType")) if item.get("feeType") else None,
         )
     except (TypeError, ValueError, json.JSONDecodeError):
         return None
@@ -149,6 +160,23 @@ def _json_list(value: Any) -> list[Any]:
         parsed = json.loads(value)
         return parsed if isinstance(parsed, list) else []
     return []
+
+
+def _parse_taker_fee_rate(item: dict[str, Any]) -> float | None:
+    fee_schedule = item.get("feeSchedule")
+    if isinstance(fee_schedule, str):
+        try:
+            fee_schedule = json.loads(fee_schedule)
+        except json.JSONDecodeError:
+            fee_schedule = None
+    if isinstance(fee_schedule, dict):
+        try:
+            rate = float(fee_schedule["rate"])
+            if 0 <= rate <= 1:
+                return rate
+        except (KeyError, TypeError, ValueError):
+            return None
+    return None
 
 
 def _dedupe(markets: list[Market]) -> list[Market]:

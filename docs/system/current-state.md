@@ -105,6 +105,11 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 taker_fee = notional * taker_fee_rate * p * (1 - p)
 ```
 
+fee rate 来源：
+
+- 优先使用 Polymarket market 对象里的 `feeSchedule.rate`。
+- 如果市场没有提供 fee schedule，则回退到 `config/default.toml` 的 `backtest.taker_fee_rate`。
+
 汇总代码位置：[src/ploymarket_sim/summary.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/summary.py)
 
 汇总输出：
@@ -168,7 +173,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 - 没有考虑到期结算和市场 resolution 风险。
 - 没有接 BTC 现货/永续价格源。
 - 当前信号很初级，不能直接作为实盘依据。
-- 当前费用模型还是估算值，后续应读取市场真实 fee 设置。
+- 当前费用模型已经读取市场级 fee rate，但仍然没有读取更复杂的 maker rebate、reward 和真实成交路径费用。
 - 市场分类还是关键词规则，后续要用真实样本不断修正。
 - 组合曲线还不是逐 bar mark-to-market，只基于交易事件更新。
 - 订单状态机还没有真实的失败、撤单、部分成交和链上 settlement 查询。
