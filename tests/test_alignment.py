@@ -17,6 +17,8 @@ class AlignmentTests(unittest.TestCase):
             storage.save_markets([market])
             storage.save_price_history("yes", [PricePoint(100, 0.40), PricePoint(3700, 0.45), PricePoint(10900, 0.50)])
             candles = [
+                BtcCandle(-10800, 80.0, 100.0, 90.0, 90.0),
+                BtcCandle(-3600, 85.0, 105.0, 95.0, 95.0),
                 BtcCandle(0, 90.0, 110.0, 100.0, 100.0),
                 BtcCandle(3600, 100.0, 120.0, 105.0, 110.0),
                 BtcCandle(10800, 110.0, 130.0, 115.0, 120.0),
@@ -26,5 +28,6 @@ class AlignmentTests(unittest.TestCase):
             summaries = summarize_alignment(rows)
 
             self.assertEqual(len(rows), 2)
+            self.assertGreater(rows[0].btc_past_1h_return, 0.0)
             self.assertEqual(summaries[0].horizon_hours, 1)
             self.assertGreater(summaries[0].sample_count, 0)

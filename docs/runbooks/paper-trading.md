@@ -276,6 +276,35 @@ data/alignment_summary.csv
 
 这不是交易信号，只是基础统计。后续需要按 `BUY_YES`、`HOLD`、市场流动性、到期时间和 BTC 涨跌区间分层。
 
+## Edge 分层报告
+
+生成分层 edge 报告：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml edge-report --min-samples 30
+```
+
+输出：
+
+```text
+data/edge_report.csv
+```
+
+当前第一版分组条件：
+
+- `horizon_hours`: 未来观察窗口。
+- `yes_price_bucket`: 当前 YES 价格区间。
+- `btc_past_1h_bucket`: 过去 1 小时 BTC 收益区间。
+
+重点：分组条件只使用当时已经知道的信息。未来 BTC 收益只作为结果字段保留，不能作为实盘条件。
+
+本轮观察：
+
+- 最好桶：`1h / YES 0.20-0.50 / BTC过去1h下跌0.25%-1%`，平均 YES 变化约 `+0.0022`，样本 `99`。
+- 最差桶：`6h / YES>=0.50 / BTC过去1h下跌0.25%-1%`，平均 YES 变化约 `-0.0414`，样本 `33`。
+
+当前更强的结论是排除坏条件，而不是直接开仓：高 YES 价格市场在 BTC 短线走弱后风险明显更差。
+
 输出文件在：
 
 ```text

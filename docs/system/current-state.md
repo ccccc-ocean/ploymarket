@@ -99,6 +99,15 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
   - `data/alignment_report.csv`
   - `data/alignment_summary.csv`
 
+### Edge 分层报告
+
+代码位置：[src/ploymarket_sim/edge_report.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/edge_report.py)
+
+- 读取 `data/alignment_report.csv`。
+- 按 `horizon_hours`、当前 YES 价格区间、过去 1 小时 BTC 动量分组。
+- 输出 `data/edge_report.csv`。
+- 分组条件只使用过去/当前信息，避免未来函数。
+
 ### 信号生成
 
 代码位置：[src/ploymarket_sim/signals.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/signals.py)
@@ -234,6 +243,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml replay
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-run
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml btc-price
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml alignment-report
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml edge-report
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explain-risk
 ```
 
@@ -263,6 +273,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 - 有持续 `paper-loop`，但还没有系统级守护进程、告警和自动日报。
 - SQLite 已用于 paper-run 本地读取和 replay-backtest 离线回放，但样本数量仍然很小。
 - 已有 BTC/Polymarket 时间对齐报告，但还没有按信号、市场类型、流动性分层评估 edge。
+- 已有第一版 edge 分层报告，但还没有把分层结论转成策略过滤器。
 - 没有盘口深度模拟。
 - 没有考虑到期结算和市场 resolution 风险。
 - 已接 BTC 现货 K 线，但还没有把外部价格源纳入信号模型。

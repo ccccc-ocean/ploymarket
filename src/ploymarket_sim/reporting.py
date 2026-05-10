@@ -6,6 +6,7 @@ from pathlib import Path
 from .alignment import AlignmentRow, AlignmentSummary
 from .backtest import BacktestResult
 from .btc_price import BtcCandle
+from .edge_report import EdgeBucket
 from .classifier import classify_market
 from .portfolio import PortfolioPoint, PortfolioSummary
 from .paper import PaperSignalRow
@@ -437,6 +438,8 @@ def write_alignment_rows_csv(rows: list[AlignmentRow], output_dir: str) -> Path:
                 "btc_close",
                 "future_btc_close",
                 "btc_return",
+                "btc_past_1h_return",
+                "btc_past_3h_return",
                 "question",
             ]
         )
@@ -452,6 +455,8 @@ def write_alignment_rows_csv(rows: list[AlignmentRow], output_dir: str) -> Path:
                     row.btc_close,
                     row.future_btc_close,
                     row.btc_return,
+                    row.btc_past_1h_return,
+                    row.btc_past_3h_return,
                     row.question,
                 ]
             )
@@ -486,6 +491,57 @@ def print_alignment_summary(summaries: list[AlignmentSummary]) -> None:
             f"alignment[{summary.horizon_hours}h] | samples={summary.sample_count} | "
             f"avg_yes_change={summary.average_yes_change:.4f} | avg_btc_return={summary.average_btc_return:.4%}"
         )
+
+
+def write_edge_report_csv(buckets: list[EdgeBucket], output_dir: str) -> Path:
+    directory = Path(output_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / "edge_report.csv"
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow(
+            [
+                "horizon_hours",
+                "yes_price_bucket",
+                "btc_past_1h_bucket",
+                "sample_count",
+                "average_yes_change",
+                "median_yes_change",
+                "yes_up_rate",
+                "average_btc_past_1h_return",
+                "average_btc_future_return",
+            ]
+        )
+        for bucket in buckets:
+            writer.writerow(
+                [
+                    bucket.horizon_hours,
+                    bucket.yes_price_bucket,
+                    bucket.btc_past_1h_bucket,
+                    bucket.sample_count,
+                    bucket.average_yes_change,
+                    bucket.median_yes_change,
+                    bucket.yes_up_rate,
+                    bucket.average_btc_past_1h_return,
+                    bucket.average_btc_future_return,
+                ]
+            )
+    return path
+
+
+def print_edge_report_summary(buckets: list[EdgeBucket]) -> None:
+    if not buckets:
+        print("edge_report | buckets=0")
+        return
+    best = max(buckets, key=lambda bucket: bucket.average_yes_change)
+    worst = min(buckets, key=lambda bucket: bucket.average_yes_change)
+    print(
+        f"edge_report | buckets={len(buckets)} | "
+        f"best={best.horizon_hours}h/{best.yes_price_bucket}/{best.btc_past_1h_bucket} "
+        f"avg_yes_change={best.average_yes_change:.4f} n={best.sample_count} | "
+        f"worst={worst.horizon_hours}h/{worst.yes_price_bucket}/{worst.btc_past_1h_bucket} "
+        f"avg_yes_change={worst.average_yes_change:.4f} n={worst.sample_count}"
+    )
 
 
 def print_data_quality_summary(stats: list[MarketHistoryStats]) -> None:

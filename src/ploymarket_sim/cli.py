@@ -12,6 +12,7 @@ from .cache import CachePolicy, JsonCache
 from .classifier import MARKET_TYPES, is_market_type
 from .clob import get_price_history
 from .config import load_config
+from .edge_report import build_edge_buckets, load_alignment_rows_csv
 from .execution import plan_execution
 from .http import HttpError
 from .portfolio import build_mark_to_market_curve, build_portfolio_curve, summarize_portfolio
@@ -25,6 +26,7 @@ from .reporting import (
     print_paper_report_summary,
     print_data_quality_summary,
     print_alignment_summary,
+    print_edge_report_summary,
     print_signal,
     write_aggregate_summary_csv,
     write_all_order_events_csv,
@@ -40,6 +42,7 @@ from .reporting import (
     write_alignment_rows_csv,
     write_alignment_summary_csv,
     write_data_quality_csv,
+    write_edge_report_csv,
     write_summary_csv,
 )
 from .signals import build_signal
@@ -76,6 +79,8 @@ def main() -> None:
     subparsers.add_parser("btc-price", help="fetch external BTC spot candles")
     alignment_parser = subparsers.add_parser("alignment-report", help="align local Polymarket YES history with BTC candles")
     alignment_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
+    edge_parser = subparsers.add_parser("edge-report", help="bucket alignment rows to inspect conditional edge")
+    edge_parser.add_argument("--min-samples", type=int, default=30)
     subparsers.add_parser("explain-risk", help="explain the current risk limits")
 
     args = parser.parse_args()
@@ -124,6 +129,8 @@ def main() -> None:
         _run_btc_price(config)
     elif args.command == "alignment-report":
         _run_alignment_report(config, args.market_type)
+    elif args.command == "edge-report":
+        _run_edge_report(config, args.min_samples)
 
 
 def _run_backtest(config, markets, storage, prefer_local: bool) -> None:
@@ -334,6 +341,17 @@ def _run_alignment_report(config, market_type: str) -> None:
     print_alignment_summary(summaries)
     print(f"alignment_csv={rows_path}")
     print(f"alignment_summary_csv={summary_path}")
+
+
+def _run_edge_report(config, min_samples: int) -> None:
+    alignment_path = Path(config.backtest.output_dir) / "alignment_report.csv"
+    rows = load_alignment_rows_csv(alignment_path)
+    if not rows:
+        raise SystemExit("No alignment rows found. Run alignment-report first.")
+    buckets = build_edge_buckets(rows, min_samples=min_samples)
+    path = write_edge_report_csv(buckets, config.backtest.output_dir)
+    print_edge_report_summary(buckets)
+    print(f"edge_report_csv={path}")
 
 
 if __name__ == "__main__":

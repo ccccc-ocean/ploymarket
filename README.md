@@ -46,6 +46,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml storag
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml data-quality
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml btc-price
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml alignment-report
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml edge-report
 ```
 
 `paper-run` 输出里的 `execution_mode` 含义：
@@ -141,6 +142,8 @@ data/alignment_summary.csv
 ```
 
 当前默认统计未来 `1h`、`3h`、`6h` 的 YES 价格变化和 BTC 收益率，用来判断信号是否真的有可重复 edge。
+
+`edge-report` 会进一步按可提前知道的条件分层，例如 YES 价格区间和过去 1 小时 BTC 动量。注意：它不会用未来 BTC 收益做分组，避免引入未来函数。
 
 默认值偏保守，是为了先观察策略行为。等我们看过几轮模拟盘结果，再逐步回答：
 

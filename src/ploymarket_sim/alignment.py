@@ -20,6 +20,8 @@ class AlignmentRow:
     btc_close: float
     future_btc_close: float
     btc_return: float
+    btc_past_1h_return: float
+    btc_past_3h_return: float
 
 
 @dataclass(frozen=True)
@@ -45,7 +47,9 @@ def build_alignment_rows(
             continue
         for point in history:
             btc_now = _latest_candle_at_or_before(btc_candles, point.timestamp)
-            if btc_now is None:
+            btc_past_1h = _latest_candle_at_or_before(btc_candles, point.timestamp - 3600)
+            btc_past_3h = _latest_candle_at_or_before(btc_candles, point.timestamp - 3 * 3600)
+            if btc_now is None or btc_past_1h is None or btc_past_3h is None:
                 continue
             for horizon in horizons_hours:
                 target_timestamp = point.timestamp + horizon * 3600
@@ -65,6 +69,8 @@ def build_alignment_rows(
                         btc_close=btc_now.close,
                         future_btc_close=future_btc.close,
                         btc_return=(future_btc.close - btc_now.close) / btc_now.close if btc_now.close else 0.0,
+                        btc_past_1h_return=(btc_now.close - btc_past_1h.close) / btc_past_1h.close if btc_past_1h.close else 0.0,
+                        btc_past_3h_return=(btc_now.close - btc_past_3h.close) / btc_past_3h.close if btc_past_3h.close else 0.0,
                     )
                 )
     return rows

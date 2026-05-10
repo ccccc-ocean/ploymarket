@@ -747,3 +747,38 @@ SQLite 当前状态：
 ### 当前判断
 
 整体平均值不能直接用于交易。下一步要按信号动作、市场类型、流动性、YES 价格区间、BTC 涨跌区间分层，寻找是否存在稳定 edge。
+
+## 2026-05-10：第一版 Edge 分层报告
+
+### 本次目标
+
+从整体平均值进入条件分层，观察哪些“当时可见”的条件下，未来 YES 价格表现更好或更差。
+
+### 已完成
+
+- 新增 `src/ploymarket_sim/edge_report.py`。
+- 新增 CLI 命令：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml edge-report --min-samples 30
+```
+
+- 输出 `data/edge_report.csv`。
+
+### 重要修正
+
+第一版思路里曾考虑按未来 BTC 收益分桶，这会引入未来函数。已改成按“过去 1 小时 BTC 动量”分桶，未来 YES 变化只作为结果。
+
+### 本轮观察
+
+- 分桶数：45。
+- 最好桶：`1h / YES 0.20-0.50 / BTC过去1h下跌0.25%-1%`，平均 YES 变化约 `+0.0022`，样本 `99`。
+- 最差桶：`6h / YES>=0.50 / BTC过去1h下跌0.25%-1%`，平均 YES 变化约 `-0.0414`，样本 `33`。
+
+### 当前判断
+
+目前还没有强到足以开仓的正向 edge。更明确的信号是：高 YES 价格市场在 BTC 短线走弱后表现很差，适合作为风险过滤器候选。
+
+### 下次继续
+
+建议把这个坏条件先转成策略过滤器：当 YES 价格高于 `0.50` 且 BTC 过去 1 小时下跌超过 `0.25%` 时，不允许做多 YES。然后重新跑离线回放，观察最大回撤和亏损交易是否下降。
