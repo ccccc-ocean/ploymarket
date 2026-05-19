@@ -151,7 +151,16 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 - [scripts/install_research_cycle_launchd.sh](/Users/pizza_yang/code/ploymarket/scripts/install_research_cycle_launchd.sh)
 - [scripts/uninstall_research_cycle_launchd.sh](/Users/pizza_yang/code/ploymarket/scripts/uninstall_research_cycle_launchd.sh)
 
-默认每 30 分钟运行一次 `research_cycle.sh`，日志写入 `logs/`。
+当前本地定时任务每 5 分钟运行一次 `research_cycle.sh`，日志写入 `logs/`。脚本内部有锁，上一轮没结束时会跳过本轮，避免重叠。
+
+### macOS 防睡眠
+
+脚本位置：
+
+- [scripts/install_keep_awake_launchd.sh](/Users/pizza_yang/code/ploymarket/scripts/install_keep_awake_launchd.sh)
+- [scripts/uninstall_keep_awake_launchd.sh](/Users/pizza_yang/code/ploymarket/scripts/uninstall_keep_awake_launchd.sh)
+
+当前 keep-awake 使用 `caffeinate -i -m -s`，防止系统和磁盘睡眠，但不强制屏幕常亮。屏幕可以熄灭，脚本仍应继续运行。不要合盖。
 
 ### 信号生成
 

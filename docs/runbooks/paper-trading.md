@@ -379,12 +379,13 @@ scripts/research_cycle.sh
 
 它会按顺序执行：
 
+- `btc-price`
+- `backtest`
 - `paper-run`
 - `paper-report`
-- `btc-price`
 - `alignment-report`
 - `edge-report`
-- `replay-backtest`
+- `strategy-sweep`
 - `data-quality`
 - `daily-report`
 
@@ -406,6 +407,12 @@ scripts/install_research_cycle_launchd.sh
 scripts/install_research_cycle_launchd.sh 900
 ```
 
+当前 5 分钟研究模式：
+
+```bash
+scripts/install_research_cycle_launchd.sh 300
+```
+
 检查是否已加载：
 
 ```bash
@@ -425,7 +432,42 @@ tail -f logs/research_cycle.err.log
 scripts/uninstall_research_cycle_launchd.sh
 ```
 
-当前建议：先用 `1800` 秒，也就是 30 分钟。等稳定运行 1-2 天后，再考虑缩短到 15 分钟。
+当前建议：5 分钟粒度研究可以用 `300` 秒，但必须依赖 `research_cycle.sh` 里的锁防止上一轮未结束时重叠运行。
+
+## macOS 防睡眠
+
+屏幕熄灭不等于系统睡眠。为了让定时脚本在屏幕关闭后继续运行，可以安装 keep-awake launchd：
+
+```bash
+scripts/install_keep_awake_launchd.sh
+```
+
+它使用：
+
+```bash
+caffeinate -i -m -s
+```
+
+含义：
+
+- 防止系统 idle sleep。
+- 防止磁盘睡眠。
+- 插电时更稳定地保持系统 awake。
+- 不使用 `-d`，所以不会强制屏幕常亮，屏幕仍然可以熄灭。
+
+检查：
+
+```bash
+launchctl list | grep com.ploymarket.keep-awake
+```
+
+停止：
+
+```bash
+scripts/uninstall_keep_awake_launchd.sh
+```
+
+注意：不要合上 MacBook 盖子。合盖通常会触发硬件级睡眠策略，普通 launchd/caffeinate 未必能保证继续联网运行。
 
 输出文件在：
 
