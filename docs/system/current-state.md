@@ -78,14 +78,14 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 - 调用 CLOB `prices-history` 获取 YES token 的历史价格。
 - 当前默认参数：
   - `interval = 1w`
-  - `fidelity = 60` 分钟
+  - `fidelity = 5` 分钟
 
 ### 外部 BTC 现货价格
 
 代码位置：[src/ploymarket_sim/btc_price.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/btc_price.py)
 
 - 使用 Coinbase 公开 BTC-USD candles。
-- 当前默认粒度：`ONE_HOUR`。
+- 当前默认粒度：`FIVE_MINUTE`。
 - 输出 `data/btc_price_candles.csv`。
 - 当前只用于研究，不直接进入交易决策。
 
@@ -95,6 +95,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 
 - 将本地 Polymarket YES 历史价格与 BTC-USD K 线对齐。
 - 默认计算未来 `1h`、`3h`、`6h` 的 YES 变化和 BTC 收益率。
+- 底层 YES 价格历史和 BTC K 线已切换到 5 分钟粒度，便于后续扩展到 `5m`、`15m`、`30m` 短线市场研究。
 - 输出：
   - `data/alignment_report.csv`
   - `data/alignment_summary.csv`
@@ -107,6 +108,15 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 - 按 `horizon_hours`、当前 YES 价格区间、过去 1 小时 BTC 动量分组。
 - 输出 `data/edge_report.csv`。
 - 分组条件只使用过去/当前信息，避免未来函数。
+
+### 策略参数扫描
+
+代码位置：[src/ploymarket_sim/strategy_sweep.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/strategy_sweep.py)
+
+- 每轮在本地 5 分钟历史数据上测试一组保守候选参数。
+- 输出 `data/strategy_sweep.csv`。
+- 当前扫描维度包括短/长均线窗口、`min_momentum`、`min_edge` 和 BTC 下跌过滤阈值。
+- 这个报告只用于研究，不会自动改写默认配置，避免因为单轮样本过拟合。
 
 ### BTC 动量过滤器
 

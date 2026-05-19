@@ -17,7 +17,7 @@ sqlite_path = "data/ploymarket.sqlite"
 provider = "coinbase_public"
 base_url = "https://api.coinbase.com"
 product_id = "BTC-USD"
-granularity = "ONE_HOUR"
+granularity = "FIVE_MINUTE"
 
 [btc_filter]
 enabled = true
@@ -37,9 +37,9 @@ require_orderbook = true
 
 [signal]
 history_interval = "1w"
-history_fidelity_minutes = 60
-short_window = 6
-long_window = 24
+history_fidelity_minutes = 5
+short_window = 72
+long_window = 288
 min_momentum = 0.015
 min_edge = 0.025
 safety_margin = 0.01

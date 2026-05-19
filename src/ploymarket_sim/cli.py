@@ -48,6 +48,7 @@ from .reporting import (
 )
 from .signals import build_signal
 from .storage import storage_from_config
+from .strategy_sweep import print_strategy_sweep_summary, run_strategy_sweep, write_strategy_sweep_csv
 from .summary import aggregate_summaries, summarize_all, summarize_market
 
 
@@ -82,6 +83,9 @@ def main() -> None:
     alignment_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
     edge_parser = subparsers.add_parser("edge-report", help="bucket alignment rows to inspect conditional edge")
     edge_parser.add_argument("--min-samples", type=int, default=30)
+    sweep_parser = subparsers.add_parser("strategy-sweep", help="try conservative 5-minute strategy parameter candidates")
+    sweep_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
+    sweep_parser.add_argument("--limit", type=int, default=10)
     subparsers.add_parser("daily-report", help="summarize paper, replay, alignment, and edge outputs")
     subparsers.add_parser("explain-risk", help="explain the current risk limits")
 
@@ -133,6 +137,8 @@ def main() -> None:
         _run_alignment_report(config, args.market_type)
     elif args.command == "edge-report":
         _run_edge_report(config, args.min_samples)
+    elif args.command == "strategy-sweep":
+        _run_strategy_sweep(config, args.market_type, args.limit)
     elif args.command == "daily-report":
         _run_daily_report(config)
 
@@ -357,6 +363,21 @@ def _run_edge_report(config, min_samples: int) -> None:
     path = write_edge_report_csv(buckets, config.backtest.output_dir)
     print_edge_report_summary(buckets)
     print(f"edge_report_csv={path}")
+
+
+def _run_strategy_sweep(config, market_type: str, limit: int) -> None:
+    storage = storage_from_config(config)
+    markets = storage.load_markets()
+    btc_candles = load_btc_candles_csv(Path(config.backtest.output_dir) / "btc_price_candles.csv")
+    if limit <= 0:
+        raise SystemExit("--limit must be > 0")
+    if not markets:
+        raise SystemExit("No local markets found. Run discover or backtest first.")
+    if not btc_candles:
+        raise SystemExit("No BTC candles found. Run btc-price first.")
+    results = run_strategy_sweep(config, storage, markets, btc_candles, market_type, limit)
+    path = write_strategy_sweep_csv(results, config.backtest.output_dir)
+    print_strategy_sweep_summary(results, path)
 
 
 def _run_daily_report(config) -> None:

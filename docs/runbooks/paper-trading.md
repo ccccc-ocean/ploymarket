@@ -267,6 +267,24 @@ data/alignment_summary.csv
 - `1h`: 未来 1 小时 YES 价格变化和 BTC 收益率。
 - `3h`: 未来 3 小时 YES 价格变化和 BTC 收益率。
 - `6h`: 未来 6 小时 YES 价格变化和 BTC 收益率。
+- 底层采样已切到 5 分钟粒度：Polymarket `prices-history` 使用 `fidelity=5`，Coinbase BTC-USD 使用 `FIVE_MINUTE`。
+- 信号窗口仍保持近似原来的时间长度：短窗 `72` 个 5 分钟点约等于 6 小时，长窗 `288` 个 5 分钟点约等于 24 小时。
+
+## 策略参数扫描
+
+每轮流水线会额外运行一组保守的 5 分钟参数候选：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml strategy-sweep --market-type price_target --limit 10
+```
+
+输出：
+
+```text
+data/strategy_sweep.csv
+```
+
+它的用途是持续观察哪些参数组合在当前样本里更接近盈利，而不是自动把单轮最优参数写回默认配置。只有当同一类参数在多轮、多市场、足够交易数下持续优于默认策略，才考虑升级为默认策略。
 
 本轮样本：
 
