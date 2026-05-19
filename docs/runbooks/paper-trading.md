@@ -434,40 +434,36 @@ scripts/uninstall_research_cycle_launchd.sh
 
 当前建议：5 分钟粒度研究可以用 `300` 秒，但必须依赖 `research_cycle.sh` 里的锁防止上一轮未结束时重叠运行。
 
-## macOS 防睡眠
+## macOS 系统防睡眠设置
 
-屏幕熄灭不等于系统睡眠。为了让定时脚本在屏幕关闭后继续运行，可以安装 keep-awake launchd：
+目标是系统层面设置“屏幕可以熄灭，但 Mac 不进入睡眠”，而不是依赖项目里的常驻脚本。
 
-```bash
-scripts/install_keep_awake_launchd.sh
-```
-
-它使用：
+当前推荐设置：
 
 ```bash
-caffeinate -i -m -s
+sudo pmset -c sleep 0 disksleep 0 displaysleep 5
 ```
 
 含义：
 
-- 防止系统 idle sleep。
-- 防止磁盘睡眠。
-- 插电时更稳定地保持系统 awake。
-- 不使用 `-d`，所以不会强制屏幕常亮，屏幕仍然可以熄灭。
+- `-c`: 只修改接电源时的设置。
+- `sleep 0`: 接电源时系统不自动睡眠。
+- `disksleep 0`: 接电源时磁盘不自动睡眠。
+- `displaysleep 5`: 屏幕 5 分钟后熄灭，但系统仍保持运行。
 
-检查：
-
-```bash
-launchctl list | grep com.ploymarket.keep-awake
-```
-
-停止：
+检查当前设置：
 
 ```bash
-scripts/uninstall_keep_awake_launchd.sh
+pmset -g custom
 ```
 
-注意：不要合上 MacBook 盖子。合盖通常会触发硬件级睡眠策略，普通 launchd/caffeinate 未必能保证继续联网运行。
+重点看 `AC Power` 下：
+
+- `sleep` 应为 `0`。
+- `disksleep` 应为 `0`。
+- `displaysleep` 可以是你希望的屏幕熄灭分钟数。
+
+注意：不要合上 MacBook 盖子。合盖通常会触发更强的硬件睡眠策略，即使系统设置为不自动睡眠，也不保证脚本继续联网运行。
 
 输出文件在：
 
