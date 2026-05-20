@@ -1,6 +1,6 @@
 # Polymarket 底层机制知识库
 
-最后更新：2026-05-07
+最后更新：2026-05-20
 
 来源：
 
@@ -148,12 +148,14 @@ fee = C * feeRate * p * (1 - p)
 
 - 中间概率区间交易摩擦更高。
 - 高频 Taker 策略必须把 fee 纳入 edge 计算。
-- 当前配置里的 `fee_rate = 0.0` 只是临时简化，后续需要按市场费率改成动态费用。
+- 公式里的 `C` 是交易份额数量，不是 USDC notional。若回测使用 USDC notional，需要先换算成 shares。
+- 对同一笔 USDC notional，价格越低，买到的 shares 越多，因此不能简单用 `notional * feeRate * p * (1-p)`。
+- 当前代码已按市场费率估算 taker fee，并在 spread scan 中按 1 YES + 1 NO 的完整组合份额计算费用。
 
 后续代码任务：
 
 - 拉取 fee-enabled 和 fee rate。
-- 回测里加入 `p * (1 - p)` 手续费模型。
+- 回测里持续校验 `C * feeRate * p * (1 - p)` 手续费模型。
 - 把信号里的 `min_edge` 改成必须覆盖 fee + slippage + 安全边际。
 
 ## 8. Negative Risk 主要影响多结果市场

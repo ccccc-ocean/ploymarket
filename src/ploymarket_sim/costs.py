@@ -15,9 +15,11 @@ class CostEstimate:
 
 
 def taker_fee_rate(price: float, base_fee_rate: float) -> float:
-    """Estimate Polymarket Taker fee as feeRate * p * (1 - p)."""
+    """Estimate taker fee as a rate on USDC notional."""
     bounded_price = min(max(price, 0.0), 1.0)
-    return base_fee_rate * bounded_price * (1.0 - bounded_price)
+    if bounded_price <= 0:
+        return 0.0
+    return base_fee_rate * (1.0 - bounded_price)
 
 
 def estimate_entry_cost(
@@ -35,3 +37,9 @@ def estimate_entry_cost(
 
 def fee_amount(notional: float, price: float, base_fee_rate: float) -> float:
     return notional * taker_fee_rate(price, base_fee_rate)
+
+
+def fee_amount_for_shares(shares: float, price: float, base_fee_rate: float) -> float:
+    """Estimate Polymarket taker fee as C * feeRate * p * (1 - p)."""
+    bounded_price = min(max(price, 0.0), 1.0)
+    return shares * base_fee_rate * bounded_price * (1.0 - bounded_price)

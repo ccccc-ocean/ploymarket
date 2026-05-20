@@ -6,7 +6,7 @@ import sys
 from .classifier import classify_market
 from .clob import TokenQuote, get_token_quote
 from .config import AppConfig
-from .costs import fee_amount
+from .costs import fee_amount_for_shares
 from .http import HttpError
 from .polymarket import Market
 
@@ -153,7 +153,7 @@ def build_spread_scan_row(
     buy_pair_total_cost = None
     buy_pair_edge = None
     if yes_quote.ask is not None and no_quote.ask is not None:
-        buy_pair_fees = fee_amount(yes_quote.ask, yes_quote.ask, fee_rate) + fee_amount(no_quote.ask, no_quote.ask, fee_rate)
+        buy_pair_fees = fee_amount_for_shares(1.0, yes_quote.ask, fee_rate) + fee_amount_for_shares(1.0, no_quote.ask, fee_rate)
         buy_pair_slippage = buy_pair_cost * slippage_rate
         buy_pair_total_cost = buy_pair_cost + buy_pair_fees + buy_pair_slippage
         buy_pair_edge = 1.0 - buy_pair_total_cost
@@ -164,7 +164,7 @@ def build_spread_scan_row(
     sell_pair_net_proceeds = None
     sell_pair_edge = None
     if yes_quote.bid is not None and no_quote.bid is not None:
-        sell_pair_fees = fee_amount(yes_quote.bid, yes_quote.bid, fee_rate) + fee_amount(no_quote.bid, no_quote.bid, fee_rate)
+        sell_pair_fees = fee_amount_for_shares(1.0, yes_quote.bid, fee_rate) + fee_amount_for_shares(1.0, no_quote.bid, fee_rate)
         sell_pair_slippage = sell_pair_proceeds * slippage_rate
         sell_pair_net_proceeds = sell_pair_proceeds - sell_pair_fees - sell_pair_slippage
         sell_pair_edge = sell_pair_net_proceeds - 1.0
