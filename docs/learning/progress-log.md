@@ -931,3 +931,41 @@ logs/research_cycle.err.log
 ### 当前建议
 
 先用 30 分钟间隔运行 1-2 天，确认没有错误和 API 卡顿，再决定是否提高频率。
+
+## 2026-05-20：从单边 BUY_YES 转向 YES/NO 双边价差扫描
+
+### 本次目标
+
+当前 BUY_YES 动量策略在 5 分钟粒度下回放 PnL 明显为负，因此不继续围绕旧策略微调。根据 Polymarket YES/NO 互补 token 机制，新增只读价差扫描，观察是否存在扣除费用和滑点后仍为正的完整组合机会。
+
+### 已完成
+
+新增：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml spread-scan --market-type price_target
+```
+
+输出：
+
+```text
+data/spread_scan.csv
+```
+
+扫描逻辑：
+
+- `BUY_BOTH`: 同时买入 1 YES + 1 NO，要求 `YES ask + NO ask + 费用 + 滑点 < 1`。
+- `SELL_BOTH`: 已持有完整组合时，要求 `YES bid + NO bid - 费用 - 滑点 > 1`。
+- 当前只读，不下单，不做实盘。
+
+### 本轮观察
+
+- 扫描 price_target 市场：`22` 个。
+- `BUY_BOTH`: `0`。
+- `SELL_BOTH`: `0`。
+- 最好的 buy edge 约 `-0.0036`，仍为负。
+- 结论：方向是正确的，但当前盘口暂未出现扣费后可执行的完整组合套利机会。
+
+### 下一步
+
+继续让定时流水线记录 `spread_scan.csv` 和 `daily_report.csv` 中的价差字段。如果连续多轮出现正 edge，再加入模拟盘状态机：记录机会出现时间、可成交深度、是否在下一轮消失、以及假设成交后的退出/merge/redeem 路径。

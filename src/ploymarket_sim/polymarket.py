@@ -35,11 +35,30 @@ class Market:
         return self.clob_token_ids[0] if self.clob_token_ids else None
 
     @property
+    def no_token_id(self) -> str | None:
+        for outcome, token_id in zip(self.outcomes, self.clob_token_ids):
+            if outcome.lower() == "no":
+                return token_id
+        if len(self.clob_token_ids) > 1:
+            return self.clob_token_ids[1]
+        return None
+
+    @property
     def yes_price(self) -> float | None:
         for outcome, price in zip(self.outcomes, self.outcome_prices):
             if outcome.lower() == "yes":
                 return price
         return self.outcome_prices[0] if self.outcome_prices else None
+
+    @property
+    def no_price(self) -> float | None:
+        for outcome, price in zip(self.outcomes, self.outcome_prices):
+            if outcome.lower() == "no":
+                return price
+        if len(self.outcome_prices) > 1:
+            return self.outcome_prices[1]
+        yes_price = self.yes_price
+        return max(0.0, 1.0 - yes_price) if yes_price is not None else None
 
     def effective_taker_fee_rate(self, fallback: float) -> float:
         if self.fees_enabled and self.taker_fee_rate is not None:

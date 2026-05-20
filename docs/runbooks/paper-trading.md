@@ -159,6 +159,27 @@ data/paper_report.csv
 
 这个报告用于观察信号是否持续出现，而不是只看单轮偶然结果。
 
+## YES/NO 双边价差扫描
+
+`spread-scan` 会读取真实 CLOB 订单簿里的 YES/NO 最佳 bid/ask，检查完整组合价差：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml spread-scan --market-type price_target
+```
+
+输出文件：
+
+```text
+data/spread_scan.csv
+```
+
+重点看：
+
+- `BUY_BOTH`: 如果 `YES ask + NO ask + 费用 + 滑点 < 1`，理论上可同时买入 YES/NO 完整组合，等待 merge/redeem。
+- `SELL_BOTH`: 如果已经持有完整组合，且 `YES bid + NO bid - 费用 - 滑点 > 1`，理论上可双边卖出。
+- `buy_pair_edge` / `sell_pair_edge`: 扣除估算费用和滑点后的净优势。
+- 当前这个命令只做只读扫描，不会下单；只有连续多轮出现正 edge、且订单簿深度足够时，才考虑进入模拟盘成交状态机。
+
 ## 跑回测
 
 ```bash
@@ -383,6 +404,7 @@ scripts/research_cycle.sh
 - `backtest`
 - `paper-run`
 - `paper-report`
+- `spread-scan`
 - `alignment-report`
 - `edge-report`
 - `strategy-sweep`

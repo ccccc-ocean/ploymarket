@@ -25,6 +25,10 @@ class PolymarketParsingTests(unittest.TestCase):
         self.assertIsNotNone(market)
         assert market is not None
         self.assertTrue(market.fees_enabled)
+        self.assertEqual(market.yes_token_id, "yes")
+        self.assertEqual(market.no_token_id, "no")
+        self.assertEqual(market.yes_price, 0.5)
+        self.assertEqual(market.no_price, 0.5)
         self.assertEqual(market.taker_fee_rate, 0.04)
         self.assertEqual(market.effective_taker_fee_rate(0.02), 0.04)
 

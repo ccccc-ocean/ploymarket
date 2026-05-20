@@ -60,6 +60,8 @@ class Storage:
                     volume_24hr REAL NOT NULL,
                     yes_price REAL,
                     yes_token_id TEXT,
+                    no_price REAL,
+                    no_token_id TEXT,
                     fees_enabled INTEGER NOT NULL,
                     taker_fee_rate REAL,
                     fee_type TEXT,
@@ -67,6 +69,8 @@ class Storage:
                 )
                 """
             )
+            _ensure_column(connection, "markets", "no_price", "REAL")
+            _ensure_column(connection, "markets", "no_token_id", "TEXT")
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS price_history (
@@ -111,8 +115,8 @@ class Storage:
                 """
                 INSERT INTO markets (
                     market_id, question, slug, market_type, end_date, liquidity, volume_24hr,
-                    yes_price, yes_token_id, fees_enabled, taker_fee_rate, fee_type, observed_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    yes_price, yes_token_id, no_price, no_token_id, fees_enabled, taker_fee_rate, fee_type, observed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(market_id) DO UPDATE SET
                     question=excluded.question,
                     slug=excluded.slug,
@@ -122,6 +126,8 @@ class Storage:
                     volume_24hr=excluded.volume_24hr,
                     yes_price=excluded.yes_price,
                     yes_token_id=excluded.yes_token_id,
+                    no_price=excluded.no_price,
+                    no_token_id=excluded.no_token_id,
                     fees_enabled=excluded.fees_enabled,
                     taker_fee_rate=excluded.taker_fee_rate,
                     fee_type=excluded.fee_type,
@@ -138,6 +144,8 @@ class Storage:
                         market.volume_24hr,
                         market.yes_price,
                         market.yes_token_id,
+                        market.no_price,
+                        market.no_token_id,
                         1 if market.fees_enabled else 0,
                         market.taker_fee_rate,
                         market.fee_type,
@@ -155,7 +163,7 @@ class Storage:
             rows = connection.execute(
                 """
                 SELECT market_id, question, slug, end_date, liquidity, volume_24hr,
-                       yes_price, yes_token_id, fees_enabled, taker_fee_rate, fee_type
+                       yes_price, yes_token_id, no_price, no_token_id, fees_enabled, taker_fee_rate, fee_type
                 FROM markets
                 ORDER BY volume_24hr DESC
                 """
@@ -171,13 +179,26 @@ class Storage:
                 volume_24hr,
                 yes_price,
                 yes_token_id,
+                no_price,
+                no_token_id,
                 fees_enabled,
                 taker_fee_rate,
                 fee_type,
             ) = row
-            prices = [float(yes_price)] if yes_price is not None else []
+            prices = []
             if yes_price is not None:
+                prices.append(float(yes_price))
+            if no_price is not None:
+                prices.append(float(no_price))
+            elif yes_price is not None:
                 prices.append(max(0.0, 1.0 - float(yes_price)))
+            token_ids = []
+            if yes_token_id:
+                token_ids.append(str(yes_token_id))
+            if no_token_id:
+                token_ids.append(str(no_token_id))
+            elif yes_token_id:
+                token_ids.append("")
             markets.append(
                 Market(
                     str(market_id),
@@ -189,7 +210,7 @@ class Storage:
                     True,
                     ["Yes", "No"],
                     prices,
-                    [str(yes_token_id), ""] if yes_token_id else [],
+                    token_ids,
                     bool(fees_enabled),
                     float(taker_fee_rate) if taker_fee_rate is not None else None,
                     str(fee_type) if fee_type else None,
@@ -341,3 +362,9 @@ class Storage:
 
 def storage_from_config(config) -> Storage:
     return Storage(config.storage.enabled, config.storage.sqlite_path)
+
+
+def _ensure_column(connection: sqlite3.Connection, table: str, column: str, column_type: str) -> None:
+    columns = {row[1] for row in connection.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in columns:
+        connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")

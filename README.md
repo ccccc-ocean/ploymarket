@@ -11,6 +11,7 @@
 - 生成逐 bar mark-to-market 组合曲线，用价格历史观察持仓期间回撤。
 - 生成模拟订单状态机 CSV，为未来持续模拟盘和实盘订单生命周期做准备。
 - `paper-run` 已区分 `TAKER`、`MAKER`、`SKIP` 执行计划，并优先使用本地 SQLite 历史数据避免网络慢请求拖死扫描。
+- `spread-scan` 会读取 YES/NO 真实订单簿，检查完整组合价差机会，输出 `data/spread_scan.csv`。
 - 可抓取 Coinbase 公开 BTC-USD 现货 K 线，作为后续外部价格锚点。
 
 ## 学习和项目文档
@@ -40,6 +41,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml replay
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-run
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-loop --iterations 3 --interval-seconds 300
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-report
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml spread-scan --market-type price_target
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explain-risk
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-info
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml storage-info
@@ -56,7 +58,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml daily-
 scripts/research_cycle.sh
 ```
 
-它会依次执行 paper-run、paper-report、BTC 价格更新、alignment、edge、离线回放、data-quality 和 daily-report。
+它会依次执行 BTC 价格更新、backtest、paper-run、paper-report、spread-scan、alignment、edge、strategy-sweep、data-quality 和 daily-report。
 
 在 macOS 上定时运行，默认每 30 分钟执行一次：
 

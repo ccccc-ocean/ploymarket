@@ -1,6 +1,6 @@
 # 当前系统状态
 
-最后更新：2026-05-10
+最后更新：2026-05-20
 
 ## 项目定位
 
@@ -14,7 +14,7 @@
 
 - 搜索 BTC / Bitcoin 相关 Polymarket 市场。
 - 过滤活跃、未关闭、有订单簿、达到最低流动性的市场。
-- 提取市场问题、slug、流动性、24 小时成交量、YES 价格、CLOB token id。
+- 提取市场问题、slug、流动性、24 小时成交量、YES/NO 价格、YES/NO CLOB token id。
 
 ### 本地缓存
 
@@ -76,9 +76,20 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 代码位置：[src/ploymarket_sim/clob.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/clob.py)
 
 - 调用 CLOB `prices-history` 获取 YES token 的历史价格。
+- 调用 CLOB `book` 获取 YES/NO token 的当前最佳 bid/ask，用于双边价差扫描。
 - 当前默认参数：
   - `interval = 1w`
   - `fidelity = 5` 分钟
+
+### YES/NO 双边价差扫描
+
+代码位置：[src/ploymarket_sim/spread_scan.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/spread_scan.py)
+
+- 新增 `spread-scan` 命令，读取真实 CLOB 订单簿，而不是用 `1 - YES` 假设 NO 价格。
+- 计算 `BUY_BOTH`: 同时买入 1 YES + 1 NO，若 `YES ask + NO ask + 费用 + 滑点 < 1`，理论上可等待 merge/redeem 获利。
+- 计算 `SELL_BOTH`: 如果已经持有完整 YES/NO 组合，若 `YES bid + NO bid - 费用 - 滑点 > 1`，理论上可双边卖出获利。
+- 输出 `data/spread_scan.csv`。
+- 当前只做只读监控，不会下单。下一步需要连续观察正 edge 的持续性、可成交深度和机会消失速度，再进入模拟盘状态机。
 
 ### 外部 BTC 现货价格
 
@@ -141,7 +152,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 
 脚本位置：[scripts/research_cycle.sh](/Users/pizza_yang/code/ploymarket/scripts/research_cycle.sh)
 
-- 依次运行模拟盘扫描、复盘、BTC 价格更新、alignment、edge、离线回放、数据质量和日报。
+- 依次运行模拟盘扫描、复盘、YES/NO 价差扫描、BTC 价格更新、alignment、edge、离线回放、数据质量和日报。
 - 适合后续接入 cron 或其他本地调度器。
 
 ### macOS 定时任务

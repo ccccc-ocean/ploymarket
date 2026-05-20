@@ -37,6 +37,8 @@ class StorageTests(unittest.TestCase):
             markets = storage.load_markets()
             self.assertEqual(len(markets), 1)
             self.assertEqual(markets[0].yes_token_id, "yes-token")
+            self.assertEqual(markets[0].no_token_id, "no-token")
+            self.assertEqual(markets[0].no_price, 0.5)
             history = storage.load_price_history("yes-token")
             self.assertEqual([point.price for point in history], [0.5, 0.6])
             quality = storage.market_history_stats()

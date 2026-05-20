@@ -47,6 +47,7 @@ from .reporting import (
     write_summary_csv,
 )
 from .signals import build_signal
+from .spread_scan import print_spread_scan_summary, scan_spreads, write_spread_scan_csv
 from .storage import storage_from_config
 from .strategy_sweep import print_strategy_sweep_summary, run_strategy_sweep, write_strategy_sweep_csv
 from .summary import aggregate_summaries, summarize_all, summarize_market
@@ -86,6 +87,8 @@ def main() -> None:
     sweep_parser = subparsers.add_parser("strategy-sweep", help="try conservative 5-minute strategy parameter candidates")
     sweep_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
     sweep_parser.add_argument("--limit", type=int, default=10)
+    spread_parser = subparsers.add_parser("spread-scan", help="scan live YES/NO order books for complete-set spread edges")
+    spread_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
     subparsers.add_parser("daily-report", help="summarize paper, replay, alignment, and edge outputs")
     subparsers.add_parser("explain-risk", help="explain the current risk limits")
 
@@ -139,6 +142,8 @@ def main() -> None:
         _run_edge_report(config, args.min_samples)
     elif args.command == "strategy-sweep":
         _run_strategy_sweep(config, args.market_type, args.limit)
+    elif args.command == "spread-scan":
+        _run_spread_scan(config, args.market_type)
     elif args.command == "daily-report":
         _run_daily_report(config)
 
@@ -380,13 +385,34 @@ def _run_strategy_sweep(config, market_type: str, limit: int) -> None:
     print_strategy_sweep_summary(results, path)
 
 
+def _run_spread_scan(config, market_type: str) -> None:
+    storage = storage_from_config(config)
+    markets = _filter_markets(_spread_markets(config, storage), market_type)
+    if not markets:
+        raise SystemExit("No local markets found. Run discover or backtest first.")
+    rows = scan_spreads(config, markets)
+    path = write_spread_scan_csv(rows, config.backtest.output_dir)
+    print_spread_scan_summary(rows, path)
+
+
+def _spread_markets(config, storage):
+    local_markets = storage.load_markets()
+    if local_markets and all(market.yes_token_id and market.no_token_id for market in local_markets):
+        return local_markets
+    markets = discover_btc_markets(config)
+    storage.save_markets(markets)
+    return markets
+
+
 def _run_daily_report(config) -> None:
     report = build_daily_report(config.backtest.output_dir)
     path = write_daily_report_csv(report, config.backtest.output_dir)
     print(
         f"daily_report | readiness={report.readiness} | paper_runs={report.paper_runs} | "
         f"trades={report.replay_trade_count} | pnl={report.replay_pnl:.2f} | "
-        f"max_drawdown={report.replay_max_drawdown:.1%} | reason={report.reason}"
+        f"max_drawdown={report.replay_max_drawdown:.1%} | "
+        f"spread_buy_both={report.spread_buy_both_count} | best_buy_edge={report.spread_best_buy_edge:.4f} | "
+        f"reason={report.reason}"
     )
     print(f"daily_report_csv={path}")
 

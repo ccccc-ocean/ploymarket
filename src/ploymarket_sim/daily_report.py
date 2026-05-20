@@ -20,6 +20,10 @@ class DailyReport:
     replay_win_rate: float
     alignment_samples_1h: int
     edge_bucket_count: int
+    spread_buy_both_count: int
+    spread_sell_both_count: int
+    spread_best_buy_edge: float
+    spread_best_sell_edge: float
     readiness: str
     reason: str
 
@@ -31,6 +35,7 @@ def build_daily_report(output_dir: str) -> DailyReport:
     backtest_rows = _read_csv(directory / "backtest_summary_by_type.csv")
     alignment_rows = _read_csv(directory / "alignment_summary.csv")
     edge_rows = _read_csv(directory / "edge_report.csv")
+    spread_rows = _read_csv(directory / "spread_scan.csv")
 
     latest_paper = paper_rows[-1] if paper_rows else {}
     portfolio = portfolio_rows[0] if portfolio_rows else {}
@@ -42,6 +47,10 @@ def build_daily_report(output_dir: str) -> DailyReport:
     replay_trade_count = int(_float(aggregate.get("trade_count")))
     replay_win_rate = _float(aggregate.get("win_rate"))
     alignment_samples_1h = int(_float(alignment_1h.get("sample_count")))
+    spread_buy_both_count = len([row for row in spread_rows if row.get("recommendation") == "BUY_BOTH"])
+    spread_sell_both_count = len([row for row in spread_rows if row.get("recommendation") == "SELL_BOTH"])
+    spread_best_buy_edge = _max_float(spread_rows, "buy_pair_edge")
+    spread_best_sell_edge = _max_float(spread_rows, "sell_pair_edge")
 
     readiness, reason = _readiness(replay_pnl, replay_max_drawdown, replay_trade_count, alignment_samples_1h, len(paper_rows))
 
@@ -58,6 +67,10 @@ def build_daily_report(output_dir: str) -> DailyReport:
         replay_win_rate=replay_win_rate,
         alignment_samples_1h=alignment_samples_1h,
         edge_bucket_count=len(edge_rows),
+        spread_buy_both_count=spread_buy_both_count,
+        spread_sell_both_count=spread_sell_both_count,
+        spread_best_buy_edge=spread_best_buy_edge,
+        spread_best_sell_edge=spread_best_sell_edge,
         readiness=readiness,
         reason=reason,
     )
@@ -83,6 +96,10 @@ def write_daily_report_csv(report: DailyReport, output_dir: str) -> Path:
                 "replay_win_rate",
                 "alignment_samples_1h",
                 "edge_bucket_count",
+                "spread_buy_both_count",
+                "spread_sell_both_count",
+                "spread_best_buy_edge",
+                "spread_best_sell_edge",
                 "readiness",
                 "reason",
             ]
@@ -101,6 +118,10 @@ def write_daily_report_csv(report: DailyReport, output_dir: str) -> Path:
                 report.replay_win_rate,
                 report.alignment_samples_1h,
                 report.edge_bucket_count,
+                report.spread_buy_both_count,
+                report.spread_sell_both_count,
+                report.spread_best_buy_edge,
+                report.spread_best_sell_edge,
                 report.readiness,
                 report.reason,
             ]
@@ -147,3 +168,8 @@ def _float(value: str | None) -> float:
         return float(value or 0.0)
     except ValueError:
         return 0.0
+
+
+def _max_float(rows: list[dict[str, str]], key: str) -> float:
+    values = [_float(row.get(key)) for row in rows if row.get(key)]
+    return max(values) if values else 0.0
