@@ -16,6 +16,7 @@ from .daily_report import build_daily_report, write_daily_report_csv
 from .edge_report import build_edge_buckets, load_alignment_rows_csv
 from .execution import plan_execution
 from .http import HttpError
+from .market_type_report import build_market_type_report, print_market_type_report, write_market_type_report_csv
 from .portfolio import build_mark_to_market_curve, build_portfolio_curve, summarize_portfolio
 from .paper import build_paper_signal_row, summarize_paper_rows
 from .paper_report import load_paper_run_summaries
@@ -89,6 +90,7 @@ def main() -> None:
     sweep_parser.add_argument("--limit", type=int, default=10)
     spread_parser = subparsers.add_parser("spread-scan", help="scan live YES/NO order books for complete-set spread edges")
     spread_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
+    subparsers.add_parser("market-type-report", help="compare local backtest results by BTC market type")
     subparsers.add_parser("daily-report", help="summarize paper, replay, alignment, and edge outputs")
     subparsers.add_parser("explain-risk", help="explain the current risk limits")
 
@@ -144,6 +146,8 @@ def main() -> None:
         _run_strategy_sweep(config, args.market_type, args.limit)
     elif args.command == "spread-scan":
         _run_spread_scan(config, args.market_type)
+    elif args.command == "market-type-report":
+        _run_market_type_report(config)
     elif args.command == "daily-report":
         _run_daily_report(config)
 
@@ -402,6 +406,20 @@ def _spread_markets(config, storage):
     markets = discover_btc_markets(config)
     storage.save_markets(markets)
     return markets
+
+
+def _run_market_type_report(config) -> None:
+    storage = storage_from_config(config)
+    markets = storage.load_markets()
+    if not markets:
+        raise SystemExit("No local markets found. Run discover or backtest first.")
+    candles = load_btc_candles_csv(Path(config.backtest.output_dir) / "btc_price_candles.csv")
+    if not candles:
+        candles = get_btc_candles(config)
+        write_btc_candles_csv(candles, config.backtest.output_dir)
+    rows = build_market_type_report(config, storage, candles)
+    path = write_market_type_report_csv(rows, config.backtest.output_dir)
+    print_market_type_report(rows, path)
 
 
 def _run_daily_report(config) -> None:

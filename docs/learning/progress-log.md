@@ -991,3 +991,31 @@ data/spread_scan.csv
 ### 交易结论
 
 这次修正会让回测和价差扫描更保守，PnL 可能更难看，但更接近真实交易成本。我们宁愿晚一点进入实盘，也不能依赖低估费用得到的虚假正 PnL。
+
+## 2026-05-20：聚焦 BTC，拆分单日目标市场
+
+### 本次目标
+
+继续聚焦 BTC，不扩散到体育/比赛市场。先把 BTC 市场内部拆细，避免把长期目标、单日目标、日内区间混在一个 PnL 里。
+
+### 已完成
+
+- 新增市场类型：`price_target_daily`。
+- 新增命令：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml market-type-report
+```
+
+- 输出：`data/market_type_report.csv`。
+- 定时流水线已加入 `market-type-report`。
+
+### 本轮观察
+
+- `price_target`: 市场 `35` 个，交易 `8` 笔，PnL 约 `-17.41`。
+- `price_target_daily`: 市场 `15` 个，交易 `0` 笔，PnL `0`。
+- `price_range_daily`: 市场 `11` 个，交易 `0` 笔，PnL `0`。
+
+### 结论
+
+旧 BUY_YES 动量策略主要在长期 `price_target` 上亏损，对单日/短周期 BTC 市场几乎完全不触发交易。下一步不能继续套旧参数，而应该为 `price_target_daily` / `price_range_daily` 单独设计边界型策略，例如临近 strike、临近结算、BTC 现货短线接近目标价时的盘口滞后。

@@ -54,6 +54,7 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 可用类型：
 
 - `price_target`
+- `price_target_daily`
 - `price_range_daily`
 - `company_treasury`
 - `indirect_event`
@@ -232,6 +233,28 @@ data/data_quality.csv
 - `with_24plus_points`: 至少有 24 个价格点的市场数量。
 - `price_points`: 总价格点数。
 
+## 市场类型对比
+
+按市场类型分别回测本地样本：
+
+```bash
+env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ploymarket_sim.cli --config config/default.toml market-type-report
+```
+
+输出：
+
+```text
+data/market_type_report.csv
+```
+
+重点看：
+
+- 哪类市场实际触发了交易。
+- 哪类市场 PnL 为正或接近正。
+- 哪类市场只是样本多，但旧策略完全不交易。
+
+当前用途：把 `price_target_daily` 这类短周期 BTC 市场从长期目标市场中拆出来，后续单独设计边界/临近结算策略。
+
 ## Maker 研究开关
 
 默认配置里 `maker_enabled = false`。原因是当前本地小样本显示：如果把 Maker 候选纳入“触价成交 + TTL 取消”的模拟，回测结果会从小幅盈利变成明显亏损。
@@ -408,6 +431,7 @@ scripts/research_cycle.sh
 - `alignment-report`
 - `edge-report`
 - `strategy-sweep`
+- `market-type-report`
 - `data-quality`
 - `daily-report`
 

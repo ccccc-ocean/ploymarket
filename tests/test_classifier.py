@@ -12,6 +12,9 @@ class ClassifierTests(unittest.TestCase):
     def test_classifies_price_target_market(self) -> None:
         self.assertEqual(classify_market(market("Will Bitcoin reach $100,000 in May?")).market_type, "price_target")
 
+    def test_classifies_daily_price_target_market(self) -> None:
+        self.assertEqual(classify_market(market("Will Bitcoin reach $84,000 on May 19?")).market_type, "price_target_daily")
+
     def test_classifies_daily_price_range_market(self) -> None:
         self.assertEqual(
             classify_market(market("Will the price of Bitcoin be above $80,000 on May 8?")).market_type,

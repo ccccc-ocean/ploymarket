@@ -60,6 +60,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml data-q
 代码位置：[src/ploymarket_sim/classifier.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/classifier.py)
 
 - `price_target`: BTC 价格目标市场。
+- `price_target_daily`: 单日 BTC 价格目标市场，例如 “Will Bitcoin reach $84,000 on May 19?”。
 - `price_range_daily`: 日内或短周期价格范围市场。
 - `company_treasury`: MicroStrategy / MSTR / 公司 BTC 持仓事件市场。
 - `indirect_event`: 只和 BTC 间接相关的市场。
@@ -129,6 +130,15 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 - 当前扫描维度包括短/长均线窗口、`min_momentum`、`min_edge` 和 BTC 下跌过滤阈值。
 - 这个报告只用于研究，不会自动改写默认配置，避免因为单轮样本过拟合。
 
+### 市场类型对比报告
+
+代码位置：[src/ploymarket_sim/market_type_report.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/market_type_report.py)
+
+- 新增 `market-type-report` 命令，使用本地 SQLite 历史按市场类型分别回测。
+- 输出 `data/market_type_report.csv`。
+- 目标是避免把长期目标、单日目标、日内区间、间接事件混成一个 PnL，从而误判策略是否有效。
+- 当前观察：`price_target_daily` 已被单独识别，但旧 BUY_YES 动量策略还没有在这类市场产生交易，需要单独设计短周期/边界策略。
+
 ### BTC 动量过滤器
 
 代码位置：[src/ploymarket_sim/backtest.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/backtest.py)
@@ -152,7 +162,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 
 脚本位置：[scripts/research_cycle.sh](/Users/pizza_yang/code/ploymarket/scripts/research_cycle.sh)
 
-- 依次运行模拟盘扫描、复盘、YES/NO 价差扫描、BTC 价格更新、alignment、edge、离线回放、数据质量和日报。
+- 依次运行模拟盘扫描、复盘、YES/NO 价差扫描、BTC 价格更新、alignment、edge、离线回放、市场类型对比、数据质量和日报。
 - 适合后续接入 cron 或其他本地调度器。
 
 ### macOS 定时任务
