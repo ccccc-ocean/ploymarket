@@ -11,6 +11,7 @@ from .orders import OrderEvent, canceled_events, lifecycle_events, make_order_id
 from .polymarket import Market
 from .risk import Portfolio, Position, approve_entry, should_exit
 from .signals import build_signal
+from .market_rules import latest_btc_candle_at_or_before
 from .strategy_profiles import is_tradeable_market, strategy_config_for_market
 
 
@@ -252,8 +253,7 @@ def _blocked_by_btc_filter(current: PricePoint, config: AppConfig, btc_candles: 
 
 
 def _latest_btc_candle_at_or_before(candles: list[BtcCandle], timestamp: int) -> BtcCandle | None:
-    candidates = [candle for candle in candles if candle.timestamp <= timestamp]
-    return candidates[-1] if candidates else None
+    return latest_btc_candle_at_or_before(candles, timestamp)
 
 
 def _create_pending_maker_order(

@@ -7,7 +7,7 @@ from time import sleep, time
 
 from .alignment import build_alignment_rows, summarize_alignment
 from .backtest import backtest_market
-from .btc_price import get_btc_candles, load_btc_candles_csv
+from .btc_price import get_btc_candles, load_btc_candles_csv, merge_btc_candles
 from .cache import CachePolicy, JsonCache
 from .classifier import MARKET_TYPES, is_market_type
 from .clob import get_price_history
@@ -99,13 +99,12 @@ def main() -> None:
     config = load_config(args.config)
 
     if args.command == "discover":
-        markets = _filter_markets(discover_btc_markets(config, use_cache=False), args.market_type)
-        storage_from_config(config).save_markets(markets)
+        storage = storage_from_config(config)
+        markets = _filter_markets(_discover_markets_with_quality_guard(config, storage, "discover"), args.market_type)
         print_market_table(markets)
     elif args.command == "signals":
-        markets = _filter_markets(discover_btc_markets(config, use_cache=False), args.market_type)
         storage = storage_from_config(config)
-        storage.save_markets(markets)
+        markets = _filter_markets(_discover_markets_with_quality_guard(config, storage, "signals"), args.market_type)
         for market in markets:
             history = _safe_history(config, market, storage)
             if not history:
@@ -115,8 +114,7 @@ def main() -> None:
             print_signal(market, build_signal(market, history, market_config.signal, market_config.backtest))
     elif args.command == "backtest":
         storage = storage_from_config(config)
-        markets = _filter_markets(discover_btc_markets(config, use_cache=False), args.market_type)
-        storage.save_markets(markets)
+        markets = _filter_markets(_discover_markets_with_quality_guard(config, storage, "backtest"), args.market_type)
         _run_backtest(config, markets, storage, prefer_local=False)
     elif args.command == "replay-backtest":
         storage = storage_from_config(config)
@@ -244,6 +242,47 @@ def _filter_markets(markets, market_type):
     return [market for market in markets if is_market_type(market, market_type)]
 
 
+def _discover_markets_with_quality_guard(config, storage, purpose: str):
+    local_markets = storage.load_markets()
+    try:
+        live_markets = discover_btc_markets(config, use_cache=False)
+    except Exception as exc:
+        print(f"warning: live market discovery failed for {purpose}: {exc}", file=sys.stderr)
+        live_markets = []
+
+    if _market_discovery_is_healthy(live_markets, local_markets):
+        storage.save_markets(live_markets)
+        return live_markets
+
+    print(
+        f"warning: live market discovery degraded for {purpose}: "
+        f"live={len(live_markets)} local={len(local_markets)}",
+        file=sys.stderr,
+    )
+    try:
+        cached_markets = discover_btc_markets(config, use_cache=True)
+    except Exception as exc:
+        print(f"warning: cached market discovery failed for {purpose}: {exc}", file=sys.stderr)
+        cached_markets = []
+
+    if len(cached_markets) > max(len(live_markets), len(local_markets)):
+        print(f"warning: using HTTP cached markets for {purpose}: cached={len(cached_markets)}", file=sys.stderr)
+        storage.save_markets(cached_markets)
+        return cached_markets
+
+    if local_markets:
+        print(f"warning: using local SQLite markets for {purpose}: local={len(local_markets)}", file=sys.stderr)
+        return local_markets
+
+    return live_markets
+
+
+def _market_discovery_is_healthy(live_markets, local_markets) -> bool:
+    if len(live_markets) >= 10:
+        return not local_markets or len(live_markets) >= len(local_markets) * 0.5
+    return bool(live_markets) and not local_markets
+
+
 def _run_paper_scan(config, market_type: str) -> None:
     run_timestamp = int(time())
     storage = storage_from_config(config)
@@ -273,17 +312,7 @@ def _run_paper_scan(config, market_type: str) -> None:
 
 
 def _paper_markets(config, storage):
-    try:
-        markets = discover_btc_markets(config, use_cache=False)
-    except Exception as exc:
-        print(f"warning: discover failed for paper-run: {exc}", file=sys.stderr)
-        local_markets = storage.load_markets()
-        if local_markets:
-            print("warning: using local SQLite markets for paper-run", file=sys.stderr)
-            return local_markets
-        raise
-    storage.save_markets(markets)
-    return markets
+    return _discover_markets_with_quality_guard(config, storage, "paper-run")
 
 
 def _run_paper_loop(config, market_type: str, interval_seconds: int, iterations: int) -> None:
@@ -347,16 +376,19 @@ def _run_data_quality(config) -> None:
 
 
 def _run_btc_price(config) -> None:
+    csv_path = Path(config.backtest.output_dir) / "btc_price_candles.csv"
+    existing = load_btc_candles_csv(csv_path)
     try:
         candles = get_btc_candles(config, use_cache=False)
         source = "live"
     except HttpError as exc:
         print(f"warning: live BTC candles failed: {exc}", file=sys.stderr)
-        candles = load_btc_candles_csv(Path(config.backtest.output_dir) / "btc_price_candles.csv")
+        candles = existing
         source = "local_csv"
         if not candles:
             candles = get_btc_candles(config, use_cache=True)
             source = "http_cache"
+    candles = merge_btc_candles(existing, candles)
     path = write_btc_candles_csv(candles, config.backtest.output_dir)
     latest = candles[-1] if candles else None
     if latest is None:
@@ -421,9 +453,7 @@ def _run_spread_scan(config, market_type: str) -> None:
 
 
 def _spread_markets(config, storage):
-    markets = discover_btc_markets(config, use_cache=False)
-    storage.save_markets(markets)
-    return markets
+    return _discover_markets_with_quality_guard(config, storage, "spread-scan")
 
 
 def _run_market_type_report(config) -> None:

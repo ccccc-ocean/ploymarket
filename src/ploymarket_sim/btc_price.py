@@ -53,6 +53,12 @@ def load_btc_candles_csv(path: str | Path) -> list[BtcCandle]:
     return [candle for candle in candles if candle is not None]
 
 
+def merge_btc_candles(existing: list[BtcCandle], fresh: list[BtcCandle]) -> list[BtcCandle]:
+    by_timestamp = {candle.timestamp: candle for candle in existing}
+    by_timestamp.update({candle.timestamp: candle for candle in fresh})
+    return [by_timestamp[timestamp] for timestamp in sorted(by_timestamp)]
+
+
 def _parse_coinbase_candle(item: Any) -> BtcCandle | None:
     try:
         if isinstance(item, dict):

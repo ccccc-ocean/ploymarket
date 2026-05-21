@@ -1097,3 +1097,32 @@ HTTP cache 默认 TTL 是 `900` 秒，适合减少研究阶段 API 抖动，但�
 - 实时 paper-run 仍没有触发可执行交易，说明当前价格区间经常太极端，不能为了交易次数硬追。
 - `price_target` 样本太少，对总 PnL 的贡献暂时不可靠。
 - 策略仍主要是 BUY_YES 动量逻辑，还没有真正建成 BTC 边界/strike 距离模型。
+
+## 2026-05-21：加入 BTC strike 边界过滤
+
+### 观察
+
+样本扩展到约 `42` 笔后，整体 PnL 回到小幅负值。主要亏损集中在 `price_range_daily` 的较高 strike，例如 `above $78,000`，说明单纯看 Polymarket YES 动量会在 BTC 现货尚未接近 strike 时过早买入。
+
+### 已尝试
+
+- 对 `price_range_daily` 解析问题中的美元 strike。
+- `above strike` 市场：BTC 现货未接近或站上 strike 时，不允许 BUY_YES。
+- `below strike` 市场：BTC 现货未接近或跌破 strike 时，不允许 BUY_YES。
+- 回测和 paper-run 使用同一套 strike 过滤，避免回测和模拟盘规则不一致。
+
+### 判断
+
+第一版 strike 过滤过于粗糙，回测 PnL 从约 `-3.45` 恶化到约 `-27.84`。它会挡掉一些后续修复/反弹交易，所以不能作为默认执行规则。随后尝试把 `price_range_daily` 的 `min_edge` 提高到 `0.005`，交易数从约 `42` 降到 `36`，但 PnL 仍恶化到约 `-22.98`。结论：当前亏损不是简单靠减少交易次数能解决，默认参数恢复为 `min_edge=0.0015`，下一步应做更结构化的 BTC 方向/入场时机模型。
+
+## 2026-05-21：修正 BTC candles 覆盖不足
+
+### 问题
+
+`btc-price` 每轮只保存 Coinbase 最近一批 5 分钟 candles，并覆盖旧 CSV。这会导致 1 周 Polymarket 历史回测里很多入场点没有 BTC 现货上下文，进而让 strike/距离类模型缺数据。
+
+### 已调整
+
+- `btc-price` 新增 merge 逻辑：新拉到的 candles 与已有 `data/btc_price_candles.csv` 按 timestamp 合并。
+- 新数据覆盖同 timestamp 的旧数据，但不会删除更早历史。
+- 这为后续 BTC spot vs strike 距离模型打基础。
