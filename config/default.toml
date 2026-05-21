@@ -38,11 +38,11 @@ require_orderbook = true
 [signal]
 history_interval = "1w"
 history_fidelity_minutes = 5
-short_window = 72
-long_window = 288
-min_momentum = 0.015
-min_edge = 0.025
-safety_margin = 0.01
+short_window = 6
+long_window = 24
+min_momentum = 0.005
+min_edge = 0.003
+safety_margin = 0.005
 buy_below = 0.92
 sell_above = 0.08
 

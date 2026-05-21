@@ -21,7 +21,7 @@ class BacktestTests(unittest.TestCase):
             risk=RiskConfig(10.0, 50.0, 50.0, 50.0, 1, 10.0, 1.0, 0.9, 0.9, 1.0, 0.01, 0.99),
             backtest=BacktestConfig(10.0, 0.02, 25, "data"),
         )
-        market = Market("m1", "Will BTC be above X?", "btc-x", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
+        market = Market("m1", "Will BTC hit $100,000?", "btc-hit-100k", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
         history = [PricePoint(i, 0.40) for i in range(4)] + [PricePoint(4 + i, 0.60) for i in range(4)]
 
         result = backtest_market(market, history, config)
@@ -42,7 +42,7 @@ class BacktestTests(unittest.TestCase):
             risk=RiskConfig(100.0, 50.0, 50.0, 50.0, 1, 100.0, 1.0, 0.9, 0.9, 1.0, 0.01, 0.99),
             backtest=BacktestConfig(10.0, 0.02, 25, "data"),
         )
-        market = Market("m1", "Will BTC be above X?", "btc-x", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
+        market = Market("m1", "Will BTC hit $100,000?", "btc-hit-100k", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
         history = [
             PricePoint(1, 0.50),
             PricePoint(2, 0.50),
@@ -71,7 +71,7 @@ class BacktestTests(unittest.TestCase):
             risk=RiskConfig(100.0, 50.0, 50.0, 50.0, 1, 100.0, 1.0, 0.9, 0.9, 1.0, 0.01, 0.99),
             backtest=BacktestConfig(10.0, 0.02, 25, "data"),
         )
-        market = Market("m1", "Will BTC be above X?", "btc-x", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
+        market = Market("m1", "Will BTC hit $100,000?", "btc-hit-100k", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
         history = [PricePoint(i * 3600, 0.55 + i * 0.03) for i in range(8)]
         btc_candles = [
             BtcCandle(i * 3600, 80.0, 110.0, 100.0 - i, 100.0 - i)

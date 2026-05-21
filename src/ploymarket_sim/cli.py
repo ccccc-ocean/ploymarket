@@ -47,9 +47,10 @@ from .reporting import (
     write_edge_report_csv,
     write_summary_csv,
 )
-from .signals import build_signal
+from .signals import Signal, build_signal
 from .spread_scan import print_spread_scan_summary, scan_spreads, write_spread_scan_csv
 from .storage import storage_from_config
+from .strategy_profiles import is_tradeable_market, strategy_config_for_market
 from .strategy_sweep import print_strategy_sweep_summary, run_strategy_sweep, write_strategy_sweep_csv
 from .summary import aggregate_summaries, summarize_all, summarize_market
 
@@ -110,7 +111,8 @@ def main() -> None:
             if not history:
                 continue
             storage.save_price_history(market.yes_token_id or "", history)
-            print_signal(market, build_signal(market, history, config.signal, config.backtest))
+            market_config = strategy_config_for_market(config, market)
+            print_signal(market, build_signal(market, history, market_config.signal, market_config.backtest))
     elif args.command == "backtest":
         storage = storage_from_config(config)
         markets = _filter_markets(discover_btc_markets(config), args.market_type)
@@ -252,8 +254,13 @@ def _run_paper_scan(config, market_type: str) -> None:
         if not history:
             continue
         storage.save_price_history(market.yes_token_id or "", history)
-        signal = build_signal(market, history, config.signal, config.backtest)
-        execution_plan = plan_execution(market, signal, config.signal, config.backtest, config.execution)
+        market_config = strategy_config_for_market(config, market)
+        if not is_tradeable_market(market):
+            signal = build_signal(market, history, market_config.signal, market_config.backtest)
+            signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, "当前市场类型暂不交易，只记录观察")
+        else:
+            signal = build_signal(market, history, market_config.signal, market_config.backtest)
+        execution_plan = plan_execution(market, signal, market_config.signal, market_config.backtest, market_config.execution)
         rows.append(build_paper_signal_row(market, signal, config.backtest.taker_fee_rate, run_timestamp, execution_plan))
     storage.save_paper_snapshots(rows)
     path = write_paper_signal_rows_csv(rows, config.backtest.output_dir, run_timestamp)

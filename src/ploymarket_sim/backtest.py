@@ -11,6 +11,7 @@ from .orders import OrderEvent, canceled_events, lifecycle_events, make_order_id
 from .polymarket import Market
 from .risk import Portfolio, Position, approve_entry, should_exit
 from .signals import build_signal
+from .strategy_profiles import is_tradeable_market, strategy_config_for_market
 
 
 @dataclass(frozen=True)
@@ -56,6 +57,10 @@ def backtest_market(
     config: AppConfig,
     btc_candles: list[BtcCandle] | None = None,
 ) -> BacktestResult:
+    if not is_tradeable_market(market):
+        return BacktestResult(market.id, market.question, [], config.risk.starting_cash, 0.0, [])
+
+    config = strategy_config_for_market(config, market)
     portfolio = Portfolio.from_starting_cash(config.risk.starting_cash)
     trades: list[Trade] = []
     order_events: list[OrderEvent] = []

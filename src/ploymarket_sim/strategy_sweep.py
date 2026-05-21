@@ -47,8 +47,13 @@ class SweepResult:
 def default_candidates() -> list[SweepCandidate]:
     return [
         SweepCandidate(short_window, long_window, min_momentum, min_edge, -0.0025)
-        for short_window, long_window in [(36, 144), (72, 288), (144, 576)]
-        for min_momentum, min_edge in [(0.005, 0.005), (0.01, 0.005), (0.01, 0.015), (0.015, 0.015)]
+        for short_window, long_window in [(3, 12), (6, 24), (12, 48), (24, 96), (36, 144)]
+        for min_momentum, min_edge in [
+            (0.0025, 0.0015),
+            (0.0050, 0.0030),
+            (0.0075, 0.0050),
+            (0.0100, 0.0075),
+        ]
     ]
 
 
