@@ -19,13 +19,13 @@ class BtcCandle:
     close: float
 
 
-def get_btc_candles(config: AppConfig) -> list[BtcCandle]:
+def get_btc_candles(config: AppConfig, use_cache: bool = True) -> list[BtcCandle]:
     payload = get_json(
         config.btc_price.base_url,
         f"/api/v3/brokerage/market/products/{config.btc_price.product_id}/candles",
         {"granularity": config.btc_price.granularity},
         timeout=config.api.request_timeout_seconds,
-        cache=_cache_from_config(config),
+        cache=_cache_from_config(config) if use_cache else None,
     )
     raw_candles = payload.get("candles", payload) if isinstance(payload, dict) else payload
     candles = [_parse_coinbase_candle(item) for item in raw_candles if _parse_coinbase_candle(item) is not None]

@@ -1070,3 +1070,30 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 - 亏损主要来自不同市场类型混用同一个 BUY_YES 动量策略。
 - 分市场 sweep 显示 `price_range_daily` 用 `36/144`、`min_momentum=0.0025`、`min_edge=0.0015` 时，交易 `38` 笔、胜率 `57.9%`、PnL 约 `-6.09`，明显优于全市场混跑。
 - 因此新增市场类型策略 profile：`price_range_daily` 单独使用 `36/144`，`price_target` 使用更短但更严格的 `6/24`，`company_treasury`、`indirect_event`、`unknown` 暂时只观察不交易。
+
+## 2026-05-21：区分实时行情和研究缓存
+
+### 问题
+
+HTTP cache 默认 TTL 是 `900` 秒，适合减少研究阶段 API 抖动，但不适合模拟盘决策。如果 `paper-run` 读取缓存或优先使用 SQLite 历史，会导致信号和真实盘口存在时间差，尤其不适合 5 分钟市场。
+
+### 已调整
+
+- `paper-run` 每轮优先实时刷新活跃 BTC 市场，发现失败才回退本地市场缓存。
+- `paper-run` 每个市场优先实时拉取 Polymarket `prices-history`，失败才回退 SQLite 历史。
+- `btc-price` 强制实时拉取 Coinbase candles。
+- `discover`、`signals`、`backtest`、`spread-scan` 默认绕过 HTTP cache。
+- `/book` 盘口原本就没有使用 HTTP cache，仍保持实时请求。
+
+### 当前策略有效点
+
+- 交易次数已经从个位数提升到约 `28` 笔，开始具备初步评估价值。
+- `price_range_daily` 是当前最有效的市场类型，最新回放约 `24` 笔、胜率约 `58%`、PnL 小幅为正。
+- 将 `company_treasury`、`indirect_event` 排除出交易后，整体 PnL 明显改善。
+
+### 当前策略无效点
+
+- 样本数仍不足，不能证明稳定盈利。
+- 实时 paper-run 仍没有触发可执行交易，说明当前价格区间经常太极端，不能为了交易次数硬追。
+- `price_target` 样本太少，对总 PnL 的贡献暂时不可靠。
+- 策略仍主要是 BUY_YES 动量逻辑，还没有真正建成 BTC 边界/strike 距离模型。

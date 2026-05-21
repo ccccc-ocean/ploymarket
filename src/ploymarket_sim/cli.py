@@ -99,11 +99,11 @@ def main() -> None:
     config = load_config(args.config)
 
     if args.command == "discover":
-        markets = _filter_markets(discover_btc_markets(config), args.market_type)
+        markets = _filter_markets(discover_btc_markets(config, use_cache=False), args.market_type)
         storage_from_config(config).save_markets(markets)
         print_market_table(markets)
     elif args.command == "signals":
-        markets = _filter_markets(discover_btc_markets(config), args.market_type)
+        markets = _filter_markets(discover_btc_markets(config, use_cache=False), args.market_type)
         storage = storage_from_config(config)
         storage.save_markets(markets)
         for market in markets:
@@ -115,7 +115,7 @@ def main() -> None:
             print_signal(market, build_signal(market, history, market_config.signal, market_config.backtest))
     elif args.command == "backtest":
         storage = storage_from_config(config)
-        markets = _filter_markets(discover_btc_markets(config), args.market_type)
+        markets = _filter_markets(discover_btc_markets(config, use_cache=False), args.market_type)
         storage.save_markets(markets)
         _run_backtest(config, markets, storage, prefer_local=False)
     elif args.command == "replay-backtest":
@@ -160,7 +160,7 @@ def _run_backtest(config, markets, storage, prefer_local: bool) -> None:
     summaries = []
     btc_candles = load_btc_candles_csv(Path(config.backtest.output_dir) / "btc_price_candles.csv")
     for market in markets:
-        history = _safe_history(config, market, storage, prefer_local=prefer_local)
+        history = _safe_history(config, market, storage, prefer_local=prefer_local, use_cache=prefer_local)
         if not history:
             continue
         histories_by_market[market.id] = history
@@ -221,14 +221,14 @@ def _explain_risk(config) -> None:
     print(f"- max_spread: 买卖价差高于 {risk.max_spread:.2f} 不交易")
 
 
-def _safe_history(config, market, storage=None, prefer_local: bool = False):
+def _safe_history(config, market, storage=None, prefer_local: bool = False, use_cache: bool = True):
     token_id = market.yes_token_id or ""
     if prefer_local and storage is not None:
         local_history = storage.load_price_history(token_id)
         if local_history:
             return local_history
     try:
-        history = get_price_history(config, token_id)
+        history = get_price_history(config, token_id, use_cache=use_cache)
         return history
     except HttpError as exc:
         print(f"warning: skip {market.id} history: {exc}", file=sys.stderr)
@@ -250,7 +250,7 @@ def _run_paper_scan(config, market_type: str) -> None:
     markets = _filter_markets(_paper_markets(config, storage), market_type)
     rows = []
     for market in markets:
-        history = _safe_history(config, market, storage, prefer_local=True)
+        history = _safe_history(config, market, storage, prefer_local=False, use_cache=False)
         if not history:
             continue
         storage.save_price_history(market.yes_token_id or "", history)
@@ -274,7 +274,7 @@ def _run_paper_scan(config, market_type: str) -> None:
 
 def _paper_markets(config, storage):
     try:
-        markets = discover_btc_markets(config)
+        markets = discover_btc_markets(config, use_cache=False)
     except Exception as exc:
         print(f"warning: discover failed for paper-run: {exc}", file=sys.stderr)
         local_markets = storage.load_markets()
@@ -347,14 +347,23 @@ def _run_data_quality(config) -> None:
 
 
 def _run_btc_price(config) -> None:
-    candles = get_btc_candles(config)
+    try:
+        candles = get_btc_candles(config, use_cache=False)
+        source = "live"
+    except HttpError as exc:
+        print(f"warning: live BTC candles failed: {exc}", file=sys.stderr)
+        candles = load_btc_candles_csv(Path(config.backtest.output_dir) / "btc_price_candles.csv")
+        source = "local_csv"
+        if not candles:
+            candles = get_btc_candles(config, use_cache=True)
+            source = "http_cache"
     path = write_btc_candles_csv(candles, config.backtest.output_dir)
     latest = candles[-1] if candles else None
     if latest is None:
         print(f"btc_price | candles=0 | {path}")
         return
     print(
-        f"btc_price | provider={config.btc_price.provider} | product={config.btc_price.product_id} | "
+        f"btc_price | provider={config.btc_price.provider} | product={config.btc_price.product_id} | source={source} | "
         f"candles={len(candles)} | latest_close={latest.close:.2f} | {path}"
     )
 
@@ -412,10 +421,7 @@ def _run_spread_scan(config, market_type: str) -> None:
 
 
 def _spread_markets(config, storage):
-    local_markets = storage.load_markets()
-    if local_markets and all(market.yes_token_id and market.no_token_id for market in local_markets):
-        return local_markets
-    markets = discover_btc_markets(config)
+    markets = discover_btc_markets(config, use_cache=False)
     storage.save_markets(markets)
     return markets
 

@@ -27,7 +27,7 @@ class TokenQuote:
         return self.ask - self.bid
 
 
-def get_price_history(config: AppConfig, token_id: str) -> list[PricePoint]:
+def get_price_history(config: AppConfig, token_id: str, use_cache: bool = True) -> list[PricePoint]:
     payload = get_json(
         config.api.clob_base_url,
         "/prices-history",
@@ -37,7 +37,7 @@ def get_price_history(config: AppConfig, token_id: str) -> list[PricePoint]:
             "fidelity": config.signal.history_fidelity_minutes,
         },
         timeout=config.api.request_timeout_seconds,
-        cache=_cache_from_config(config),
+        cache=_cache_from_config(config) if use_cache else None,
     )
     raw_points = payload.get("history", payload) if isinstance(payload, dict) else payload
     return [_parse_point(point) for point in raw_points if _parse_point(point) is not None]

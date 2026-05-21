@@ -66,14 +66,14 @@ class Market:
         return fallback
 
 
-def discover_btc_markets(config: AppConfig) -> list[Market]:
-    cache = _cache_from_config(config)
+def discover_btc_markets(config: AppConfig, use_cache: bool = True) -> list[Market]:
+    cache = _cache_from_config(config) if use_cache else None
     markets = _discover_with_search(config, cache)
     markets.extend(_discover_with_market_pages(config, cache))
     return _dedupe(markets)
 
 
-def _discover_with_search(config: AppConfig, cache: JsonCache) -> list[Market]:
+def _discover_with_search(config: AppConfig, cache: JsonCache | None) -> list[Market]:
     markets: list[Market] = []
     for keyword in config.universe.keywords:
         try:
@@ -103,7 +103,7 @@ def _discover_with_search(config: AppConfig, cache: JsonCache) -> list[Market]:
     return markets
 
 
-def _discover_with_market_pages(config: AppConfig, cache: JsonCache) -> list[Market]:
+def _discover_with_market_pages(config: AppConfig, cache: JsonCache | None) -> list[Market]:
     markets: list[Market] = []
     for page in range(config.universe.max_pages):
         try:
