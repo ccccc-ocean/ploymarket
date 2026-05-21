@@ -273,10 +273,15 @@ def _run_paper_scan(config, market_type: str) -> None:
 
 
 def _paper_markets(config, storage):
-    local_markets = storage.load_markets()
-    if local_markets:
-        return local_markets
-    markets = discover_btc_markets(config)
+    try:
+        markets = discover_btc_markets(config)
+    except Exception as exc:
+        print(f"warning: discover failed for paper-run: {exc}", file=sys.stderr)
+        local_markets = storage.load_markets()
+        if local_markets:
+            print("warning: using local SQLite markets for paper-run", file=sys.stderr)
+            return local_markets
+        raise
     storage.save_markets(markets)
     return markets
 
