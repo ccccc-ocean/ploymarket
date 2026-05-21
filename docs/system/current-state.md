@@ -163,6 +163,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 脚本位置：[scripts/research_cycle.sh](/Users/pizza_yang/code/ploymarket/scripts/research_cycle.sh)
 
 - 依次运行模拟盘扫描、复盘、YES/NO 价差扫描、BTC 价格更新、alignment、edge、离线回放、市场类型对比、数据质量和日报。
+- 主观察命令现在使用 `--market-type all`，以免短周期 BTC 市场被分类出来但没有进入模拟观察闭环。
 - 适合后续接入 cron 或其他本地调度器。
 
 ### macOS 定时任务

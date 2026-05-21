@@ -1019,3 +1019,29 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 ### 结论
 
 旧 BUY_YES 动量策略主要在长期 `price_target` 上亏损，对单日/短周期 BTC 市场几乎完全不触发交易。下一步不能继续套旧参数，而应该为 `price_target_daily` / `price_range_daily` 单独设计边界型策略，例如临近 strike、临近结算、BTC 现货短线接近目标价时的盘口滞后。
+
+## 2026-05-21：扩大 BTC 模拟观察面
+
+### 问题
+
+虽然系统已经使用 5 分钟价格历史，但主流水线仍主要对 `price_target` 运行 `backtest`、`paper-run`、`spread-scan`、`alignment-report` 和 `strategy-sweep`。这导致短周期 BTC 市场虽然被存储和分类，却没有进入主回测/模拟盘信号闭环。
+
+### 已调整
+
+`scripts/research_cycle.sh` 改为对 `all` BTC 市场类型运行主观察命令：
+
+- `backtest --market-type all`
+- `paper-run --market-type all`
+- `spread-scan --market-type all`
+- `alignment-report --market-type all`
+- `strategy-sweep --market-type all`
+
+### 判断
+
+交易数少的主要原因不是“5 分钟不够细”，而是：
+
+- 旧策略窗口是 6h/24h 均线，天然不适合 5m/15m 边界市场。
+- 旧策略只会买 YES，不会围绕临近 strike 的 YES/NO 边界变化做决策。
+- 短周期市场已经有样本，但旧规则几乎完全不触发交易。
+
+下一步应优先做 BTC 边界型策略，而不是立刻扩展到 1 分钟。15 分钟可以作为更稳的研究窗口，1 分钟要等数据和执行状态机更成熟后再加。

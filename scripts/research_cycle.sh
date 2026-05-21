@@ -16,13 +16,13 @@ run() {
 }
 
 run btc-price
-run backtest --market-type price_target
-run paper-run --market-type price_target
+run backtest --market-type all
+run paper-run --market-type all
 run paper-report
-run spread-scan --market-type price_target
-run alignment-report --market-type price_target
+run spread-scan --market-type all
+run alignment-report --market-type all
 run edge-report --min-samples 30
-run strategy-sweep --market-type price_target --limit 10
+run strategy-sweep --market-type all --limit 10
 run market-type-report
 run data-quality
 run daily-report
