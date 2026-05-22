@@ -39,6 +39,36 @@ def extract_usd_strike(question: str) -> float | None:
     return value
 
 
+def infer_strike_direction(question: str) -> str:
+    text = question.lower()
+    if any(term in text for term in ["above", "over", "higher than", "reach", "hit"]):
+        return "above"
+    if any(term in text for term in ["below", "under", "lower than"]):
+        return "below"
+    return "unknown"
+
+
+def strike_distance_pct(question: str, btc_price: float | None) -> float | None:
+    strike = extract_usd_strike(question)
+    if strike is None or btc_price is None or btc_price <= 0:
+        return None
+    return (strike - btc_price) / btc_price
+
+
+def describe_strike_risk(question: str, btc_price: float | None, far_threshold_pct: float = 0.02) -> str:
+    distance = strike_distance_pct(question, btc_price)
+    direction = infer_strike_direction(question)
+    if distance is None:
+        return "no_strike"
+    if direction == "above" and distance > far_threshold_pct:
+        return "far_above_spot"
+    if direction == "below" and distance < -far_threshold_pct:
+        return "far_below_spot"
+    if abs(distance) <= far_threshold_pct:
+        return "near_spot"
+    return "in_the_money_or_unclear"
+
+
 def latest_btc_candle_at_or_before(candles: list[BtcCandle], timestamp: int) -> BtcCandle | None:
     candidates = [candle for candle in candles if candle.timestamp <= timestamp]
     return candidates[-1] if candidates else None

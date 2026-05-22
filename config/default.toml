@@ -1,6 +1,7 @@
 [api]
 gamma_base_url = "https://gamma-api.polymarket.com"
 clob_base_url = "https://clob.polymarket.com"
+data_base_url = "https://data-api.polymarket.com"
 request_timeout_seconds = 12
 
 [cache]

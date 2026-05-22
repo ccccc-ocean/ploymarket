@@ -62,6 +62,7 @@ class Storage:
                     yes_token_id TEXT,
                     no_price REAL,
                     no_token_id TEXT,
+                    condition_id TEXT,
                     fees_enabled INTEGER NOT NULL,
                     taker_fee_rate REAL,
                     fee_type TEXT,
@@ -71,6 +72,7 @@ class Storage:
             )
             _ensure_column(connection, "markets", "no_price", "REAL")
             _ensure_column(connection, "markets", "no_token_id", "TEXT")
+            _ensure_column(connection, "markets", "condition_id", "TEXT")
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS price_history (
@@ -115,8 +117,8 @@ class Storage:
                 """
                 INSERT INTO markets (
                     market_id, question, slug, market_type, end_date, liquidity, volume_24hr,
-                    yes_price, yes_token_id, no_price, no_token_id, fees_enabled, taker_fee_rate, fee_type, observed_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    yes_price, yes_token_id, no_price, no_token_id, condition_id, fees_enabled, taker_fee_rate, fee_type, observed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(market_id) DO UPDATE SET
                     question=excluded.question,
                     slug=excluded.slug,
@@ -128,6 +130,7 @@ class Storage:
                     yes_token_id=excluded.yes_token_id,
                     no_price=excluded.no_price,
                     no_token_id=excluded.no_token_id,
+                    condition_id=excluded.condition_id,
                     fees_enabled=excluded.fees_enabled,
                     taker_fee_rate=excluded.taker_fee_rate,
                     fee_type=excluded.fee_type,
@@ -146,6 +149,7 @@ class Storage:
                         market.yes_token_id,
                         market.no_price,
                         market.no_token_id,
+                        market.condition_id,
                         1 if market.fees_enabled else 0,
                         market.taker_fee_rate,
                         market.fee_type,
@@ -163,7 +167,7 @@ class Storage:
             rows = connection.execute(
                 """
                 SELECT market_id, question, slug, end_date, liquidity, volume_24hr,
-                       yes_price, yes_token_id, no_price, no_token_id, fees_enabled, taker_fee_rate, fee_type
+                       yes_price, yes_token_id, no_price, no_token_id, condition_id, fees_enabled, taker_fee_rate, fee_type
                 FROM markets
                 ORDER BY volume_24hr DESC
                 """
@@ -181,6 +185,7 @@ class Storage:
                 yes_token_id,
                 no_price,
                 no_token_id,
+                condition_id,
                 fees_enabled,
                 taker_fee_rate,
                 fee_type,
@@ -214,6 +219,7 @@ class Storage:
                     bool(fees_enabled),
                     float(taker_fee_rate) if taker_fee_rate is not None else None,
                     str(fee_type) if fee_type else None,
+                    str(condition_id) if condition_id else None,
                 )
             )
         return markets

@@ -1142,3 +1142,21 @@ HTTP cache 默认 TTL 是 `900` 秒，适合减少研究阶段 API 抖动，但�
 ### 判断
 
 “多做高确定性 above 事件”方向合理，但不能只看确定性。高确定性事件通常 YES 价格很高，剩余收益很薄，必须同时满足扣除手续费、滑点、盘口深度和尾部风险后的正期望。下一步用 strike 分层报告寻找可泛化过滤规则。
+
+## 2026-05-22：加入资金流与大额钱包观察层
+
+### 观察
+
+`above $78k` 不是永远不能做，真正的问题是 BTC 现货没有有效突破时，单纯 BUY_YES 动量会反复买在错误位置。同理，`under $60k` 这种远低于现货的市场也不能因为 YES 便宜就持续买入。`above` 和 `under/below` 都应该统一看“strike 距离现货多远、最近资金流支持哪一边”。
+
+### 已调整
+
+- 市场发现新增保存 Polymarket `conditionId`，用于按市场查询交易流。
+- 新增 `flow-scan` 命令，输出 `data/flow_scan.csv`。
+- `flow-scan` 会按市场统计最近交易的 `BUY/SELL + YES/NO`、大额交易数、活跃钱包数、最大成交钱包、YES/NO 净资金压力。
+- 新增 `strike_direction`、`strike_distance_pct`、`strike_risk` 字段，统一标记 `far_above_spot`、`far_below_spot`、`near_spot` 等风险。
+- 定时研究流水线加入 `flow-scan`，但暂时只观察，不直接改变交易动作。
+
+### 判断
+
+资金流只能作为辅助确认，不能直接等同于“聪明钱”。大额钱包可能在做对冲、套利、拆单或库存调整，也可能只是错了。下一步应把 `flow_signal` 与历史回测结果关联：例如 `near_spot + YES_PRESSURE` 是否改善 `above` 市场表现，`far_above_spot + NO_PRESSURE` 是否能过滤类似 `$78k/$80k` 的亏损入场。

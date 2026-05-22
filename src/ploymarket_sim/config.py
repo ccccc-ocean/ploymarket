@@ -10,6 +10,7 @@ class ApiConfig:
     gamma_base_url: str
     clob_base_url: str
     request_timeout_seconds: int
+    data_base_url: str = "https://data-api.polymarket.com"
 
 
 @dataclass(frozen=True)

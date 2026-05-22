@@ -26,6 +26,7 @@ class StorageTests(unittest.TestCase):
                 True,
                 0.07,
                 "crypto_fees",
+                "0xdd22472e552920b8438158ea7238bfadfa4f736aa4cee91a6b86c39ead110917",
             )
 
             storage.save_markets([market])
@@ -39,6 +40,7 @@ class StorageTests(unittest.TestCase):
             self.assertEqual(markets[0].yes_token_id, "yes-token")
             self.assertEqual(markets[0].no_token_id, "no-token")
             self.assertEqual(markets[0].no_price, 0.5)
+            self.assertEqual(markets[0].condition_id, "0xdd22472e552920b8438158ea7238bfadfa4f736aa4cee91a6b86c39ead110917")
             history = storage.load_price_history("yes-token")
             self.assertEqual([point.price for point in history], [0.5, 0.6])
             quality = storage.market_history_stats()

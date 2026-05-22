@@ -15,6 +15,7 @@ from .config import load_config
 from .daily_report import build_daily_report, write_daily_report_csv
 from .edge_report import build_edge_buckets, load_alignment_rows_csv
 from .execution import plan_execution
+from .flow_scan import print_flow_scan_summary, scan_market_flows, write_flow_scan_csv
 from .http import HttpError
 from .market_type_report import build_market_type_report, print_market_type_report, write_market_type_report_csv
 from .portfolio import build_mark_to_market_curve, build_portfolio_curve, summarize_portfolio
@@ -92,6 +93,10 @@ def main() -> None:
     sweep_parser.add_argument("--limit", type=int, default=10)
     spread_parser = subparsers.add_parser("spread-scan", help="scan live YES/NO order books for complete-set spread edges")
     spread_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
+    flow_parser = subparsers.add_parser("flow-scan", help="scan recent Polymarket trade flow and large-wallet pressure")
+    flow_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
+    flow_parser.add_argument("--limit", type=int, default=250)
+    flow_parser.add_argument("--large-trade-usdc", type=float, default=500.0)
     subparsers.add_parser("market-type-report", help="compare local backtest results by BTC market type")
     subparsers.add_parser("strike-report", help="summarize BTC daily range backtest results by strike")
     subparsers.add_parser("daily-report", help="summarize paper, replay, alignment, and edge outputs")
@@ -148,6 +153,8 @@ def main() -> None:
         _run_strategy_sweep(config, args.market_type, args.limit)
     elif args.command == "spread-scan":
         _run_spread_scan(config, args.market_type)
+    elif args.command == "flow-scan":
+        _run_flow_scan(config, args.market_type, args.limit, args.large_trade_usdc)
     elif args.command == "market-type-report":
         _run_market_type_report(config)
     elif args.command == "strike-report":
@@ -454,6 +461,32 @@ def _run_spread_scan(config, market_type: str) -> None:
     rows = scan_spreads(config, markets)
     path = write_spread_scan_csv(rows, config.backtest.output_dir)
     print_spread_scan_summary(rows, path)
+
+
+def _run_flow_scan(config, market_type: str, limit: int, large_trade_usdc: float) -> None:
+    storage = storage_from_config(config)
+    markets = _filter_markets(_flow_markets(config, storage), market_type)
+    if not markets:
+        raise SystemExit("No markets found. Run discover first.")
+    candles = load_btc_candles_csv(Path(config.backtest.output_dir) / "btc_price_candles.csv")
+    if not candles:
+        candles = get_btc_candles(config, use_cache=False)
+        write_btc_candles_csv(candles, config.backtest.output_dir)
+    rows = scan_market_flows(config, markets, candles, limit_per_market=limit, large_trade_usdc=large_trade_usdc)
+    path = write_flow_scan_csv(rows, config.backtest.output_dir)
+    print_flow_scan_summary(rows, path)
+
+
+def _flow_markets(config, storage):
+    try:
+        live_markets = discover_btc_markets(config, use_cache=False)
+    except Exception as exc:
+        print(f"warning: live market discovery failed for flow-scan: {exc}", file=sys.stderr)
+        live_markets = []
+    if live_markets:
+        storage.save_markets(live_markets)
+        return live_markets
+    return storage.load_markets()
 
 
 def _spread_markets(config, storage):

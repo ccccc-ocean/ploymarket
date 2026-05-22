@@ -26,6 +26,7 @@ class Market:
     fees_enabled: bool
     taker_fee_rate: float | None
     fee_type: str | None
+    condition_id: str | None = None
 
     @property
     def yes_token_id(self) -> str | None:
@@ -165,6 +166,7 @@ def _parse_market(item: dict[str, Any]) -> Market | None:
             fees_enabled=bool(item.get("feesEnabled")),
             taker_fee_rate=_parse_taker_fee_rate(item),
             fee_type=str(item.get("feeType")) if item.get("feeType") else None,
+            condition_id=str(item.get("conditionId")) if item.get("conditionId") else None,
         )
     except (TypeError, ValueError, json.JSONDecodeError):
         return None

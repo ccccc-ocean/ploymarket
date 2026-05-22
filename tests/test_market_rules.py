@@ -2,7 +2,7 @@ import unittest
 
 from ploymarket_sim.btc_price import BtcCandle
 from ploymarket_sim.btc_price import merge_btc_candles
-from ploymarket_sim.market_rules import blocks_btc_strike_entry, extract_usd_strike
+from ploymarket_sim.market_rules import blocks_btc_strike_entry, describe_strike_risk, extract_usd_strike, infer_strike_direction
 from ploymarket_sim.polymarket import Market
 
 
@@ -19,6 +19,11 @@ class MarketRulesTests(unittest.TestCase):
     def test_extracts_usd_strike(self) -> None:
         self.assertEqual(extract_usd_strike("Will Bitcoin be above $78,000 on May 21?"), 78000.0)
         self.assertEqual(extract_usd_strike("Will Bitcoin hit $150k?"), 150000.0)
+
+    def test_describes_far_above_and_far_below_strike_risk(self) -> None:
+        self.assertEqual(infer_strike_direction("Will Bitcoin be under $60,000?"), "below")
+        self.assertEqual(describe_strike_risk("Will Bitcoin be above $78,000?", 76000), "far_above_spot")
+        self.assertEqual(describe_strike_risk("Will Bitcoin be under $60,000?", 78000), "far_below_spot")
 
     def test_blocks_above_market_when_btc_not_near_strike(self) -> None:
         market = Market("m1", "Will the price of Bitcoin be above $78,000 on May 21?", "btc-above", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
