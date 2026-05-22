@@ -41,7 +41,8 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-
 - 存储价格历史点。
 - 可以从 SQLite 读取已存市场和价格历史。
 - `discover`、`signals`、`backtest` 会自动写入。
-- `paper-run` 和 `spread-scan` 是实时扫描：必须使用 live 市场和 live 历史，不再把本地 SQLite 缓存当作可交易依据。
+- `paper-run` 和 `spread-scan` 是实时扫描：必须使用 live 市场；如果当前 live discovery 抖动，只允许回退到最近 `fresh_market_ttl_seconds` 内 live 观察过的市场，不再把任意旧 SQLite 缓存当作可交易依据。
+- `paper-run` 的价格历史和 `spread-scan` 的订单簿仍必须实时拉取；历史缓存只用于离线研究和回测。
 - `replay-backtest` 可以只使用 SQLite 本地数据离线回放。
 - `data-quality` 输出本地市场和历史价格覆盖情况。
 - `paper_snapshots` 保存每轮模拟盘信号和执行计划。

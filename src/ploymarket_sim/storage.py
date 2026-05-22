@@ -182,57 +182,24 @@ class Storage:
                 ORDER BY volume_24hr DESC
                 """
             ).fetchall()
-        markets = []
-        for row in rows:
-            (
-                market_id,
-                question,
-                slug,
-                end_date,
-                liquidity,
-                volume_24hr,
-                yes_price,
-                yes_token_id,
-                no_price,
-                no_token_id,
-                condition_id,
-                fees_enabled,
-                taker_fee_rate,
-                fee_type,
-            ) = row
-            prices = []
-            if yes_price is not None:
-                prices.append(float(yes_price))
-            if no_price is not None:
-                prices.append(float(no_price))
-            elif yes_price is not None:
-                prices.append(max(0.0, 1.0 - float(yes_price)))
-            token_ids = []
-            if yes_token_id:
-                token_ids.append(str(yes_token_id))
-            if no_token_id:
-                token_ids.append(str(no_token_id))
-            elif yes_token_id:
-                token_ids.append("")
-            markets.append(
-                Market(
-                    str(market_id),
-                    str(question),
-                    str(slug),
-                    str(end_date) if end_date else None,
-                    float(liquidity),
-                    float(volume_24hr),
-                    True,
-                    ["Yes", "No"],
-                    prices,
-                    token_ids,
-                    bool(fees_enabled),
-                    float(taker_fee_rate) if taker_fee_rate is not None else None,
-                    str(fee_type) if fee_type else None,
-                    str(condition_id) if condition_id else None,
-                )
-            )
-        return markets
+        return [_market_from_row(row) for row in rows]
+
+    def load_markets_observed_after(self, cutoff_timestamp: float) -> list[Market]:
+        if not self.enabled or not Path(self.sqlite_path).exists():
+            return []
+        self.init()
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT market_id, question, slug, end_date, liquidity, volume_24hr,
+                       yes_price, yes_token_id, no_price, no_token_id, condition_id, fees_enabled, taker_fee_rate, fee_type
+                FROM markets
+                WHERE observed_at >= ?
+                ORDER BY volume_24hr DESC
+                """,
+                (cutoff_timestamp,),
+            ).fetchall()
+        return [_market_from_row(row) for row in rows]
 
     def save_price_history(self, token_id: str, history: list[PricePoint]) -> None:
         if not self.enabled or not token_id:
@@ -313,6 +280,22 @@ class Storage:
                 ORDER BY timestamp
                 """,
                 (token_id,),
+            ).fetchall()
+        return [PricePoint(int(timestamp), float(price)) for timestamp, price in rows]
+
+    def load_price_history_observed_after(self, token_id: str, cutoff_timestamp: float) -> list[PricePoint]:
+        if not self.enabled or not token_id or not Path(self.sqlite_path).exists():
+            return []
+        self.init()
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT timestamp, price
+                FROM price_history
+                WHERE token_id = ? AND observed_at >= ?
+                ORDER BY timestamp
+                """,
+                (token_id, cutoff_timestamp),
             ).fetchall()
         return [PricePoint(int(timestamp), float(price)) for timestamp, price in rows]
 
@@ -412,6 +395,55 @@ class Storage:
 
 def storage_from_config(config) -> Storage:
     return Storage(config.storage.enabled, config.storage.sqlite_path)
+
+
+def _market_from_row(row) -> Market:
+    (
+        market_id,
+        question,
+        slug,
+        end_date,
+        liquidity,
+        volume_24hr,
+        yes_price,
+        yes_token_id,
+        no_price,
+        no_token_id,
+        condition_id,
+        fees_enabled,
+        taker_fee_rate,
+        fee_type,
+    ) = row
+    prices = []
+    if yes_price is not None:
+        prices.append(float(yes_price))
+    if no_price is not None:
+        prices.append(float(no_price))
+    elif yes_price is not None:
+        prices.append(max(0.0, 1.0 - float(yes_price)))
+    token_ids = []
+    if yes_token_id:
+        token_ids.append(str(yes_token_id))
+    if no_token_id:
+        token_ids.append(str(no_token_id))
+    elif yes_token_id:
+        token_ids.append("")
+    return Market(
+        str(market_id),
+        str(question),
+        str(slug),
+        str(end_date) if end_date else None,
+        float(liquidity),
+        float(volume_24hr),
+        True,
+        ["Yes", "No"],
+        prices,
+        token_ids,
+        bool(fees_enabled),
+        float(taker_fee_rate) if taker_fee_rate is not None else None,
+        str(fee_type) if fee_type else None,
+        str(condition_id) if condition_id else None,
+    )
 
 
 def _ensure_column(connection: sqlite3.Connection, table: str, column: str, column_type: str) -> None:

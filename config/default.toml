@@ -13,6 +13,8 @@ stale_if_error = true
 [storage]
 enabled = true
 sqlite_path = "data/ploymarket.sqlite"
+fresh_market_ttl_seconds = 900
+fresh_history_ttl_seconds = 180
 
 [btc_price]
 provider = "coinbase_public"

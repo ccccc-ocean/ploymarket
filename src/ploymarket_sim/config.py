@@ -25,6 +25,8 @@ class CacheConfig:
 class StorageConfig:
     enabled: bool
     sqlite_path: str
+    fresh_market_ttl_seconds: int = 900
+    fresh_history_ttl_seconds: int = 180
 
 
 @dataclass(frozen=True)

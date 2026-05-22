@@ -1267,3 +1267,25 @@ HTTP cache 默认 TTL 是 `900` 秒，适合减少研究阶段 API 抖动，但�
 ### 判断
 
 这会让网络不稳定时的 paper-run 市场数变少，甚至为 0，但这是正确行为。回测可以用本地缓存，实盘候选必须依赖实时数据。宁愿少交易，也不能用过期数据产生看似漂亮但不可执行的信号。
+
+## 2026-05-23：修复实时发现抖动导致样本骤降
+
+### 观察
+
+本地网络到 Polymarket/Gamma API 仍频繁出现 `IncompleteRead`。在一次复现中，实时发现只有 `live=1`，而 SQLite 历史市场有 `118` 个；如果完全禁用回退，模拟盘市场数会骤降，难以验证策略。但如果直接使用全部本地缓存，又会把过期市场当作实盘候选。
+
+### 已调整
+
+- Gamma `/markets` 分页请求从每页 `20` 缩小到最多 `10`，减少大响应中断概率。
+- 单个 market page 失败不再立刻终止全部发现，连续失败多页后才停止。
+- SQLite 新增按 `observed_at` 读取“最近 live 观察过的市场”的能力。
+- `paper-run` / `spread-scan` 在 live discovery 不健康时，只允许回退到最近 `fresh_market_ttl_seconds=900` 秒内 live 观察过的市场池。
+- `paper-run` 的 CLOB `prices-history` 仍必须实时拉取；`spread-scan` 的订单簿仍必须实时拉取，不用旧价格或旧盘口补位。
+
+### 最新验证
+
+一次实测中，live discovery 降级为 `live=5 local=118`，但新鲜 live 缓存恢复出 `fresh=40` 个候选市场；最终 `paper-run` 因部分 CLOB `prices-history` 仍有 `IncompleteRead`，实际记录 `markets=30`、`buy_yes=0`、`buy_no=0`、`skip=30`。`spread-scan` 在 `live=1` 时使用 `fresh=5` 个新鲜 live 市场继续扫描真实订单簿，输出 `markets=5`。
+
+### 判断
+
+这一步解决的是“市场发现层因为网络抖动把样本砍没”的问题，同时没有放松实盘安全边界。下一个瓶颈转移到 CLOB `prices-history` 的稳定性：需要继续优化历史拉取重试、降采样或分批请求，否则部分市场仍会被跳过。

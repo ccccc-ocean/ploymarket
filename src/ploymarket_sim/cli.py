@@ -311,11 +311,21 @@ def _discover_live_markets_or_empty(config, storage, purpose: str):
     if _market_discovery_is_healthy(live_markets, local_markets):
         storage.save_markets(live_markets)
         return live_markets
+    if live_markets:
+        storage.save_markets(live_markets)
     print(
-        f"warning: live market discovery degraded for {purpose}; not using local/cache for realtime decisions: "
+        f"warning: live market discovery degraded for {purpose}; not using stale local/cache for realtime decisions: "
         f"live={len(live_markets)} local={len(local_markets)}",
         file=sys.stderr,
     )
+    fresh_markets = _fresh_live_markets(config, storage)
+    if fresh_markets:
+        print(
+            f"warning: using fresh live-observed markets for {purpose}: "
+            f"fresh={len(fresh_markets)} ttl_seconds={config.storage.fresh_market_ttl_seconds}",
+            file=sys.stderr,
+        )
+        return fresh_markets
     return []
 
 
@@ -323,6 +333,13 @@ def _market_discovery_is_healthy(live_markets, local_markets) -> bool:
     if len(live_markets) >= 10:
         return not local_markets or len(live_markets) >= len(local_markets) * 0.5
     return bool(live_markets) and not local_markets
+
+
+def _fresh_live_markets(config, storage):
+    ttl_seconds = max(0, int(config.storage.fresh_market_ttl_seconds))
+    if ttl_seconds <= 0:
+        return []
+    return storage.load_markets_observed_after(time() - ttl_seconds)
 
 
 def _run_paper_scan(config, market_type: str) -> None:

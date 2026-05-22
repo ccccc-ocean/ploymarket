@@ -106,6 +106,8 @@ def _discover_with_search(config: AppConfig, cache: JsonCache | None) -> list[Ma
 
 def _discover_with_market_pages(config: AppConfig, cache: JsonCache | None) -> list[Market]:
     markets: list[Market] = []
+    page_limit = min(config.universe.limit, 10)
+    consecutive_failures = 0
     for page in range(config.universe.max_pages):
         try:
             payload = get_json(
@@ -114,8 +116,8 @@ def _discover_with_market_pages(config: AppConfig, cache: JsonCache | None) -> l
                 {
                     "active": str(config.universe.active).lower(),
                     "closed": str(config.universe.closed).lower(),
-                    "limit": config.universe.limit,
-                    "offset": page * config.universe.limit,
+                    "limit": page_limit,
+                    "offset": page * page_limit,
                     "order": config.universe.order,
                     "ascending": "false",
                 },
@@ -124,7 +126,11 @@ def _discover_with_market_pages(config: AppConfig, cache: JsonCache | None) -> l
             )
         except HttpError as exc:
             print(f"warning: market page {page} failed: {exc}", file=sys.stderr)
-            break
+            consecutive_failures += 1
+            if consecutive_failures >= 3:
+                break
+            continue
+        consecutive_failures = 0
         if not payload:
             break
         for item in payload:
