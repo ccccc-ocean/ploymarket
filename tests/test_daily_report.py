@@ -35,6 +35,34 @@ class DailyReportTests(unittest.TestCase):
             self.assertEqual(report.readiness, "not_ready")
             self.assertEqual(report.replay_trade_count, 12)
 
+    def test_latest_empty_paper_run_blocks_readiness(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            self._write_csv(
+                Path(directory) / "paper_report.csv",
+                ["run_timestamp", "market_count", "taker_count", "maker_count", "skip_count"],
+                [[1, 35, 0, 0, 35], [2, 0, 0, 0, 0]],
+            )
+            self._write_csv(
+                Path(directory) / "portfolio_mtm_summary.csv",
+                ["realized_pnl", "max_drawdown"],
+                [[100.0, 0.02]],
+            )
+            self._write_csv(
+                Path(directory) / "backtest_summary_by_type.csv",
+                ["market_type", "trade_count", "win_rate"],
+                [["all", 100, 0.66]],
+            )
+            self._write_csv(
+                Path(directory) / "alignment_summary.csv",
+                ["horizon_hours", "sample_count"],
+                [[1, 20000]],
+            )
+
+            report = build_daily_report(directory)
+
+            self.assertEqual(report.readiness, "not_ready")
+            self.assertIn("没有实时市场数据", report.reason)
+
     def _write_csv(self, path: Path, header: list[str], rows: list[list[object]]) -> None:
         with path.open("w", newline="", encoding="utf-8") as file:
             writer = csv.writer(file)

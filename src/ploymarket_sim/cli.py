@@ -243,7 +243,7 @@ def _explain_risk(config) -> None:
     print(f"- max_spread: 买卖价差高于 {risk.max_spread:.2f} 不交易")
 
 
-def _safe_history(config, market, storage=None, prefer_local: bool = False, use_cache: bool = True):
+def _safe_history(config, market, storage=None, prefer_local: bool = False, use_cache: bool = True, allow_local_fallback: bool = True):
     token_id = market.yes_token_id or ""
     if prefer_local and storage is not None:
         local_history = storage.load_price_history(token_id)
@@ -254,7 +254,7 @@ def _safe_history(config, market, storage=None, prefer_local: bool = False, use_
         return history
     except HttpError as exc:
         print(f"warning: skip {market.id} history: {exc}", file=sys.stderr)
-        if storage is not None:
+        if storage is not None and allow_local_fallback:
             local_history = storage.load_price_history(token_id)
             if local_history:
                 print(f"warning: using local SQLite history for {market.id}", file=sys.stderr)
@@ -301,6 +301,24 @@ def _discover_markets_with_quality_guard(config, storage, purpose: str):
     return live_markets
 
 
+def _discover_live_markets_or_empty(config, storage, purpose: str):
+    local_markets = storage.load_markets()
+    try:
+        live_markets = discover_btc_markets(config, use_cache=False)
+    except Exception as exc:
+        print(f"warning: live market discovery failed for {purpose}: {exc}", file=sys.stderr)
+        live_markets = []
+    if _market_discovery_is_healthy(live_markets, local_markets):
+        storage.save_markets(live_markets)
+        return live_markets
+    print(
+        f"warning: live market discovery degraded for {purpose}; not using local/cache for realtime decisions: "
+        f"live={len(live_markets)} local={len(local_markets)}",
+        file=sys.stderr,
+    )
+    return []
+
+
 def _market_discovery_is_healthy(live_markets, local_markets) -> bool:
     if len(live_markets) >= 10:
         return not local_markets or len(live_markets) >= len(local_markets) * 0.5
@@ -314,7 +332,7 @@ def _run_paper_scan(config, market_type: str) -> None:
     btc_candles = load_btc_candles_csv(Path(config.backtest.output_dir) / "btc_price_candles.csv")
     rows = []
     for market in markets:
-        history = _safe_history(config, market, storage, prefer_local=False, use_cache=False)
+        history = _safe_history(config, market, storage, prefer_local=False, use_cache=False, allow_local_fallback=False)
         if not history:
             continue
         storage.save_price_history(market.yes_token_id or "", history)
@@ -341,7 +359,7 @@ def _run_paper_scan(config, market_type: str) -> None:
 
 
 def _paper_markets(config, storage):
-    return _discover_markets_with_quality_guard(config, storage, "paper-run")
+    return _discover_live_markets_or_empty(config, storage, "paper-run")
 
 
 def _run_paper_loop(config, market_type: str, interval_seconds: int, iterations: int) -> None:
@@ -475,8 +493,12 @@ def _run_spread_scan(config, market_type: str) -> None:
     storage = storage_from_config(config)
     markets = _filter_markets(_spread_markets(config, storage), market_type)
     if not markets:
-        raise SystemExit("No local markets found. Run discover or backtest first.")
-    rows = scan_spreads(config, markets)
+        rows = []
+        path = write_spread_scan_csv(rows, config.backtest.output_dir)
+        print("spread_scan | data_degraded=true | markets=0 | reason=live market discovery unavailable; local cache not used for realtime scan")
+        print_spread_scan_summary(rows, path)
+        return
+    rows = scan_spreads(config, markets, storage)
     path = write_spread_scan_csv(rows, config.backtest.output_dir)
     print_spread_scan_summary(rows, path)
 
@@ -528,7 +550,7 @@ def _flow_markets(config, storage):
 
 
 def _spread_markets(config, storage):
-    return _discover_markets_with_quality_guard(config, storage, "spread-scan")
+    return _discover_live_markets_or_empty(config, storage, "spread-scan")
 
 
 def _run_market_type_report(config) -> None:

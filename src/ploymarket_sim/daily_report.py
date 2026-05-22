@@ -52,12 +52,13 @@ def build_daily_report(output_dir: str) -> DailyReport:
     spread_best_buy_edge = _max_float(spread_rows, "buy_pair_edge")
     spread_best_sell_edge = _max_float(spread_rows, "sell_pair_edge")
 
-    readiness, reason = _readiness(replay_pnl, replay_max_drawdown, replay_trade_count, alignment_samples_1h, len(paper_rows))
+    latest_markets = int(_float(latest_paper.get("market_count")))
+    readiness, reason = _readiness(replay_pnl, replay_max_drawdown, replay_trade_count, alignment_samples_1h, len(paper_rows), latest_markets)
 
     return DailyReport(
         generated_at=int(time()),
         paper_runs=len(paper_rows),
-        latest_markets=int(_float(latest_paper.get("market_count"))),
+        latest_markets=latest_markets,
         latest_taker=int(_float(latest_paper.get("taker_count"))),
         latest_maker=int(_float(latest_paper.get("maker_count"))),
         latest_skip=int(_float(latest_paper.get("skip_count"))),
@@ -135,7 +136,10 @@ def _readiness(
     replay_trade_count: int,
     alignment_samples_1h: int,
     paper_runs: int,
+    latest_markets: int,
 ) -> tuple[str, str]:
+    if latest_markets == 0:
+        return "not_ready", "最新 paper-run 没有实时市场数据，禁止把本地缓存当作实盘依据"
     if paper_runs < 14:
         return "not_ready", "paper-run 样本不足，至少需要连续多日/多轮观察"
     if replay_trade_count < 30:

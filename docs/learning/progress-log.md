@@ -1249,3 +1249,21 @@ HTTP cache 默认 TTL 是 `900` 秒，适合减少研究阶段 API 抖动，但�
 ### 判断
 
 短期 PnL 稍微下降是可以接受的，因为过滤器的目标不是过拟合当前震荡，而是减少未来单边行情里的反向交易风险。下一步要把 regime 分层写进报告：分别统计 `uptrend/downtrend/range_bound` 下 `BUY_YES` 和 `BUY_NO` 的胜率、PnL、最大回撤，确认过滤器不是凭感觉挡交易。
+
+## 2026-05-22：禁止用本地缓存作为实时交易依据
+
+### 观察
+
+`IncompleteRead` 多半是网络/API 传输不稳定，`orderbook 404` 多半是市场或 token 已经过期、下架或订单簿不可用。此前系统为了保证研究流水线不断，会在 `paper-run` 和 `spread-scan` 降级到本地 SQLite 市场和历史；这适合回测和研究连续性，但不适合作为实盘或实时模拟候选。
+
+### 已调整
+
+- `paper-run` 现在必须使用 live market discovery 和 live `prices-history`；如果实时数据不可用，本轮写出空扫描，不再用 SQLite 历史补位。
+- `spread-scan` 现在必须使用 live market discovery；如果实时发现不健康，本轮输出 `data_degraded`，不再扫描本地旧市场。
+- CLOB orderbook 返回 `404` 时，会把 YES/NO token 写入 `stale_tokens`，后续一段时间跳过，避免每轮重复扫失效订单簿。
+- `paper-report` 会把空 `paper_run_*.csv` 记录为 `DATA_DEGRADED`。
+- `daily-report` 如果最新 paper-run 没有实时市场，会保持 `not_ready`，理由明确为“禁止把本地缓存当作实盘依据”。
+
+### 判断
+
+这会让网络不稳定时的 paper-run 市场数变少，甚至为 0，但这是正确行为。回测可以用本地缓存，实盘候选必须依赖实时数据。宁愿少交易，也不能用过期数据产生看似漂亮但不可执行的信号。

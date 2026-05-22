@@ -106,6 +106,16 @@ class Storage:
                 )
                 """
             )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS stale_tokens (
+                    token_id TEXT PRIMARY KEY,
+                    market_id TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    observed_at REAL NOT NULL
+                )
+                """
+            )
 
     def save_markets(self, markets: list[Market]) -> None:
         if not self.enabled:
@@ -361,6 +371,40 @@ class Storage:
             )
             for market_id, question, market_type, yes_token_id, point_count, first_timestamp, last_timestamp in rows
         ]
+
+    def mark_stale_token(self, token_id: str, market_id: str, reason: str) -> None:
+        if not self.enabled or not token_id:
+            return
+        self.init()
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO stale_tokens (token_id, market_id, reason, observed_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(token_id) DO UPDATE SET
+                    market_id=excluded.market_id,
+                    reason=excluded.reason,
+                    observed_at=excluded.observed_at
+                """,
+                (token_id, market_id, reason, time()),
+            )
+
+    def is_stale_token(self, token_id: str, max_age_seconds: int = 24 * 3600) -> bool:
+        if not self.enabled or not token_id or not Path(self.sqlite_path).exists():
+            return False
+        self.init()
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT observed_at
+                FROM stale_tokens
+                WHERE token_id = ?
+                """,
+                (token_id,),
+            ).fetchone()
+        if row is None:
+            return False
+        return time() - float(row[0]) <= max_age_seconds
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.sqlite_path)

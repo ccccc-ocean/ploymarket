@@ -71,6 +71,9 @@ class StorageTests(unittest.TestCase):
                 ]
             )
             self.assertEqual(storage.snapshot_stats().snapshot_count, 1)
+            storage.mark_stale_token("yes-token", "m1", "HTTP 404")
+            self.assertTrue(storage.is_stale_token("yes-token"))
+            self.assertFalse(storage.is_stale_token("missing-token"))
 
     def test_disabled_storage_reports_zero_counts(self) -> None:
         storage = Storage(False, "unused.sqlite")

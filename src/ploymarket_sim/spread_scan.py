@@ -37,10 +37,10 @@ class SpreadScanRow:
     reason: str
 
 
-def scan_spreads(config: AppConfig, markets: list[Market]) -> list[SpreadScanRow]:
+def scan_spreads(config: AppConfig, markets: list[Market], storage=None) -> list[SpreadScanRow]:
     rows = []
     for market in markets:
-        row = _scan_market(config, market)
+        row = _scan_market(config, market, storage)
         if row is not None:
             rows.append(row)
     return rows
@@ -125,16 +125,21 @@ def write_spread_scan_csv(rows: list[SpreadScanRow], output_dir: str):
     return path
 
 
-def _scan_market(config: AppConfig, market: Market) -> SpreadScanRow | None:
+def _scan_market(config: AppConfig, market: Market, storage=None) -> SpreadScanRow | None:
     yes_token_id = market.yes_token_id
     no_token_id = market.no_token_id
     if not yes_token_id or not no_token_id:
         return _missing_row(config, market, yes_token_id or "", no_token_id or "", "missing YES/NO token id")
+    if _is_stale(storage, yes_token_id) or _is_stale(storage, no_token_id):
+        return _missing_row(config, market, yes_token_id, no_token_id, "stale token skipped after recent CLOB 404")
     try:
         yes_quote = get_token_quote(config, yes_token_id)
         no_quote = get_token_quote(config, no_token_id)
     except HttpError as exc:
         print(f"warning: skip spread scan for {market.id}: {exc}", file=sys.stderr)
+        if "HTTP Error 404" in str(exc):
+            _mark_stale(storage, yes_token_id, market.id, str(exc))
+            _mark_stale(storage, no_token_id, market.id, str(exc))
         return _missing_row(config, market, yes_token_id, no_token_id, f"quote error: {exc}")
     return build_spread_scan_row(config, market, yes_quote, no_quote)
 
@@ -250,3 +255,12 @@ def _max_optional(rows: list[SpreadScanRow], value):
     if not available:
         return None
     return max(available, key=value)
+
+
+def _is_stale(storage, token_id: str) -> bool:
+    return bool(storage is not None and hasattr(storage, "is_stale_token") and storage.is_stale_token(token_id))
+
+
+def _mark_stale(storage, token_id: str, market_id: str, reason: str) -> None:
+    if storage is not None and hasattr(storage, "mark_stale_token"):
+        storage.mark_stale_token(token_id, market_id, reason)

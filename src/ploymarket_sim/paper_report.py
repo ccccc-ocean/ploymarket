@@ -29,6 +29,7 @@ def load_paper_run_summaries(output_dir: str) -> list[PaperRunSummary]:
     for path in sorted(Path(output_dir).glob("paper_run_*.csv")):
         rows = _read_rows(path)
         if not rows:
+            summaries.append(_empty_summary(path))
             continue
         summaries.append(_summarize_rows(rows))
     return summaries
@@ -58,6 +59,33 @@ def _summarize_rows(rows: list[dict[str, str]]) -> PaperRunSummary:
         best_execution_mode=best.get("execution_mode", "UNKNOWN"),
         best_question=best["question"],
     )
+
+
+def _empty_summary(path: Path) -> PaperRunSummary:
+    return PaperRunSummary(
+        run_timestamp=_timestamp_from_path(path),
+        market_count=0,
+        buy_yes_count=0,
+        buy_no_count=0,
+        hold_count=0,
+        avoid_count=0,
+        taker_count=0,
+        maker_count=0,
+        skip_count=0,
+        best_market_id="",
+        best_market_type="",
+        best_net_edge=0.0,
+        best_action="DATA_DEGRADED",
+        best_execution_mode="SKIP",
+        best_question="live market data unavailable; local cache not used for realtime paper-run",
+    )
+
+
+def _timestamp_from_path(path: Path) -> int:
+    try:
+        return int(path.stem.replace("paper_run_", ""))
+    except ValueError:
+        return 0
 
 
 def _float(value: str | None) -> float:

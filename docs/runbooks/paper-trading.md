@@ -114,7 +114,7 @@ data/paper_run_<timestamp>.csv
 - `expected_net_edge`: 对应执行方式下的预期净 edge。
 - `execution_reason`: 为什么选择这种执行方式。
 
-`paper-run` 会优先使用 SQLite 里已有的市场和价格历史。这样网络变慢时，模拟盘仍能用本地样本完成一轮扫描；如果本地没有数据，才会尝试走公开 API。
+`paper-run` 是实时模拟扫描，不能把本地 SQLite 缓存当作可交易依据。现在它必须拿到 live 市场和 live 价格历史；如果实时发现或历史拉取失败，本轮会降级为 `data_degraded` / 空扫描，并在 `daily-report` 中保持 `not_ready`。
 
 这个命令适合未来接定时任务，每隔固定时间跑一轮，形成持续模拟盘记录。
 

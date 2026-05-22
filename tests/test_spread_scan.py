@@ -3,7 +3,7 @@ import unittest
 from ploymarket_sim.clob import TokenQuote
 from ploymarket_sim.config import load_config
 from ploymarket_sim.polymarket import Market
-from ploymarket_sim.spread_scan import build_spread_scan_row
+from ploymarket_sim.spread_scan import build_spread_scan_row, scan_spreads
 
 
 class SpreadScanTests(unittest.TestCase):
@@ -42,6 +42,17 @@ class SpreadScanTests(unittest.TestCase):
         )
 
         self.assertEqual(row.recommendation, "SKIP")
+
+    def test_skips_recent_stale_tokens_without_requesting_books(self) -> None:
+        class FakeStorage:
+            def is_stale_token(self, token_id: str) -> bool:
+                return token_id == "yes-token"
+
+        rows = scan_spreads(load_config("config/default.toml"), [_market()], FakeStorage())
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].recommendation, "SKIP")
+        self.assertIn("stale token", rows[0].reason)
 
 
 def _market() -> Market:

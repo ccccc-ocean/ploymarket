@@ -44,3 +44,17 @@ class PaperReportTests(unittest.TestCase):
             self.assertEqual(summaries[0].taker_count, 2)
             self.assertEqual(summaries[0].skip_count, 1)
             self.assertEqual(summaries[0].best_market_id, "m2")
+
+    def test_empty_paper_run_is_recorded_as_data_degraded(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "paper_run_456.csv"
+            with path.open("w", newline="", encoding="utf-8") as file:
+                writer = csv.writer(file)
+                writer.writerow(["run_timestamp", "market_id", "market_type"])
+
+            summaries = load_paper_run_summaries(directory)
+
+            self.assertEqual(len(summaries), 1)
+            self.assertEqual(summaries[0].run_timestamp, 456)
+            self.assertEqual(summaries[0].market_count, 0)
+            self.assertEqual(summaries[0].best_action, "DATA_DEGRADED")
