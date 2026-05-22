@@ -124,13 +124,16 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 
 ## 对策略的影响
 
-第一阶段只对 `price_target` 做策略研究。
+第一阶段优先对 `price_target` 和 `price_range_daily` 做策略研究，但两者不能共用完全相同的执行条件。
 
 原因：
 
 - 它最接近 BTC 交易者的已有认知。
 - 可以接外部 BTC 价格源增强模型。
-- 相比日内结算市场，时间压力略低。
+- `price_target` 相比日内结算市场，时间压力略低。
+- `price_range_daily` 的核心不是硬编码某个固定 strike，而是动态判断当前 BTC 现货与 strike 的距离、`above/under` 方向、资金流和盘口成本。
+
+执行条件集中记录在 [BTC 策略执行条件](/Users/pizza_yang/code/ploymarket/docs/strategy/btc-execution-conditions.md)。
 
 `company_treasury` 可以作为独立研究方向，但不能和价格策略混跑。
 

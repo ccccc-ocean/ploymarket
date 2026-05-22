@@ -428,6 +428,7 @@ scripts/research_cycle.sh
 - `paper-run`
 - `paper-report`
 - `spread-scan`
+- `flow-scan`
 - `alignment-report`
 - `edge-report`
 - `strategy-sweep`

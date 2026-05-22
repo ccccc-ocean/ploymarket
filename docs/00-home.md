@@ -10,7 +10,8 @@ tags: #home #polymarket #btc #paper-trading
 2. [[system/current-state|当前系统状态]]
 3. [[strategy/polymarket-market-structure|Polymarket 底层机制知识库]]
 4. [[strategy/risk-control-basics|风控学习笔记]]
-5. [[system/roadmap|项目路线图]]
+5. [[strategy/btc-execution-conditions|BTC 策略执行条件]]
+6. [[system/roadmap|项目路线图]]
 
 ## 当前主线
 
@@ -44,6 +45,7 @@ tags: #home #polymarket #btc #paper-trading
 - [[strategy/polymarket-market-structure|Polymarket 底层机制知识库]]
 - [[strategy/risk-control-basics|风控学习笔记]]
 - [[strategy/market-taxonomy|预测市场分类笔记]]
+- [[strategy/btc-execution-conditions|BTC 策略执行条件]]
 
 ## 系统文档
 

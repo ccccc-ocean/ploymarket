@@ -99,7 +99,19 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 - 使用 Coinbase 公开 BTC-USD candles。
 - 当前默认粒度：`FIVE_MINUTE`。
 - 输出 `data/btc_price_candles.csv`。
-- 当前只用于研究，不直接进入交易决策。
+- 当前用于研究、回测对齐和 strike 距离诊断。
+- 策略不能硬编码固定 strike，必须根据当前 BTC 现货动态判断 market strike 的相对位置。
+
+### 资金流扫描
+
+代码位置：[src/ploymarket_sim/flow_scan.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/flow_scan.py)
+
+- 新增 `flow-scan` 命令。
+- 使用 Polymarket Data API 按 `conditionId` 拉取最近交易流。
+- 输出 `data/flow_scan.csv`。
+- 统计 `BUY/SELL + YES/NO`、大额交易数、活跃钱包数、最大成交钱包和 YES/NO 净资金压力。
+- 同时输出 `strike_direction`、`strike_distance_pct`、`strike_risk`，用于统一诊断 `above` 和 `under/below` 市场。
+- 当前只作为观察和回测分层条件，不直接触发交易。
 
 ### 时间对齐报告
 
@@ -357,10 +369,10 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 - 有持续 `paper-loop`，但还没有系统级守护进程、告警和自动日报。
 - SQLite 已用于 paper-run 本地读取和 replay-backtest 离线回放，但样本数量仍然很小。
 - 已有 BTC/Polymarket 时间对齐报告，但还没有按信号、市场类型、流动性分层评估 edge。
-- 已有第一版 edge 分层报告，但还没有把分层结论转成策略过滤器。
+- 已有第一版 edge 分层报告和资金流扫描，但还没有把 `flow_signal + strike_risk` 转成经过验证的策略过滤器。
 - 没有盘口深度模拟。
 - 没有考虑到期结算和市场 resolution 风险。
-- 已接 BTC 现货 K 线，但还没有把外部价格源纳入信号模型。
+- 已接 BTC 现货 K 线，并开始用于 strike 距离诊断，但还没有把动态距离模型纳入正式执行层。
 - 当前信号很初级，不能直接作为实盘依据。
 - 当前费用模型已经读取市场级 fee rate，但仍然没有读取更复杂的 maker rebate、reward 和真实成交路径费用。
 - Maker/Taker 已在执行计划层分离，Maker 已支持限价挂单、TTL 取消和价格触及成交；但还没有盘口排队位置、部分成交和更真实的成交概率。
@@ -387,3 +399,5 @@ Obsidian 入口是：[00-home.md](/Users/pizza_yang/code/ploymarket/docs/00-home
 - 每次亏损都能归类。
 - 风控能自动阻止继续扩大亏损。
 - 真实小仓位测试的滑点和成交情况可接受。
+
+当前策略执行条件集中记录在 [BTC 策略执行条件](/Users/pizza_yang/code/ploymarket/docs/strategy/btc-execution-conditions.md)。核心原则是：不硬编码固定 strike，而是动态结合 BTC 现货距离、`above/under` 方向、资金流、盘口成本和风控状态。

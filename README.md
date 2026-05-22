@@ -12,6 +12,7 @@
 - 生成模拟订单状态机 CSV，为未来持续模拟盘和实盘订单生命周期做准备。
 - `paper-run` 已区分 `TAKER`、`MAKER`、`SKIP` 执行计划，并优先使用本地 SQLite 历史数据避免网络慢请求拖死扫描。
 - `spread-scan` 会读取 YES/NO 真实订单簿，检查完整组合价差机会，输出 `data/spread_scan.csv`。
+- `flow-scan` 会读取 Polymarket 交易流，观察大额钱包、YES/NO 净资金压力和动态 strike 风险，输出 `data/flow_scan.csv`。
 - 可抓取 Coinbase 公开 BTC-USD 现货 K 线，作为后续外部价格锚点。
 
 ## 学习和项目文档
@@ -29,6 +30,7 @@
 - [Obsidian 主页](docs/00-home.md)
 - [当前系统状态](docs/system/current-state.md)
 - [学习进度记录](docs/learning/progress-log.md)
+- [BTC 策略执行条件](docs/strategy/btc-execution-conditions.md)
 - [模拟盘运行手册](docs/runbooks/paper-trading.md)
 
 ## 快速开始
@@ -42,6 +44,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-loop --iterations 3 --interval-seconds 300
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-report
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml spread-scan --market-type price_target
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml flow-scan --market-type all
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explain-risk
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-info
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml storage-info
@@ -58,7 +61,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml daily-
 scripts/research_cycle.sh
 ```
 
-它会依次执行 BTC 价格更新、backtest、paper-run、paper-report、spread-scan、alignment、edge、strategy-sweep、data-quality 和 daily-report。
+它会依次执行 BTC 价格更新、backtest、paper-run、paper-report、spread-scan、flow-scan、alignment、edge、strategy-sweep、market-type-report、strike-report、data-quality 和 daily-report。
 
 在 macOS 上定时运行，默认每 30 分钟执行一次：
 

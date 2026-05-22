@@ -1160,3 +1160,19 @@ HTTP cache 默认 TTL 是 `900` 秒，适合减少研究阶段 API 抖动，但�
 ### 判断
 
 资金流只能作为辅助确认，不能直接等同于“聪明钱”。大额钱包可能在做对冲、套利、拆单或库存调整，也可能只是错了。下一步应把 `flow_signal` 与历史回测结果关联：例如 `near_spot + YES_PRESSURE` 是否改善 `above` 市场表现，`far_above_spot + NO_PRESSURE` 是否能过滤类似 `$78k/$80k` 的亏损入场。
+
+## 2026-05-22：整理动态 strike 执行条件
+
+### 观察
+
+不能把 `$74k`、`$76k`、`$78k` 这类单次行情下表现较好的 strike 写死进策略。行情大幅移动后，同一个 strike 的含义会完全改变。真正有泛化能力的条件应该围绕“当前 BTC 现货与 strike 的相对距离”构建。
+
+### 已调整
+
+- 新增 [BTC 策略执行条件](/Users/pizza_yang/code/ploymarket/docs/strategy/btc-execution-conditions.md)。
+- 文档明确 `above` 与 `under/below` 要统一按 strike 距离、资金流、成本和风控判断。
+- 更新 Obsidian 首页、docs README、市场分类笔记和当前系统状态，方便下次继续时直接进入策略执行条件。
+
+### 判断
+
+下一步不是继续手工挑某个 strike，而是验证 `near_spot + YES_PRESSURE`、`far_above_spot + NO_PRESSURE`、`far_below_spot + NO_PRESSURE` 等组合是否能稳定改善回测 PnL。只有通过样本验证后，才能进入模拟盘执行层。

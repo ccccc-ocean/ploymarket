@@ -10,7 +10,8 @@
 5. [风控学习笔记](strategy/risk-control-basics.md)
 6. [Polymarket 底层机制知识库](strategy/polymarket-market-structure.md)
 7. [预测市场分类笔记](strategy/market-taxonomy.md)
-8. [项目路线图](system/roadmap.md)
+8. [BTC 策略执行条件](strategy/btc-execution-conditions.md)
+9. [项目路线图](system/roadmap.md)
 
 ## 目录说明
 
