@@ -49,7 +49,7 @@ def summarize_market(market: Market, result: BacktestResult) -> BacktestSummary:
     exits = _exit_trades(result.trades)
     wins = [trade for trade in exits if trade.pnl > 0]
     losses = [trade for trade in exits if trade.pnl < 0]
-    entry_count = len([trade for trade in result.trades if trade.action == "BUY_YES"])
+    entry_count = len([trade for trade in result.trades if trade.action in {"BUY_YES", "BUY_NO", "MAKER_BUY_YES"}])
     rejected_count = len([trade for trade in result.trades if trade.action == "REJECTED"])
     trade_count = entry_count + len(exits)
     pnl_values = [trade.pnl for trade in exits]
@@ -109,7 +109,7 @@ def _aggregate_for_type(market_type: str, summaries: list[BacktestSummary]) -> A
 
 
 def _exit_trades(trades: list[Trade]) -> list[Trade]:
-    return [trade for trade in trades if trade.action in {"SELL_YES", "MARK_TO_MARKET_EXIT"}]
+    return [trade for trade in trades if trade.action in {"SELL_YES", "SELL_NO", "MARK_TO_MARKET_EXIT"}]
 
 
 def _average(values: list[float]) -> float:

@@ -329,6 +329,7 @@ def _run_paper_scan(config, market_type: str) -> None:
     summary = summarize_paper_rows(rows)
     print(
         f"paper_run | markets={summary['markets']} | buy_yes={summary['buy_yes']} | "
+        f"buy_no={summary['buy_no']} | "
         f"hold={summary['hold']} | avoid={summary['avoid']} | taker={summary['taker']} | "
         f"maker={summary['maker']} | skip={summary['skip']} | {path}"
     )

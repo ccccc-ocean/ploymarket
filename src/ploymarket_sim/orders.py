@@ -5,7 +5,7 @@ from typing import Literal
 
 
 OrderStatus = Literal["created", "submitted", "accepted", "matched", "settled", "rejected", "failed", "canceled"]
-OrderSide = Literal["buy_yes", "sell_yes"]
+OrderSide = Literal["buy_yes", "sell_yes", "buy_no", "sell_no"]
 
 
 @dataclass(frozen=True)

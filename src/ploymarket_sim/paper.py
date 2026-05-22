@@ -62,6 +62,7 @@ def summarize_paper_rows(rows: list[PaperSignalRow]) -> dict[str, int]:
     return {
         "markets": len(rows),
         "buy_yes": len([row for row in rows if row.action == "BUY_YES"]),
+        "buy_no": len([row for row in rows if row.action == "BUY_NO"]),
         "hold": len([row for row in rows if row.action == "HOLD"]),
         "avoid": len([row for row in rows if row.action == "AVOID"]),
         "taker": len([row for row in rows if row.execution_mode == "TAKER"]),

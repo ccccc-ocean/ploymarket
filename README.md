@@ -5,12 +5,13 @@
 ## 当前能力
 
 - 从 Polymarket Gamma API 发现活跃的 BTC / Bitcoin 相关市场。
-- 用 CLOB 公开价格历史生成简单的 YES 动量信号，并区分 gross edge / net edge。
+- 用 CLOB 公开价格历史生成简单的 YES/NO 候选信号，并区分 gross edge / net edge。
 - 用统一风控规则做模拟开仓、止损、止盈和回测，并优先使用市场级真实 fee rate。
 - 输出包含费用、滑点和 PnL 的回测交易 CSV，并生成逐市场、按类型聚合和组合级资金曲线 CSV。
 - 生成逐 bar mark-to-market 组合曲线，用价格历史观察持仓期间回撤。
 - 生成模拟订单状态机 CSV，为未来持续模拟盘和实盘订单生命周期做准备。
 - `paper-run` 已区分 `TAKER`、`MAKER`、`SKIP` 执行计划，并优先使用本地 SQLite 历史数据避免网络慢请求拖死扫描。
+- 主回测和 paper-run 已支持 `BUY_NO` 候选，但仍只用于研究和模拟盘，不会下实盘订单。
 - `spread-scan` 会读取 YES/NO 真实订单簿，检查完整组合价差机会，输出 `data/spread_scan.csv`。
 - `flow-scan` 会读取 Polymarket 交易流，观察大额钱包、YES/NO 净资金压力和动态 strike 风险，输出 `data/flow_scan.csv`。
 - `reversal-backtest` 会比较 `BUY_YES`、`BUY_NO`、止损后反转和不同止损宽度，输出 `data/reversal_summary.csv`。

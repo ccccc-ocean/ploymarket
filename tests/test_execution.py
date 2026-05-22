@@ -23,6 +23,19 @@ class ExecutionTests(unittest.TestCase):
         self.assertEqual(plan.mode, "TAKER")
         self.assertEqual(plan.side, "BUY_YES")
 
+    def test_taker_when_signal_is_buy_no(self) -> None:
+        plan = plan_execution(
+            market(0.4),
+            Signal("BUY_NO", 0.5, 0.08, 0.04, "edge"),
+            SignalConfig("1w", 60, 6, 24, 0.015, 0.025, 0.01, 0.92, 0.08),
+            BacktestConfig(25.0, 0.02, 25, "data"),
+            ExecutionConfig(True, 0.01, 0.015, 0.0, 300),
+        )
+
+        self.assertEqual(plan.mode, "TAKER")
+        self.assertEqual(plan.side, "BUY_NO")
+        self.assertAlmostEqual(plan.limit_price or 0.0, 0.6)
+
     def test_maker_when_gross_edge_survives_maker_costs(self) -> None:
         plan = plan_execution(
             market(),

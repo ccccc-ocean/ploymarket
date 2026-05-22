@@ -10,6 +10,7 @@ class PaperRunSummary:
     run_timestamp: int
     market_count: int
     buy_yes_count: int
+    buy_no_count: int
     hold_count: int
     avoid_count: int
     taker_count: int
@@ -44,6 +45,7 @@ def _summarize_rows(rows: list[dict[str, str]]) -> PaperRunSummary:
         run_timestamp=int(float(rows[0]["run_timestamp"])),
         market_count=len(rows),
         buy_yes_count=len([row for row in rows if row["action"] == "BUY_YES"]),
+        buy_no_count=len([row for row in rows if row["action"] == "BUY_NO"]),
         hold_count=len([row for row in rows if row["action"] == "HOLD"]),
         avoid_count=len([row for row in rows if row["action"] == "AVOID"]),
         taker_count=len([row for row in rows if row.get("execution_mode") == "TAKER"]),

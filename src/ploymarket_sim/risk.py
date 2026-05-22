@@ -12,6 +12,7 @@ class Position:
     entry_price: float
     shares: float
     notional: float
+    side: str = "YES"
 
 
 @dataclass

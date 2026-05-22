@@ -142,20 +142,22 @@ def backtest_market(
                 pending_order = None
 
         if position:
-            exit_now, reason = should_exit(position, current.price, config.risk)
+            current_side_price = _side_price(position.side, current.price)
+            exit_now, reason = should_exit(position, current_side_price, config.risk)
             if exit_now:
                 order_sequence += 1
                 order_id = make_order_id(market.id, current.timestamp, order_sequence)
-                gross_proceeds = position.shares * current.price
-                fee = fee_amount(gross_proceeds, current.price, market.effective_taker_fee_rate(config.backtest.taker_fee_rate))
+                gross_proceeds = position.shares * current_side_price
+                fee = fee_amount(gross_proceeds, current_side_price, market.effective_taker_fee_rate(config.backtest.taker_fee_rate))
                 proceeds = gross_proceeds - fee
                 pnl = proceeds - position.notional
                 portfolio.cash += proceeds
                 portfolio.daily_realized_pnl += pnl
                 portfolio.peak_equity = max(portfolio.peak_equity, portfolio.cash)
                 del portfolio.positions[market.id]
-                order_events.extend(lifecycle_events(current.timestamp, order_id, market.id, "sell_yes", current.price, proceeds, reason))
-                trades.append(Trade(current.timestamp, market.id, "SELL_YES", current.price, proceeds, fee, 0.0, pnl, 0.0, reason))
+                order_side = _order_side("SELL", position.side)
+                order_events.extend(lifecycle_events(current.timestamp, order_id, market.id, order_side, current_side_price, proceeds, reason))
+                trades.append(Trade(current.timestamp, market.id, _trade_action("SELL", position.side), current_side_price, proceeds, fee, 0.0, pnl, 0.0, reason))
             continue
 
         signal = build_signal(market, visible_history, config.signal, config.backtest)
@@ -185,27 +187,30 @@ def backtest_market(
         if execution_plan.mode != "TAKER":
             continue
 
+        entry_side = _execution_side(execution_plan.side)
         market_fee_rate = market.effective_taker_fee_rate(config.backtest.taker_fee_rate)
-        entry_fee_rate = taker_fee_rate(current.price, market_fee_rate)
+        side_price = _side_price(entry_side, current.price)
+        entry_fee_rate = taker_fee_rate(side_price, market_fee_rate)
         slippage_rate = config.backtest.slippage_bps / 10_000
         notional = min(config.backtest.trade_size_usdc, portfolio.cash / (1 + entry_fee_rate + slippage_rate))
         slippage = notional * slippage_rate
         entry_fee = notional * entry_fee_rate
         total_cash_needed = notional + entry_fee + slippage
-        execution_price = current.price * (1 + config.backtest.slippage_bps / 10_000)
+        execution_price = side_price * (1 + config.backtest.slippage_bps / 10_000)
         decision = approve_entry(portfolio, config.risk, market.id, execution_price, total_cash_needed)
         order_sequence += 1
         order_id = make_order_id(market.id, current.timestamp, order_sequence)
         if not decision.approved:
-            order_events.extend(rejected_events(current.timestamp, order_id, market.id, "buy_yes", execution_price, total_cash_needed, decision.reason))
+            order_events.extend(rejected_events(current.timestamp, order_id, market.id, _order_side("BUY", entry_side), execution_price, total_cash_needed, decision.reason))
             trades.append(Trade(current.timestamp, market.id, "REJECTED", execution_price, 0.0, 0.0, 0.0, 0.0, execution_plan.expected_net_edge, decision.reason))
             continue
 
         shares = notional / execution_price
         portfolio.cash -= total_cash_needed
-        portfolio.positions[market.id] = Position(market.id, token_id, execution_price, shares, total_cash_needed)
-        order_events.extend(lifecycle_events(current.timestamp, order_id, market.id, "buy_yes", execution_price, notional, execution_plan.reason))
-        trades.append(Trade(current.timestamp, market.id, "BUY_YES", execution_price, notional, entry_fee, slippage, 0.0, execution_plan.expected_net_edge, execution_plan.reason))
+        token = market.yes_token_id if entry_side == "YES" else market.no_token_id
+        portfolio.positions[market.id] = Position(market.id, token or token_id, execution_price, shares, total_cash_needed, entry_side)
+        order_events.extend(lifecycle_events(current.timestamp, order_id, market.id, _order_side("BUY", entry_side), execution_price, notional, execution_plan.reason))
+        trades.append(Trade(current.timestamp, market.id, _trade_action("BUY", entry_side), execution_price, notional, entry_fee, slippage, 0.0, execution_plan.expected_net_edge, execution_plan.reason))
 
     if pending_order and history:
         final = history[-1]
@@ -226,14 +231,15 @@ def backtest_market(
         final = history[-1]
         order_sequence += 1
         order_id = make_order_id(market.id, final.timestamp, order_sequence)
-        gross_proceeds = position.shares * final.price
-        fee = fee_amount(gross_proceeds, final.price, market.effective_taker_fee_rate(config.backtest.taker_fee_rate))
+        final_side_price = _side_price(position.side, final.price)
+        gross_proceeds = position.shares * final_side_price
+        fee = fee_amount(gross_proceeds, final_side_price, market.effective_taker_fee_rate(config.backtest.taker_fee_rate))
         proceeds = gross_proceeds - fee
         pnl = proceeds - position.notional
         portfolio.cash += proceeds
         portfolio.daily_realized_pnl += pnl
-        order_events.extend(lifecycle_events(final.timestamp, order_id, market.id, "sell_yes", final.price, proceeds, "回测结束平仓"))
-        trades.append(Trade(final.timestamp, market.id, "MARK_TO_MARKET_EXIT", final.price, proceeds, fee, 0.0, pnl, 0.0, "回测结束平仓"))
+        order_events.extend(lifecycle_events(final.timestamp, order_id, market.id, _order_side("SELL", position.side), final_side_price, proceeds, "回测结束平仓"))
+        trades.append(Trade(final.timestamp, market.id, "MARK_TO_MARKET_EXIT", final_side_price, proceeds, fee, 0.0, pnl, 0.0, "回测结束平仓"))
 
     realized_pnl = sum(trade.pnl for trade in trades)
     return BacktestResult(market.id, market.question, trades, portfolio.cash, realized_pnl, order_events)
@@ -254,6 +260,22 @@ def _blocked_by_btc_filter(current: PricePoint, config: AppConfig, btc_candles: 
 
 def _latest_btc_candle_at_or_before(candles: list[BtcCandle], timestamp: int) -> BtcCandle | None:
     return latest_btc_candle_at_or_before(candles, timestamp)
+
+
+def _side_price(side: str, yes_price: float) -> float:
+    return yes_price if side == "YES" else max(0.0, 1.0 - yes_price)
+
+
+def _execution_side(execution_side: str) -> str:
+    return "NO" if execution_side == "BUY_NO" else "YES"
+
+
+def _trade_action(prefix: str, side: str) -> str:
+    return f"{prefix}_{side}"
+
+
+def _order_side(prefix: str, side: str) -> str:
+    return f"{prefix.lower()}_{side.lower()}"
 
 
 def _create_pending_maker_order(

@@ -43,12 +43,20 @@ class PaperTests(unittest.TestCase):
                 ExecutionPlan("TAKER", "BUY_YES", 0.5, 0.02, 0.04, "take"),
             ),
             build_paper_signal_row(market, Signal("HOLD", 0.0, 0.0, 0.0, "wait"), 0.02, 123),
+            build_paper_signal_row(
+                market,
+                Signal("BUY_NO", 0.5, 0.08, 0.04, "edge"),
+                0.02,
+                123,
+                ExecutionPlan("TAKER", "BUY_NO", 0.5, 0.02, 0.04, "take"),
+            ),
         ]
 
         summary = summarize_paper_rows(rows)
 
-        self.assertEqual(summary["markets"], 2)
+        self.assertEqual(summary["markets"], 3)
         self.assertEqual(summary["buy_yes"], 1)
+        self.assertEqual(summary["buy_no"], 1)
         self.assertEqual(summary["hold"], 1)
-        self.assertEqual(summary["taker"], 1)
+        self.assertEqual(summary["taker"], 2)
         self.assertEqual(summary["skip"], 1)

@@ -42,3 +42,21 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(all_summary.market_type, "all")
         self.assertEqual(all_summary.market_count, 1)
         self.assertEqual(by_type[0].market_type, "price_target")
+
+    def test_summarizes_buy_no_entries_and_exits(self) -> None:
+        result = BacktestResult(
+            "m1",
+            "Will the price of Bitcoin be above $78,000 on May 22?",
+            [
+                Trade(1, "m1", "BUY_NO", 0.5, 25.0, 0.1, 0.05, 0.0, 0.04, "entry"),
+                Trade(2, "m1", "SELL_NO", 0.6, 30.0, 0.1, 0.0, 4.75, 0.0, "exit"),
+            ],
+            1004.75,
+            4.75,
+        )
+
+        summary = summarize_market(market("Will the price of Bitcoin be above $78,000 on May 22?"), result)
+
+        self.assertEqual(summary.entry_count, 1)
+        self.assertEqual(summary.exit_count, 1)
+        self.assertEqual(summary.win_count, 1)

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from statistics import mean
 
+from .classifier import classify_market
 from .clob import PricePoint
 from .config import BacktestConfig, SignalConfig
 from .costs import estimate_entry_cost
@@ -33,15 +34,28 @@ def build_signal(
     long_avg = mean(prices[-config.long_window :])
     momentum = short_avg - long_avg
     net_edge = _net_edge(market, momentum, current, config, backtest_config)
-
-    if current >= config.buy_below:
-        return Signal("HOLD", 0.0, momentum, net_edge, "YES 价格太接近 1，盈亏比不够")
-    if current <= config.sell_above:
-        return Signal("HOLD", 0.0, momentum, net_edge, "YES 价格太接近 0，容易被噪音扫损")
+    no_price = max(0.0, 1.0 - current)
+    no_net_edge = _net_edge(market, -momentum, no_price, config, backtest_config)
 
     if momentum >= config.min_momentum and net_edge >= config.min_edge:
+        if current >= config.buy_below:
+            return Signal("HOLD", 0.0, momentum, net_edge, "YES 价格太接近 1，盈亏比不够")
+        if current <= config.sell_above:
+            return Signal("HOLD", 0.0, momentum, net_edge, "YES 价格太接近 0，容易被噪音扫损")
         confidence = min(1.0, net_edge / (config.min_edge * 3))
         return Signal("BUY_YES", confidence, momentum, net_edge, "扣除费用、滑点和安全边际后仍有正 edge")
+
+    if (
+        classify_market(market).market_type == "price_range_daily"
+        and momentum <= -config.min_momentum
+        and no_net_edge >= config.min_edge
+    ):
+        if no_price >= config.buy_below:
+            return Signal("HOLD", 0.0, -momentum, no_net_edge, "NO 价格太接近 1，盈亏比不够")
+        if no_price <= config.sell_above:
+            return Signal("HOLD", 0.0, -momentum, no_net_edge, "NO 价格太接近 0，容易被噪音扫损")
+        confidence = min(1.0, no_net_edge / (config.min_edge * 3))
+        return Signal("BUY_NO", confidence, -momentum, no_net_edge, "YES 动量转弱，NO 扣除成本后仍有正 edge")
 
     if momentum <= -config.min_momentum and abs(momentum) >= config.min_edge:
         confidence = min(1.0, abs(momentum) / (config.min_edge * 3))

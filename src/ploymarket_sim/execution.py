@@ -30,12 +30,13 @@ def plan_execution(
     if price is None:
         return ExecutionPlan("SKIP", "", None, 0.0, 0.0, "缺少 YES 价格，无法制定执行计划")
 
-    if signal.action == "BUY_YES":
+    if signal.action in {"BUY_YES", "BUY_NO"}:
+        execution_price = price if signal.action == "BUY_YES" else max(0.0, 1.0 - price)
         fee_rate = market.effective_taker_fee_rate(backtest_config.taker_fee_rate)
         return ExecutionPlan(
             mode="TAKER",
-            side="BUY_YES",
-            limit_price=price,
+            side=signal.action,
+            limit_price=execution_price,
             expected_fee_rate=fee_rate,
             expected_net_edge=signal.net_edge,
             reason="Taker 成本后仍满足最小净优势，允许模拟直接吃单",

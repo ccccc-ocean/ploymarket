@@ -1203,3 +1203,27 @@ HTTP cache 默认 TTL 是 `900` 秒，适合减少研究阶段 API 抖动，但�
 ### 判断
 
 允许 `BUY_NO` 是目前最有希望的方向之一，但收紧止损没有自动改善结果。`12%/15%` 止损会显著增加噪音交易和手续费消耗。止损后反转也必须重新满足反向净 edge，不能无脑反手。下一步应该把 `BUY_NO` 与动态 strike、资金流 `NO_PRESSURE` 结合验证，防止当前结果只是单日样本过拟合。
+
+## 2026-05-22：将 BUY_NO 升级为主候选策略
+
+### 观察
+
+单独的 `reversal-backtest` 已经证明，在当前 `price_range_daily` 样本里，允许 `BUY_NO` 比只做 `BUY_YES` 更有希望。原因很直观：当某个 above strike 多次突破失败时，旧策略只能“不买”或反复买 YES；新策略至少可以在 YES 动量转弱且 NO 扣除成本后仍有正 edge 时，选择买 NO。
+
+### 已调整
+
+- `signals` 支持在 `price_range_daily` 市场生成 `BUY_NO`。
+- `execution` 支持把 `BUY_NO` 作为 taker 候选，limit price 使用 `1 - yes_price`。
+- `backtest`、`portfolio` 和订单事件支持 `BUY_NO` / `SELL_NO` 的入场、止损、止盈、期末平仓和 mark-to-market。
+- `paper-run`、`paper-report` 和 CLI 摘要新增 `buy_no` / `buy_no_count` 统计。
+- 价格过滤改成按交易侧判断：买 YES 看 YES 是否太贵或太便宜；买 NO 看 NO 是否太贵或太便宜。
+
+### 最新验证
+
+主回测接入 `BUY_NO` 后，`price_range_daily` 当前样本约 `88` 笔交易、胜率约 `79.5%`、PnL 约 `+127`；全部 BTC 市场约 `110` 笔交易、胜率约 `72.7%`、PnL 约 `+108`、最大回撤约 `5.0%`。
+
+同一轮 `paper-run` 没有强行给出实时交易候选：`buy_yes=0`、`buy_no=0`、`skip=33`。这反而是好现象，说明策略接入后没有为了交易而交易。
+
+### 判断
+
+`BUY_NO` 可以进入候选策略池，但还不能实盘。下一步重点是继续扩大样本，观察真实 paper-run 是否能持续出现高质量 `BUY_NO`，并把资金流 `NO_PRESSURE`、动态 strike 距离和冷却规则加入分层验证。我们要追求的是稳定正期望，而不是在某一晚样本里刚好赚到钱。

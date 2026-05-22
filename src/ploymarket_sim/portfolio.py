@@ -40,10 +40,10 @@ def build_portfolio_curve(results: list[BacktestResult], config: AppConfig) -> l
     points: list[PortfolioPoint] = []
 
     for trade in _ordered_trades(results):
-        if trade.action in {"BUY_YES", "MAKER_BUY_YES"}:
+        if trade.action in {"BUY_YES", "BUY_NO", "MAKER_BUY_YES"}:
             cash -= trade.notional + trade.fee + trade.slippage
             invested_by_market[trade.market_id] = invested_by_market.get(trade.market_id, 0.0) + trade.notional
-        elif trade.action in {"SELL_YES", "MARK_TO_MARKET_EXIT"}:
+        elif trade.action in {"SELL_YES", "SELL_NO", "MARK_TO_MARKET_EXIT"}:
             cash += trade.notional
             invested_by_market.pop(trade.market_id, None)
         elif trade.action == "REJECTED":
@@ -78,7 +78,7 @@ def build_mark_to_market_curve(
     config: AppConfig,
 ) -> list[PortfolioPoint]:
     cash = config.risk.starting_cash
-    positions: dict[str, float] = {}
+    positions: dict[str, tuple[float, str]] = {}
     latest_prices: dict[str, float] = {}
     peak_equity = cash
     points: list[PortfolioPoint] = []
@@ -102,11 +102,13 @@ def build_mark_to_market_curve(
             pnl = trade.pnl
             fee = trade.fee
             slippage = trade.slippage
-            if trade.action in {"BUY_YES", "MAKER_BUY_YES"}:
+            if trade.action in {"BUY_YES", "BUY_NO", "MAKER_BUY_YES"}:
                 cash -= trade.notional + trade.fee + trade.slippage
-                positions[market_id] = positions.get(market_id, 0.0) + trade.notional / trade.price
-                latest_prices[market_id] = trade.price
-            elif trade.action in {"SELL_YES", "MARK_TO_MARKET_EXIT"}:
+                side = "NO" if trade.action == "BUY_NO" else "YES"
+                existing_shares, _existing_side = positions.get(market_id, (0.0, side))
+                positions[market_id] = (existing_shares + trade.notional / trade.price, side)
+                latest_prices[market_id] = trade.price if side == "YES" else max(0.0, 1.0 - trade.price)
+            elif trade.action in {"SELL_YES", "SELL_NO", "MARK_TO_MARKET_EXIT"}:
                 cash += trade.notional
                 positions.pop(market_id, None)
                 latest_prices[market_id] = trade.price
@@ -114,7 +116,10 @@ def build_mark_to_market_curve(
         if not positions and action == "MARK":
             continue
 
-        invested = sum(shares * latest_prices.get(open_market_id, 0.0) for open_market_id, shares in positions.items())
+        invested = sum(
+            shares * _side_price(side, latest_prices.get(open_market_id, 0.0))
+            for open_market_id, (shares, side) in positions.items()
+        )
         equity = cash + invested
         peak_equity = max(peak_equity, equity)
         drawdown = 0.0 if peak_equity == 0 else (peak_equity - equity) / peak_equity
@@ -167,3 +172,7 @@ def _ordered_portfolio_events(
     for trade in _ordered_trades(results):
         events.append(("trade", trade.timestamp, trade.market_id, trade, None))
     return sorted(events, key=lambda event: (event[1], 0 if event[0] == "price" else 1, event[2]))
+
+
+def _side_price(side: str, yes_price: float) -> float:
+    return yes_price if side == "YES" else max(0.0, 1.0 - yes_price)
