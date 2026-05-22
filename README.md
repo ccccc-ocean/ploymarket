@@ -182,7 +182,7 @@ data/alignment_summary.csv
 
 `edge-report` 会进一步按可提前知道的条件分层，例如 YES 价格区间和过去 1 小时 BTC 动量。注意：它不会用未来 BTC 收益做分组，避免引入未来函数。
 
-当前默认启用了一个保守 BTC 过滤器：当 `YES >= 0.50` 且 BTC 过去 1 小时跌幅超过 `0.25%` 时，不允许做多 YES。这个规则来自 `edge-report` 的坏条件分层，不是盈利保证。
+当前默认启用了 BTC 行情过滤：旧的 BTC 下跌过滤只用于阻止弱势行情里追 `BUY_YES`；新的 `btc_regime` 会按 15m/1h/3h BTC 收益和 1h 区间，把短周期 `price_range_daily` 的方向单分成 `uptrend`、`downtrend`、`range_bound` 等环境后再决定是否放行。
 
 `daily-report` 会汇总当前模拟盘、回放、对齐和 edge 报告，并给出 `not_ready` / `candidate` 状态。
 

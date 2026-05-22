@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .btc_regime import blocks_directional_entry
 from .btc_price import BtcCandle
 from .clob import PricePoint
 from .config import AppConfig
@@ -161,7 +162,11 @@ def backtest_market(
             continue
 
         signal = build_signal(market, visible_history, config.signal, config.backtest)
-        if _blocked_by_btc_filter(current, config, btc_candles or []):
+        if _blocked_by_btc_filter(signal, current, config, btc_candles or []):
+            continue
+        regime_blocked, regime_reason = blocks_directional_entry(market, signal, btc_candles or [], current.timestamp)
+        if regime_blocked:
+            trades.append(Trade(current.timestamp, market.id, "REJECTED", current.price, 0.0, 0.0, 0.0, 0.0, signal.net_edge, regime_reason))
             continue
         execution_plan = plan_execution(market, signal, config.signal, config.backtest, config.execution, current.price)
         if execution_plan.mode == "MAKER" and pending_order is None:
@@ -245,8 +250,10 @@ def backtest_market(
     return BacktestResult(market.id, market.question, trades, portfolio.cash, realized_pnl, order_events)
 
 
-def _blocked_by_btc_filter(current: PricePoint, config: AppConfig, btc_candles: list[BtcCandle]) -> bool:
+def _blocked_by_btc_filter(signal: Signal, current: PricePoint, config: AppConfig, btc_candles: list[BtcCandle]) -> bool:
     if not config.btc_filter.enabled:
+        return False
+    if signal.action != "BUY_YES":
         return False
     if current.price < config.btc_filter.avoid_yes_price_gte:
         return False

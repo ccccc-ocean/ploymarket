@@ -1227,3 +1227,25 @@ HTTP cache 默认 TTL 是 `900` 秒，适合减少研究阶段 API 抖动，但�
 ### 判断
 
 `BUY_NO` 可以进入候选策略池，但还不能实盘。下一步重点是继续扩大样本，观察真实 paper-run 是否能持续出现高质量 `BUY_NO`，并把资金流 `NO_PRESSURE`、动态 strike 距离和冷却规则加入分层验证。我们要追求的是稳定正期望，而不是在某一晚样本里刚好赚到钱。
+
+## 2026-05-22：加入 BTC regime 过滤
+
+### 观察
+
+当前样本里 BTC 大部分时间处于 `78k` 下方震荡，`BUY_NO above 78k` 自然容易表现更好。但这不代表 `BUY_NO` 在单边上涨里也安全；同理，`BUY_YES` 在持续下跌里也会反复亏损。因此不能只用当前震荡行情验证策略，必须先识别 BTC 现货处于趋势还是震荡。
+
+### 已调整
+
+- 新增 `btc_regime` 模块，按 BTC 过去 `15m`、`1h`、`3h` 收益和 `1h` 高低区间识别 `uptrend`、`downtrend`、`range_bound`、`volatile`、`neutral`。
+- 在 `backtest` 和 `paper-run` 中接入统一方向过滤。
+- `above` 市场：震荡且 BTC 仍在 strike 下方时，不追 `BUY_YES`；上涨趋势接近或站上 strike 时，不做 `BUY_NO`。
+- `below/under` 市场：规则反向处理，避免在明显下跌并接近/跌破 strike 时继续做 `BUY_NO`。
+- 修正旧 BTC 下跌过滤器：它现在只阻止 `BUY_YES`，不再误伤 BTC 下跌时合理的 `BUY_NO`。
+
+### 最新验证
+
+加入 regime 过滤后，主回测从约 `110` 笔降到 `108` 笔，全部 BTC 市场 PnL 从约 `+110` 降到约 `+101.8`；`price_range_daily` 从约 `88` 笔降到 `86` 笔，PnL 从约 `+127` 降到约 `+118.7`，最大回撤仍约 `5.0%`。
+
+### 判断
+
+短期 PnL 稍微下降是可以接受的，因为过滤器的目标不是过拟合当前震荡，而是减少未来单边行情里的反向交易风险。下一步要把 regime 分层写进报告：分别统计 `uptrend/downtrend/range_bound` 下 `BUY_YES` 和 `BUY_NO` 的胜率、PnL、最大回撤，确认过滤器不是凭感觉挡交易。

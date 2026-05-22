@@ -7,6 +7,7 @@ from time import sleep, time
 
 from .alignment import build_alignment_rows, summarize_alignment
 from .backtest import backtest_market
+from .btc_regime import blocks_directional_entry
 from .btc_price import get_btc_candles, load_btc_candles_csv, merge_btc_candles
 from .cache import CachePolicy, JsonCache
 from .classifier import MARKET_TYPES, is_market_type
@@ -310,6 +311,7 @@ def _run_paper_scan(config, market_type: str) -> None:
     run_timestamp = int(time())
     storage = storage_from_config(config)
     markets = _filter_markets(_paper_markets(config, storage), market_type)
+    btc_candles = load_btc_candles_csv(Path(config.backtest.output_dir) / "btc_price_candles.csv")
     rows = []
     for market in markets:
         history = _safe_history(config, market, storage, prefer_local=False, use_cache=False)
@@ -322,6 +324,9 @@ def _run_paper_scan(config, market_type: str) -> None:
             signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, "当前市场类型暂不交易，只记录观察")
         else:
             signal = build_signal(market, history, market_config.signal, market_config.backtest)
+            blocked, reason = blocks_directional_entry(market, signal, btc_candles, history[-1].timestamp)
+            if blocked:
+                signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, reason)
         execution_plan = plan_execution(market, signal, market_config.signal, market_config.backtest, market_config.execution)
         rows.append(build_paper_signal_row(market, signal, config.backtest.taker_fee_rate, run_timestamp, execution_plan))
     storage.save_paper_snapshots(rows)

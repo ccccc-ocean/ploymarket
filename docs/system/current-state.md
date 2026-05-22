@@ -230,10 +230,22 @@ pmset -g custom
 - 计算短窗口均价和长窗口均价。
 - 计算 `gross_edge` 和扣除 Taker fee、滑点、安全边际后的 `net_edge`。
 - 如果短期均值明显高于长期均值，当前价格没有太接近 1，且 `net_edge` 达到门槛，生成 `BUY_YES`。
-- 如果短期均值明显低于长期均值，生成 `AVOID`。
+- 如果 `price_range_daily` 的短期均值明显低于长期均值，且 NO 侧扣除成本后仍有净 edge，生成 `BUY_NO`。
+- 如果短期均值明显低于长期均值但 NO 侧不满足条件，生成 `AVOID`。
 - 其他情况为 `HOLD`。
 
 成本估算代码位置：[src/ploymarket_sim/costs.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/costs.py)
+
+### BTC 行情状态过滤
+
+代码位置：[src/ploymarket_sim/btc_regime.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/btc_regime.py)
+
+- 使用 BTC 5 分钟 K 线计算过去 `15m`、`1h`、`3h` 收益和 `1h` 高低区间。
+- 输出 `uptrend`、`downtrend`、`range_bound`、`volatile`、`neutral` 或 `unknown`。
+- 该过滤器不是预测模型，只负责挡掉明显逆势的短周期方向单。
+- `above` 市场中，`range_bound` 且 BTC 仍低于 strike 时阻止追 `BUY_YES`；`uptrend` 且 BTC 接近或站上 strike 时阻止 `BUY_NO`。
+- `below/under` 市场中，规则反向处理：下跌趋势接近或跌破 strike 时阻止 `BUY_NO`，上涨趋势时阻止追 `BUY_YES below`。
+- 旧的 BTC 下跌过滤器现在只过滤 `BUY_YES`，避免误伤 BTC 下跌时合理的 `BUY_NO`。
 
 ### 执行计划
 
