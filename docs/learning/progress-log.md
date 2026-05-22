@@ -1126,3 +1126,19 @@ HTTP cache 默认 TTL 是 `900` 秒，适合减少研究阶段 API 抖动，但�
 - `btc-price` 新增 merge 逻辑：新拉到的 candles 与已有 `data/btc_price_candles.csv` 按 timestamp 合并。
 - 新数据覆盖同 timestamp 的旧数据，但不会删除更早历史。
 - 这为后续 BTC spot vs strike 距离模型打基础。
+
+## 2026-05-22：按 strike 验证高确定性事件假设
+
+### 观察
+
+昨晚 BTC 大部分时间在 `78k` 下方波动。回测显示 `above $74k` 和 `above $76k` 贡献正 PnL，而 `above $78k` 是主要亏损来源。
+
+### 已调整
+
+- 新增 `strike-report` 命令。
+- 输出 `data/strike_report.csv`，按 `price_range_daily` 的美元 strike 汇总交易数、胜率、PnL、手续费和滑点。
+- 定时流水线加入 `strike-report`。
+
+### 判断
+
+“多做高确定性 above 事件”方向合理，但不能只看确定性。高确定性事件通常 YES 价格很高，剩余收益很薄，必须同时满足扣除手续费、滑点、盘口深度和尾部风险后的正期望。下一步用 strike 分层报告寻找可泛化过滤规则。

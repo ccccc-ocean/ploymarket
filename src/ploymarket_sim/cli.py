@@ -52,6 +52,7 @@ from .spread_scan import print_spread_scan_summary, scan_spreads, write_spread_s
 from .storage import storage_from_config
 from .strategy_profiles import is_tradeable_market, strategy_config_for_market
 from .strategy_sweep import print_strategy_sweep_summary, run_strategy_sweep, write_strategy_sweep_csv
+from .strike_report import build_strike_report, print_strike_report, write_strike_report_csv
 from .summary import aggregate_summaries, summarize_all, summarize_market
 
 
@@ -92,6 +93,7 @@ def main() -> None:
     spread_parser = subparsers.add_parser("spread-scan", help="scan live YES/NO order books for complete-set spread edges")
     spread_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
     subparsers.add_parser("market-type-report", help="compare local backtest results by BTC market type")
+    subparsers.add_parser("strike-report", help="summarize BTC daily range backtest results by strike")
     subparsers.add_parser("daily-report", help="summarize paper, replay, alignment, and edge outputs")
     subparsers.add_parser("explain-risk", help="explain the current risk limits")
 
@@ -148,6 +150,8 @@ def main() -> None:
         _run_spread_scan(config, args.market_type)
     elif args.command == "market-type-report":
         _run_market_type_report(config)
+    elif args.command == "strike-report":
+        _run_strike_report(config)
     elif args.command == "daily-report":
         _run_daily_report(config)
 
@@ -468,6 +472,12 @@ def _run_market_type_report(config) -> None:
     rows = build_market_type_report(config, storage, candles)
     path = write_market_type_report_csv(rows, config.backtest.output_dir)
     print_market_type_report(rows, path)
+
+
+def _run_strike_report(config) -> None:
+    rows = build_strike_report(Path(config.backtest.output_dir) / "backtest_summary.csv")
+    path = write_strike_report_csv(rows, config.backtest.output_dir)
+    print_strike_report(rows, path)
 
 
 def _run_daily_report(config) -> None:

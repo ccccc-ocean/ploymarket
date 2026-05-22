@@ -24,5 +24,6 @@ run alignment-report --market-type all
 run edge-report --min-samples 30
 run strategy-sweep --market-type all --limit 10
 run market-type-report
+run strike-report
 run data-quality
 run daily-report
