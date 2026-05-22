@@ -21,6 +21,7 @@ run paper-run --market-type all
 run paper-report
 run spread-scan --market-type all
 run flow-scan --market-type all --limit 250 --large-trade-usdc 500
+run reversal-backtest --market-type price_range_daily
 run alignment-report --market-type all
 run edge-report --min-samples 30
 run strategy-sweep --market-type all --limit 10

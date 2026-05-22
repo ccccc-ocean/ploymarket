@@ -48,6 +48,14 @@ from .reporting import (
     write_edge_report_csv,
     write_summary_csv,
 )
+from .reversal_backtest import (
+    default_reversal_strategies,
+    print_reversal_summary,
+    run_reversal_backtest,
+    summarize_reversal_results,
+    write_reversal_summary_csv,
+    write_reversal_trades_csv,
+)
 from .signals import Signal, build_signal
 from .spread_scan import print_spread_scan_summary, scan_spreads, write_spread_scan_csv
 from .storage import storage_from_config
@@ -93,6 +101,8 @@ def main() -> None:
     sweep_parser.add_argument("--limit", type=int, default=10)
     spread_parser = subparsers.add_parser("spread-scan", help="scan live YES/NO order books for complete-set spread edges")
     spread_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
+    reversal_parser = subparsers.add_parser("reversal-backtest", help="compare BUY_YES, BUY_NO, reversal, and stop-loss variants")
+    reversal_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_range_daily")
     flow_parser = subparsers.add_parser("flow-scan", help="scan recent Polymarket trade flow and large-wallet pressure")
     flow_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
     flow_parser.add_argument("--limit", type=int, default=250)
@@ -153,6 +163,8 @@ def main() -> None:
         _run_strategy_sweep(config, args.market_type, args.limit)
     elif args.command == "spread-scan":
         _run_spread_scan(config, args.market_type)
+    elif args.command == "reversal-backtest":
+        _run_reversal_backtest(config, args.market_type)
     elif args.command == "flow-scan":
         _run_flow_scan(config, args.market_type, args.limit, args.large_trade_usdc)
     elif args.command == "market-type-report":
@@ -461,6 +473,26 @@ def _run_spread_scan(config, market_type: str) -> None:
     rows = scan_spreads(config, markets)
     path = write_spread_scan_csv(rows, config.backtest.output_dir)
     print_spread_scan_summary(rows, path)
+
+
+def _run_reversal_backtest(config, market_type: str) -> None:
+    storage = storage_from_config(config)
+    markets = _filter_markets(storage.load_markets(), market_type)
+    if not markets:
+        raise SystemExit("No local markets found. Run discover or backtest first.")
+    results = []
+    strategies = default_reversal_strategies()
+    for market in markets:
+        history = _safe_history(config, market, storage, prefer_local=True, use_cache=True)
+        if not history:
+            continue
+        for strategy in strategies:
+            results.append(run_reversal_backtest(config, market, history, strategy))
+    rows = summarize_reversal_results(results)
+    summary_path = write_reversal_summary_csv(rows, config.backtest.output_dir)
+    trades_path = write_reversal_trades_csv(results, config.backtest.output_dir)
+    print_reversal_summary(rows, summary_path)
+    print(f"reversal_trades_csv={trades_path}")
 
 
 def _run_flow_scan(config, market_type: str, limit: int, large_trade_usdc: float) -> None:

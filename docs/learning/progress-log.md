@@ -1176,3 +1176,30 @@ HTTP cache 默认 TTL 是 `900` 秒，适合减少研究阶段 API 抖动，但�
 ### 判断
 
 下一步不是继续手工挑某个 strike，而是验证 `near_spot + YES_PRESSURE`、`far_above_spot + NO_PRESSURE`、`far_below_spot + NO_PRESSURE` 等组合是否能稳定改善回测 PnL。只有通过样本验证后，才能进入模拟盘执行层。
+
+## 2026-05-22：加入 BUY_NO 与反转回测实验
+
+### 观察
+
+`above $78k` 的持续亏损不是没有止损，而是旧策略只能 `BUY_YES`。当 BTC 多次突破失败时，正确方向可能不是继续等待更好的 BUY_YES，而是允许 `BUY_NO` 或在止损后研究反向机会。
+
+### 已调整
+
+- 新增 `reversal-backtest` 命令。
+- 新增 `data/reversal_summary.csv` 和 `data/reversal_trades.csv` 输出。
+- 并排比较 `YES_ONLY`、`YES_NO`、`YES_NO_REVERSAL` 和不同止损宽度。
+- `research_cycle.sh` 加入 `reversal-backtest --market-type price_range_daily`。
+
+### 初步结果
+
+当前 `price_range_daily` 样本上：
+
+- `YES_ONLY_SL25`: PnL 约 `-12.91`。
+- `YES_NO_SL25`: PnL 约 `+129.10`。
+- `YES_NO_REV_SL25_CD60M`: PnL 约 `+108.56`。
+- `YES_NO_REV_SL15_CD60M`: PnL 约 `-1.05`。
+- `YES_NO_REV_SL12_CD60M`: PnL 约 `-75.07`。
+
+### 判断
+
+允许 `BUY_NO` 是目前最有希望的方向之一，但收紧止损没有自动改善结果。`12%/15%` 止损会显著增加噪音交易和手续费消耗。止损后反转也必须重新满足反向净 edge，不能无脑反手。下一步应该把 `BUY_NO` 与动态 strike、资金流 `NO_PRESSURE` 结合验证，防止当前结果只是单日样本过拟合。

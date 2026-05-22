@@ -113,6 +113,21 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 - 同时输出 `strike_direction`、`strike_distance_pct`、`strike_risk`，用于统一诊断 `above` 和 `under/below` 市场。
 - 当前只作为观察和回测分层条件，不直接触发交易。
 
+### BUY_NO 与反转回测
+
+代码位置：[src/ploymarket_sim/reversal_backtest.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/reversal_backtest.py)
+
+- 新增 `reversal-backtest` 命令。
+- 对同一批 `price_range_daily` 历史并排比较：
+  - `YES_ONLY_SL25`
+  - `YES_NO_SL25`
+  - `YES_NO_REV_SL25_CD60M`
+  - `YES_NO_REV_SL15_CD60M`
+  - `YES_NO_REV_SL12_CD60M`
+- 输出 `data/reversal_summary.csv` 和 `data/reversal_trades.csv`。
+- 第一轮实验显示：允许 `BUY_NO` 明显改善当前样本，但把止损收紧到 `12%/15%` 会产生更多噪音交易并恶化 PnL。
+- 反转不是无脑反手，必须重新满足反向净 edge；否则会在 5 分钟市场里被来回扫损。
+
 ### 时间对齐报告
 
 代码位置：[src/ploymarket_sim/alignment.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/alignment.py)
@@ -369,7 +384,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 - 有持续 `paper-loop`，但还没有系统级守护进程、告警和自动日报。
 - SQLite 已用于 paper-run 本地读取和 replay-backtest 离线回放，但样本数量仍然很小。
 - 已有 BTC/Polymarket 时间对齐报告，但还没有按信号、市场类型、流动性分层评估 edge。
-- 已有第一版 edge 分层报告和资金流扫描，但还没有把 `flow_signal + strike_risk` 转成经过验证的策略过滤器。
+- 已有第一版 edge 分层报告、资金流扫描和 BUY_NO/反转实验，但还没有把新策略升级为默认执行层。
 - 没有盘口深度模拟。
 - 没有考虑到期结算和市场 resolution 风险。
 - 已接 BTC 现货 K 线，并开始用于 strike 距离诊断，但还没有把动态距离模型纳入正式执行层。
