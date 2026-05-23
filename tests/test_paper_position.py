@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from ploymarket_sim.cli import _paper_position_state_signal
+from ploymarket_sim.cli import _paper_reentry_edge_too_weak
 from ploymarket_sim.config import (
     ApiConfig,
     AppConfig,
@@ -138,6 +139,30 @@ class PaperPositionTests(unittest.TestCase):
             self.assertEqual(position.status, "closed")
             self.assertEqual(position.cooldown_until, 800)
             self.assertGreater(position.realized_pnl, 0.0)
+
+    def test_profitable_reentry_requires_stronger_edge(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = app_config(str(Path(directory) / "paper.sqlite"))
+            storage = Storage(True, config.storage.sqlite_path)
+            storage.save_open_paper_position(
+                PaperPositionState(
+                    market_id="m1",
+                    side="NO",
+                    entry_price=0.7,
+                    shares=50.0,
+                    notional=35.0,
+                    opened_at=100,
+                    status="closed",
+                    closed_at=200,
+                    realized_pnl=4.0,
+                    cooldown_until=0,
+                    peak_price=0.82,
+                    partial_take_profit_count=1,
+                )
+            )
+
+            self.assertTrue(_paper_reentry_edge_too_weak(config, storage, market(), 0.002, 0.0015))
+            self.assertFalse(_paper_reentry_edge_too_weak(config, storage, market(), 0.003, 0.0015))
 
 
 if __name__ == "__main__":

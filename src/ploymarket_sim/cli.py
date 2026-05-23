@@ -240,10 +240,12 @@ def _explain_risk(config) -> None:
     print(f"- daily_loss_limit_usdc: 单日已实现亏损达到 {risk.daily_loss_limit_usdc:.2f} USDC 后停止开仓")
     print(f"- max_drawdown_pct: 账户回撤达到 {risk.max_drawdown_pct:.0%} 后停止开仓")
     print(f"- stop_loss_pct: 单笔浮亏达到 {risk.stop_loss_pct:.0%} 后退出")
-    print(f"- take_profit_pct: 单笔浮盈达到 {risk.take_profit_pct:.0%} 后退出")
+    print(f"- take_profit_pct: 回测/策略单笔浮盈达到 {risk.take_profit_pct:.0%} 后退出")
+    print(f"- paper_full_take_profit_pct: 模拟盘单笔浮盈达到 {risk.paper_full_take_profit_pct:.0%} 后全量止盈")
     print(f"- partial_take_profit_pct: 单笔浮盈达到 {risk.partial_take_profit_pct:.1%} 后先卖出 {risk.partial_take_profit_fraction:.0%}")
     print(f"- trailing_stop: 浮盈达到 {risk.trailing_stop_activation_pct:.0%} 后，如果从峰值回吐 {risk.trailing_stop_drawdown_pct:.0%} 则保护性退出")
     print(f"- paper_take_profit_reentry_cooldown_seconds: 止盈后同市场短冷却 {risk.paper_take_profit_reentry_cooldown_seconds} 秒")
+    print(f"- paper_reentry_edge_multiplier: 止盈后重新入场需要达到普通 edge 门槛的 {risk.paper_reentry_edge_multiplier:.1f} 倍")
     print(f"- max_spread: 买卖价差高于 {risk.max_spread:.2f} 不交易")
 
 
@@ -372,6 +374,15 @@ def _run_paper_scan(config, market_type: str) -> None:
             if blocked:
                 signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, reason)
         execution_plan = plan_execution(market, signal, market_config.signal, market_config.backtest, market_config.execution)
+        if execution_plan.mode == "TAKER" and _paper_reentry_edge_too_weak(
+            config,
+            storage,
+            market,
+            execution_plan.expected_net_edge,
+            market_config.signal.min_edge,
+        ):
+            signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, "止盈后重新入场 edge 不够强，避免频繁止盈/再开仓消耗手续费")
+            execution_plan = plan_execution(market, signal, market_config.signal, market_config.backtest, market_config.execution)
         if execution_plan.mode == "TAKER":
             _save_paper_position(config, storage, market, execution_plan, history[-1].price, run_timestamp)
         rows.append(build_paper_signal_row(market, signal, config.backtest.taker_fee_rate, run_timestamp, execution_plan))
@@ -408,7 +419,7 @@ def _paper_position_state_signal(config, storage, market, yes_price: float, run_
             cooldown_until = run_timestamp + config.risk.paper_reentry_cooldown_seconds
             storage.close_paper_position(market.id, run_timestamp, realized_pnl, cooldown_until)
             return Signal("HOLD", 0.0, 0.0, 0.0, f"模拟持仓触发止损，进入同市场冷却; pnl_pct={pnl_pct:.1%}; cooldown_until={cooldown_until}")
-        elif pnl_pct >= config.risk.take_profit_pct:
+        elif pnl_pct >= config.risk.paper_full_take_profit_pct:
             realized_pnl = _paper_close_value(position, current_price, market, config)
             cooldown_until = run_timestamp + config.risk.paper_take_profit_reentry_cooldown_seconds
             storage.close_paper_position(market.id, run_timestamp, realized_pnl, cooldown_until)
@@ -456,6 +467,14 @@ def _paper_position_state_signal(config, storage, market, yes_price: float, run_
     if position.cooldown_until > run_timestamp:
         return Signal("HOLD", 0.0, 0.0, 0.0, f"同一市场冷却中，cooldown_until={position.cooldown_until}")
     return None
+
+
+def _paper_reentry_edge_too_weak(config, storage, market, expected_net_edge: float, min_edge: float) -> bool:
+    position = storage.load_paper_position(market.id)
+    if position is None or position.status != "closed" or position.realized_pnl <= 0:
+        return False
+    required_edge = min_edge * config.risk.paper_reentry_edge_multiplier
+    return expected_net_edge < required_edge
 
 
 def _paper_close_value(position: PaperPositionState, current_price: float, market, config) -> float:

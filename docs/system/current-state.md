@@ -277,9 +277,11 @@ Maker 参数位于 `config/default.toml` 的 `[execution]` 区块。当前默认
 - `daily_loss_limit_usdc`: 日内亏损上限。
 - `max_drawdown_pct`: 最大账户回撤。
 - `stop_loss_pct`: 单笔止损比例。
-- `take_profit_pct`: 单笔止盈比例。
+- `take_profit_pct`: 主回测/策略的单笔全量止盈比例，当前恢复为 `35%`，避免过早卖掉历史上贡献主要收益的赢家。
 - `partial_take_profit_pct` / `partial_take_profit_fraction`: 浮盈达到阈值后先卖出一部分，剩余仓位继续跟踪。
+- `paper_full_take_profit_pct`: 模拟盘保护性全量止盈比例，当前为 `25%`，与回测趋势止盈分开配置。
 - `trailing_stop_activation_pct` / `trailing_stop_drawdown_pct`: 浮盈达到启动阈值后，如果从峰值回吐过多，则保护性退出剩余仓位。
+- `paper_reentry_edge_multiplier`: 止盈后同市场重新入场需要更高 edge，避免频繁止盈/再开仓把利润交给手续费。
 - `max_spread`: 最大允许价差。
 - `min_price` / `max_price`: 不交易过于极端的价格。
 
