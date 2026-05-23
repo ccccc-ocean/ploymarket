@@ -68,6 +68,8 @@ def blocks_directional_entry(
             return True, _reason("BUY_YES", regime, "above 市场遇到 BTC 下跌趋势")
         if signal.action == "BUY_YES" and regime.label == "range_bound" and distance_to_strike > 0:
             return True, _reason("BUY_YES", regime, "above strike 上方突破不足，震荡期不追 YES")
+        if signal.action == "BUY_NO" and (near_strike or distance_to_strike <= 0):
+            return True, _reason("BUY_NO", regime, "BTC 已接近或站上 above strike，暂停逆突破方向")
         if signal.action == "BUY_NO" and regime.label == "uptrend" and (near_strike or distance_to_strike <= 0):
             return True, _reason("BUY_NO", regime, "BTC 上涨趋势接近或站上 above strike")
 
@@ -76,6 +78,8 @@ def blocks_directional_entry(
             return True, _reason("BUY_YES", regime, "below 市场遇到 BTC 上涨趋势")
         if signal.action == "BUY_YES" and regime.label == "range_bound" and distance_to_strike < 0:
             return True, _reason("BUY_YES", regime, "below strike 下方突破不足，震荡期不追 YES")
+        if signal.action == "BUY_NO" and (near_strike or distance_to_strike >= 0):
+            return True, _reason("BUY_NO", regime, "BTC 已接近或跌破 below strike，暂停逆突破方向")
         if signal.action == "BUY_NO" and regime.label == "downtrend" and (near_strike or distance_to_strike >= 0):
             return True, _reason("BUY_NO", regime, "BTC 下跌趋势接近或跌破 below strike")
 

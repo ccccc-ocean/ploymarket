@@ -68,6 +68,19 @@ class BtcRegimeTests(unittest.TestCase):
 
         self.assertFalse(blocked)
 
+    def test_blocks_buy_no_when_above_market_is_near_strike_even_if_range_bound(self) -> None:
+        candles = [candle(index, 99.8 + (0.04 if index % 2 else -0.04)) for index in range(40)]
+
+        blocked, reason = blocks_directional_entry(
+            market("Will Bitcoin be above $100 on May 22?"),
+            Signal("BUY_NO", 0.5, 0.02, 0.01, "edge"),
+            candles,
+            candles[-1].timestamp,
+        )
+
+        self.assertTrue(blocked)
+        self.assertIn("暂停逆突破方向", reason)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -93,6 +93,7 @@ class RiskConfig:
     max_spread: float
     min_price: float
     max_price: float
+    paper_reentry_cooldown_seconds: int = 3600
 
 
 @dataclass(frozen=True)

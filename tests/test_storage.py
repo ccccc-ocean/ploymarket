@@ -5,7 +5,7 @@ from pathlib import Path
 from ploymarket_sim.clob import PricePoint
 from ploymarket_sim.paper import PaperSignalRow
 from ploymarket_sim.polymarket import Market
-from ploymarket_sim.storage import Storage
+from ploymarket_sim.storage import PaperPositionState, Storage
 
 
 class StorageTests(unittest.TestCase):
@@ -78,6 +78,30 @@ class StorageTests(unittest.TestCase):
             storage.mark_stale_token("yes-token", "m1", "HTTP 404")
             self.assertTrue(storage.is_stale_token("yes-token"))
             self.assertFalse(storage.is_stale_token("missing-token"))
+            storage.save_open_paper_position(
+                PaperPositionState(
+                    market_id="m1",
+                    side="NO",
+                    entry_price=0.7,
+                    shares=10,
+                    notional=7,
+                    opened_at=123,
+                    status="open",
+                    closed_at=None,
+                    realized_pnl=0.0,
+                    cooldown_until=0,
+                )
+            )
+            position = storage.load_paper_position("m1")
+            self.assertIsNotNone(position)
+            assert position is not None
+            self.assertEqual(position.side, "NO")
+            storage.close_paper_position("m1", 456, 1.5, 4056)
+            closed = storage.load_paper_position("m1")
+            self.assertIsNotNone(closed)
+            assert closed is not None
+            self.assertEqual(closed.status, "closed")
+            self.assertEqual(closed.cooldown_until, 4056)
 
     def test_disabled_storage_reports_zero_counts(self) -> None:
         storage = Storage(False, "unused.sqlite")

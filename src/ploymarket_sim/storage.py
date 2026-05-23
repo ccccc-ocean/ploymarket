@@ -37,6 +37,20 @@ class SnapshotStats:
     last_timestamp: int | None
 
 
+@dataclass(frozen=True)
+class PaperPositionState:
+    market_id: str
+    side: str
+    entry_price: float
+    shares: float
+    notional: float
+    opened_at: int
+    status: str
+    closed_at: int | None
+    realized_pnl: float
+    cooldown_until: int
+
+
 class Storage:
     def __init__(self, enabled: bool, sqlite_path: str):
         self.enabled = enabled
@@ -113,6 +127,22 @@ class Storage:
                     market_id TEXT NOT NULL,
                     reason TEXT NOT NULL,
                     observed_at REAL NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS paper_positions (
+                    market_id TEXT PRIMARY KEY,
+                    side TEXT NOT NULL,
+                    entry_price REAL NOT NULL,
+                    shares REAL NOT NULL,
+                    notional REAL NOT NULL,
+                    opened_at INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    closed_at INTEGER,
+                    realized_pnl REAL NOT NULL,
+                    cooldown_until INTEGER NOT NULL
                 )
                 """
             )
@@ -388,6 +418,88 @@ class Storage:
         if row is None:
             return False
         return time() - float(row[0]) <= max_age_seconds
+
+    def save_open_paper_position(self, position: PaperPositionState) -> None:
+        if not self.enabled:
+            return
+        self.init()
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO paper_positions (
+                    market_id, side, entry_price, shares, notional, opened_at,
+                    status, closed_at, realized_pnl, cooldown_until
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(market_id) DO UPDATE SET
+                    side=excluded.side,
+                    entry_price=excluded.entry_price,
+                    shares=excluded.shares,
+                    notional=excluded.notional,
+                    opened_at=excluded.opened_at,
+                    status=excluded.status,
+                    closed_at=excluded.closed_at,
+                    realized_pnl=excluded.realized_pnl,
+                    cooldown_until=excluded.cooldown_until
+                """,
+                (
+                    position.market_id,
+                    position.side,
+                    position.entry_price,
+                    position.shares,
+                    position.notional,
+                    position.opened_at,
+                    position.status,
+                    position.closed_at,
+                    position.realized_pnl,
+                    position.cooldown_until,
+                ),
+            )
+
+    def close_paper_position(self, market_id: str, closed_at: int, realized_pnl: float, cooldown_until: int) -> None:
+        if not self.enabled:
+            return
+        self.init()
+        with self._connect() as connection:
+            connection.execute(
+                """
+                UPDATE paper_positions
+                SET status = 'closed',
+                    closed_at = ?,
+                    realized_pnl = ?,
+                    cooldown_until = ?
+                WHERE market_id = ?
+                """,
+                (closed_at, realized_pnl, cooldown_until, market_id),
+            )
+
+    def load_paper_position(self, market_id: str) -> PaperPositionState | None:
+        if not self.enabled or not Path(self.sqlite_path).exists():
+            return None
+        self.init()
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT market_id, side, entry_price, shares, notional, opened_at,
+                       status, closed_at, realized_pnl, cooldown_until
+                FROM paper_positions
+                WHERE market_id = ?
+                """,
+                (market_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return PaperPositionState(
+            market_id=str(row[0]),
+            side=str(row[1]),
+            entry_price=float(row[2]),
+            shares=float(row[3]),
+            notional=float(row[4]),
+            opened_at=int(row[5]),
+            status=str(row[6]),
+            closed_at=int(row[7]) if row[7] is not None else None,
+            realized_pnl=float(row[8]),
+            cooldown_until=int(row[9]),
+        )
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.sqlite_path)

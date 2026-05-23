@@ -13,6 +13,7 @@ from .cache import CachePolicy, JsonCache
 from .classifier import MARKET_TYPES, is_market_type
 from .clob import get_price_history
 from .config import load_config
+from .costs import fee_amount, taker_fee_rate
 from .daily_report import build_daily_report, write_daily_report_csv
 from .edge_report import build_edge_buckets, load_alignment_rows_csv
 from .execution import plan_execution
@@ -59,7 +60,7 @@ from .reversal_backtest import (
 )
 from .signals import Signal, build_signal
 from .spread_scan import print_spread_scan_summary, scan_spreads, write_spread_scan_csv
-from .storage import storage_from_config
+from .storage import PaperPositionState, storage_from_config
 from .strategy_profiles import is_tradeable_market, strategy_config_for_market
 from .strategy_sweep import print_strategy_sweep_summary, run_strategy_sweep, write_strategy_sweep_csv
 from .strike_report import build_strike_report, print_strike_report, write_strike_report_csv
@@ -354,6 +355,11 @@ def _run_paper_scan(config, market_type: str) -> None:
             continue
         storage.save_price_history(market.yes_token_id or "", history)
         market_config = strategy_config_for_market(config, market)
+        state_signal = _paper_position_state_signal(config, storage, market, history[-1].price, run_timestamp)
+        if state_signal is not None:
+            execution_plan = plan_execution(market, state_signal, market_config.signal, market_config.backtest, market_config.execution)
+            rows.append(build_paper_signal_row(market, state_signal, config.backtest.taker_fee_rate, run_timestamp, execution_plan))
+            continue
         if not is_tradeable_market(market):
             signal = build_signal(market, history, market_config.signal, market_config.backtest)
             signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, "当前市场类型暂不交易，只记录观察")
@@ -363,6 +369,8 @@ def _run_paper_scan(config, market_type: str) -> None:
             if blocked:
                 signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, reason)
         execution_plan = plan_execution(market, signal, market_config.signal, market_config.backtest, market_config.execution)
+        if execution_plan.mode == "TAKER":
+            _save_paper_position(config, storage, market, execution_plan, history[-1].price, run_timestamp)
         rows.append(build_paper_signal_row(market, signal, config.backtest.taker_fee_rate, run_timestamp, execution_plan))
     storage.save_paper_snapshots(rows)
     path = write_paper_signal_rows_csv(rows, config.backtest.output_dir, run_timestamp)
@@ -377,6 +385,65 @@ def _run_paper_scan(config, market_type: str) -> None:
 
 def _paper_markets(config, storage):
     return _discover_live_markets_or_empty(config, storage, "paper-run")
+
+
+def _paper_position_state_signal(config, storage, market, yes_price: float, run_timestamp: int) -> Signal | None:
+    position = storage.load_paper_position(market.id)
+    if position is None:
+        return None
+
+    if position.status == "open":
+        current_price = _paper_side_price(position.side, yes_price)
+        pnl_pct = (current_price - position.entry_price) / position.entry_price if position.entry_price > 0 else 0.0
+        exit_reason = ""
+        if pnl_pct <= -config.risk.stop_loss_pct:
+            exit_reason = "模拟持仓触发止损，进入同市场冷却"
+        elif pnl_pct >= config.risk.take_profit_pct:
+            exit_reason = "模拟持仓触发止盈，进入同市场冷却"
+        if exit_reason:
+            gross_proceeds = position.shares * current_price
+            fee = fee_amount(gross_proceeds, current_price, market.effective_taker_fee_rate(config.backtest.taker_fee_rate))
+            realized_pnl = gross_proceeds - fee - position.notional
+            cooldown_until = run_timestamp + config.risk.paper_reentry_cooldown_seconds
+            storage.close_paper_position(market.id, run_timestamp, realized_pnl, cooldown_until)
+            return Signal("HOLD", 0.0, 0.0, 0.0, f"{exit_reason}; pnl_pct={pnl_pct:.1%}; cooldown_until={cooldown_until}")
+        return Signal("HOLD", 0.0, 0.0, 0.0, f"已有模拟持仓 {position.side}，不重复开同一市场; pnl_pct={pnl_pct:.1%}")
+
+    if position.cooldown_until > run_timestamp:
+        return Signal("HOLD", 0.0, 0.0, 0.0, f"同一市场冷却中，cooldown_until={position.cooldown_until}")
+    return None
+
+
+def _save_paper_position(config, storage, market, execution_plan, yes_price: float, run_timestamp: int) -> None:
+    if execution_plan.side not in {"BUY_YES", "BUY_NO"} or execution_plan.limit_price is None:
+        return
+    side = "NO" if execution_plan.side == "BUY_NO" else "YES"
+    entry_price = _paper_side_price(side, yes_price)
+    entry_fee_rate = taker_fee_rate(entry_price, market.effective_taker_fee_rate(config.backtest.taker_fee_rate))
+    slippage_rate = config.backtest.slippage_bps / 10_000
+    notional = config.backtest.trade_size_usdc
+    cost_basis = notional + notional * entry_fee_rate + notional * slippage_rate
+    execution_price = entry_price * (1 + slippage_rate)
+    if execution_price <= 0:
+        return
+    storage.save_open_paper_position(
+        PaperPositionState(
+            market_id=market.id,
+            side=side,
+            entry_price=execution_price,
+            shares=notional / execution_price,
+            notional=cost_basis,
+            opened_at=run_timestamp,
+            status="open",
+            closed_at=None,
+            realized_pnl=0.0,
+            cooldown_until=0,
+        )
+    )
+
+
+def _paper_side_price(side: str, yes_price: float) -> float:
+    return yes_price if side == "YES" else max(0.0, 1.0 - yes_price)
 
 
 def _run_paper_loop(config, market_type: str, interval_seconds: int, iterations: int) -> None:

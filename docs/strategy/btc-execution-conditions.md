@@ -134,6 +134,9 @@ strike_distance_pct = (strike - current_btc_price) / current_btc_price
 - 盘口 spread 超过风控阈值。
 - 最近资金流与入场方向明显相反。
 - 单日亏损、最大回撤、总敞口、单市场敞口触发风控。
+- 同一市场已有模拟持仓时，不重复开仓。
+- 同一市场刚触发止盈/止损后，必须等待冷却期结束。
+- `above` 市场买 `NO` 时，如果 BTC 已接近或站上 strike，暂停逆突破方向；`below/under` 市场买 `NO` 时规则反向处理。
 - 交易理由依赖未来信息，或依赖手工挑出来的固定 strike。
 
 ## 回测验证方向
