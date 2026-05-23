@@ -14,11 +14,13 @@ from .classifier import MARKET_TYPES, is_market_type
 from .clob import get_price_history
 from .config import load_config
 from .costs import fee_amount, taker_fee_rate
+from .cross_platform import match_btc_markets, print_cross_platform_summary, write_cross_platform_matches_csv
 from .daily_report import build_daily_report, write_daily_report_csv
 from .edge_report import build_edge_buckets, load_alignment_rows_csv
 from .execution import plan_execution
 from .flow_scan import print_flow_scan_summary, scan_market_flows, write_flow_scan_csv
 from .http import HttpError
+from .kalshi import discover_kalshi_btc_markets
 from .market_type_report import build_market_type_report, print_market_type_report, write_market_type_report_csv
 from .portfolio import build_mark_to_market_curve, build_portfolio_curve, summarize_portfolio
 from .paper import build_paper_signal_row, summarize_paper_rows
@@ -111,6 +113,9 @@ def main() -> None:
     flow_parser.add_argument("--large-trade-usdc", type=float, default=500.0)
     subparsers.add_parser("market-type-report", help="compare local backtest results by BTC market type")
     subparsers.add_parser("strike-report", help="summarize BTC daily range backtest results by strike")
+    subparsers.add_parser("kalshi-discover", help="find active BTC-related Kalshi markets")
+    cross_parser = subparsers.add_parser("cross-platform-report", help="match Polymarket and Kalshi BTC markets")
+    cross_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_range_daily")
     subparsers.add_parser("daily-report", help="summarize paper, replay, alignment, and edge outputs")
     subparsers.add_parser("explain-risk", help="explain the current risk limits")
 
@@ -173,6 +178,10 @@ def main() -> None:
         _run_market_type_report(config)
     elif args.command == "strike-report":
         _run_strike_report(config)
+    elif args.command == "kalshi-discover":
+        _run_kalshi_discover(config)
+    elif args.command == "cross-platform-report":
+        _run_cross_platform_report(config, args.market_type)
     elif args.command == "daily-report":
         _run_daily_report(config)
 
@@ -577,6 +586,26 @@ def _run_paper_report(config) -> None:
     path = write_paper_report_csv(summaries, config.backtest.output_dir)
     print_paper_report_summary(summaries)
     print(f"paper_report_csv={path}")
+
+
+def _run_kalshi_discover(config) -> None:
+    markets = discover_kalshi_btc_markets(config, use_cache=False)
+    print(f"kalshi_markets | count={len(markets)}")
+    for market in markets[:25]:
+        yes = market.mid_yes_price
+        yes_label = f"{yes:.3f}" if yes is not None else "n/a"
+        print(f"- {market.ticker} | yes={yes_label} | vol24h={market.volume_24h:.0f} | close={market.close_time} | {market.question}")
+
+
+def _run_cross_platform_report(config, market_type: str) -> None:
+    storage = storage_from_config(config)
+    polymarket_markets = _filter_markets(storage.load_markets(), market_type)
+    if not polymarket_markets:
+        polymarket_markets = _filter_markets(_discover_markets_with_quality_guard(config, storage, "cross-platform-report"), market_type)
+    kalshi_markets = discover_kalshi_btc_markets(config, use_cache=False)
+    rows = match_btc_markets(polymarket_markets, kalshi_markets)
+    path = write_cross_platform_matches_csv(rows, config.backtest.output_dir)
+    print_cross_platform_summary(rows, path)
 
 
 def _print_cache_info(config) -> None:

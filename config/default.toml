@@ -16,6 +16,15 @@ sqlite_path = "data/ploymarket.sqlite"
 fresh_market_ttl_seconds = 900
 fresh_history_ttl_seconds = 180
 
+[kalshi]
+base_url = "https://external-api.kalshi.com/trade-api/v2"
+request_timeout_seconds = 12
+limit = 10
+max_pages = 2
+status = "open"
+min_volume_24h = 0.0
+series_tickers = ["KXBTC", "KXBTCD", "KXBTC15M", "KXBTCMAX150"]
+
 [btc_price]
 provider = "coinbase_public"
 base_url = "https://api.coinbase.com"

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +11,17 @@ class ApiConfig:
     clob_base_url: str
     request_timeout_seconds: int
     data_base_url: str = "https://data-api.polymarket.com"
+
+
+@dataclass(frozen=True)
+class KalshiConfig:
+    base_url: str = "https://external-api.kalshi.com/trade-api/v2"
+    request_timeout_seconds: int = 12
+    limit: int = 10
+    max_pages: int = 2
+    status: str = "open"
+    min_volume_24h: float = 0.0
+    series_tickers: list[str] = field(default_factory=lambda: ["KXBTC", "KXBTCD", "KXBTC15M", "KXBTCMAX150"])
 
 
 @dataclass(frozen=True)
@@ -123,6 +134,7 @@ class AppConfig:
     execution: ExecutionConfig
     risk: RiskConfig
     backtest: BacktestConfig
+    kalshi: KalshiConfig = field(default_factory=KalshiConfig)
 
 
 def load_config(path: str | Path) -> AppConfig:
@@ -138,6 +150,7 @@ def load_config(path: str | Path) -> AppConfig:
         execution=ExecutionConfig(**data["execution"]),
         risk=RiskConfig(**data["risk"]),
         backtest=BacktestConfig(**data["backtest"]),
+        kalshi=KalshiConfig(**data.get("kalshi", {})),
     )
 
 

@@ -1341,3 +1341,30 @@ HTTP cache 默认 TTL 是 `900` 秒，适合减少研究阶段 API 抖动，但�
 ### 判断
 
 这次修复的核心是“不要让模拟盘保护逻辑污染历史回测主策略”。我们仍然要保留落袋为安，但不能牺牲已经验证过的趋势段收益。
+
+## 2026-05-23：启动 Kalshi 数据适配器和双平台匹配
+
+### 观察
+
+Kalshi 也有 BTC 事件合约，且公开市场数据 API 可以不认证读取。官方文档说明公开 Market Data endpoint 使用 `https://external-api.kalshi.com/trade-api/v2`，`GET /markets` 可分页获取市场，`GET /markets/{ticker}/orderbook` 可读取订单簿。第一阶段我们只做数据研究，不接账号、不签名、不下单。
+
+### 已调整
+
+- 新增 `kalshi.py`：读取 Kalshi BTC 相关公开市场，支持 `KXBTC`、`KXBTCD`、`KXBTC15M`、`KXBTCMAX150` 系列。
+- 新增 `cross_platform.py`：把 Polymarket 和 Kalshi 市场归一化为统一结构：平台、市场 ID、问题、strike、方向、日期、YES/NO 价格、流动性。
+- CLI 新增 `kalshi-discover`：打印 Kalshi BTC 市场快照。
+- CLI 新增 `cross-platform-report`：输出 `data/cross_platform_matches.csv`，按 strike、方向和日期匹配两个平台的相似 BTC 合约。
+- 匹配逻辑默认保守：方向为 `unknown` 的市场不匹配，日期优先从问题文本提取，避免把 range bucket 或不同日期的合约误认为同一事件。
+
+### 最新验证
+
+本地可以拉到 Kalshi `KXBTC15M`、`KXBTCMAX150`，并在网络较好时拉到 `KXBTC/KXBTCD` 的当前 BTC 分段市场。`cross-platform-report` 能生成匹配 CSV；但本地到 Kalshi 也会偶发 `IncompleteRead` / remote close，说明 VPS 数据层仍然有价值。
+
+### 下一步
+
+当前只是跨平台快照匹配，还不是 Kalshi 历史回测。真正的双平台回测需要继续补：
+
+- Kalshi 历史价格/订单簿数据采集。
+- Kalshi 费用模型。
+- 同一事件的结算规则校验，尤其 Polymarket 和 Kalshi 的 BTC 价格源、时间窗口和结算时区可能不同。
+- 跨平台路由回测：同一信号只选择净 edge 更高、盘口更深的平台，而不是简单双倍下注。
