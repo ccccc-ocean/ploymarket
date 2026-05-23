@@ -65,11 +65,16 @@ max_open_positions = 5
 daily_loss_limit_usdc = 35.0
 max_drawdown_pct = 0.12
 stop_loss_pct = 0.25
-take_profit_pct = 0.35
+take_profit_pct = 0.25
 max_spread = 0.08
 min_price = 0.03
 max_price = 0.97
 paper_reentry_cooldown_seconds = 3600
+paper_take_profit_reentry_cooldown_seconds = 600
+partial_take_profit_pct = 0.125
+partial_take_profit_fraction = 0.5
+trailing_stop_activation_pct = 0.12
+trailing_stop_drawdown_pct = 0.06
 
 [backtest]
 trade_size_usdc = 25.0

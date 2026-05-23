@@ -90,12 +90,36 @@ class StorageTests(unittest.TestCase):
                     closed_at=None,
                     realized_pnl=0.0,
                     cooldown_until=0,
+                    peak_price=0.7,
+                    partial_take_profit_count=0,
                 )
             )
             position = storage.load_paper_position("m1")
             self.assertIsNotNone(position)
             assert position is not None
             self.assertEqual(position.side, "NO")
+            self.assertEqual(position.peak_price, 0.7)
+            storage.update_open_paper_position(
+                PaperPositionState(
+                    market_id="m1",
+                    side="NO",
+                    entry_price=0.7,
+                    shares=5,
+                    notional=3.5,
+                    opened_at=123,
+                    status="open",
+                    closed_at=None,
+                    realized_pnl=0.25,
+                    cooldown_until=0,
+                    peak_price=0.8,
+                    partial_take_profit_count=1,
+                )
+            )
+            updated = storage.load_paper_position("m1")
+            self.assertIsNotNone(updated)
+            assert updated is not None
+            self.assertEqual(updated.shares, 5)
+            self.assertEqual(updated.partial_take_profit_count, 1)
             storage.close_paper_position("m1", 456, 1.5, 4056)
             closed = storage.load_paper_position("m1")
             self.assertIsNotNone(closed)

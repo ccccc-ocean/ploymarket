@@ -241,6 +241,9 @@ def _explain_risk(config) -> None:
     print(f"- max_drawdown_pct: 账户回撤达到 {risk.max_drawdown_pct:.0%} 后停止开仓")
     print(f"- stop_loss_pct: 单笔浮亏达到 {risk.stop_loss_pct:.0%} 后退出")
     print(f"- take_profit_pct: 单笔浮盈达到 {risk.take_profit_pct:.0%} 后退出")
+    print(f"- partial_take_profit_pct: 单笔浮盈达到 {risk.partial_take_profit_pct:.1%} 后先卖出 {risk.partial_take_profit_fraction:.0%}")
+    print(f"- trailing_stop: 浮盈达到 {risk.trailing_stop_activation_pct:.0%} 后，如果从峰值回吐 {risk.trailing_stop_drawdown_pct:.0%} 则保护性退出")
+    print(f"- paper_take_profit_reentry_cooldown_seconds: 止盈后同市场短冷却 {risk.paper_take_profit_reentry_cooldown_seconds} 秒")
     print(f"- max_spread: 买卖价差高于 {risk.max_spread:.2f} 不交易")
 
 
@@ -394,24 +397,110 @@ def _paper_position_state_signal(config, storage, market, yes_price: float, run_
 
     if position.status == "open":
         current_price = _paper_side_price(position.side, yes_price)
+        peak_price = max(position.peak_price, position.entry_price, current_price)
         pnl_pct = (current_price - position.entry_price) / position.entry_price if position.entry_price > 0 else 0.0
-        exit_reason = ""
+        peak_pnl_pct = (peak_price - position.entry_price) / position.entry_price if position.entry_price > 0 else 0.0
+        trailing_drawdown_pct = peak_pnl_pct - pnl_pct
+        updated_position = _replace_paper_position(position, peak_price=peak_price)
+
         if pnl_pct <= -config.risk.stop_loss_pct:
-            exit_reason = "模拟持仓触发止损，进入同市场冷却"
-        elif pnl_pct >= config.risk.take_profit_pct:
-            exit_reason = "模拟持仓触发止盈，进入同市场冷却"
-        if exit_reason:
-            gross_proceeds = position.shares * current_price
-            fee = fee_amount(gross_proceeds, current_price, market.effective_taker_fee_rate(config.backtest.taker_fee_rate))
-            realized_pnl = gross_proceeds - fee - position.notional
+            realized_pnl = _paper_close_value(position, current_price, market, config)
             cooldown_until = run_timestamp + config.risk.paper_reentry_cooldown_seconds
             storage.close_paper_position(market.id, run_timestamp, realized_pnl, cooldown_until)
-            return Signal("HOLD", 0.0, 0.0, 0.0, f"{exit_reason}; pnl_pct={pnl_pct:.1%}; cooldown_until={cooldown_until}")
-        return Signal("HOLD", 0.0, 0.0, 0.0, f"已有模拟持仓 {position.side}，不重复开同一市场; pnl_pct={pnl_pct:.1%}")
+            return Signal("HOLD", 0.0, 0.0, 0.0, f"模拟持仓触发止损，进入同市场冷却; pnl_pct={pnl_pct:.1%}; cooldown_until={cooldown_until}")
+        elif pnl_pct >= config.risk.take_profit_pct:
+            realized_pnl = _paper_close_value(position, current_price, market, config)
+            cooldown_until = run_timestamp + config.risk.paper_take_profit_reentry_cooldown_seconds
+            storage.close_paper_position(market.id, run_timestamp, realized_pnl, cooldown_until)
+            return Signal("HOLD", 0.0, 0.0, 0.0, f"模拟持仓触发全量止盈，短冷却后可重新评估; pnl_pct={pnl_pct:.1%}; cooldown_until={cooldown_until}")
+        elif (
+            peak_pnl_pct >= config.risk.trailing_stop_activation_pct
+            and trailing_drawdown_pct >= config.risk.trailing_stop_drawdown_pct
+        ):
+            realized_pnl = _paper_close_value(position, current_price, market, config)
+            cooldown_until = run_timestamp + config.risk.paper_take_profit_reentry_cooldown_seconds
+            storage.close_paper_position(market.id, run_timestamp, realized_pnl, cooldown_until)
+            return Signal(
+                "HOLD",
+                0.0,
+                0.0,
+                0.0,
+                f"模拟持仓触发移动止盈，保护已产生利润; pnl_pct={pnl_pct:.1%}; peak_pnl_pct={peak_pnl_pct:.1%}; cooldown_until={cooldown_until}",
+            )
+        elif pnl_pct >= config.risk.partial_take_profit_pct and position.partial_take_profit_count == 0:
+            updated_position, partial_realized_pnl = _paper_partial_close(position, current_price, market, config)
+            updated_position = _replace_paper_position(
+                updated_position,
+                peak_price=peak_price,
+                partial_take_profit_count=position.partial_take_profit_count + 1,
+            )
+            storage.update_open_paper_position(updated_position)
+            return Signal(
+                "HOLD",
+                0.0,
+                0.0,
+                0.0,
+                f"模拟持仓分批止盈，已兑现 {config.risk.partial_take_profit_fraction:.0%}; pnl_pct={pnl_pct:.1%}; realized_pnl={partial_realized_pnl:.2f}; 剩余仓位继续跟踪",
+            )
+
+        if updated_position.peak_price != position.peak_price:
+            storage.update_open_paper_position(updated_position)
+        return Signal(
+            "HOLD",
+            0.0,
+            0.0,
+            0.0,
+            f"已有模拟持仓 {position.side}，不重复开同一市场; pnl_pct={pnl_pct:.1%}; peak_pnl_pct={peak_pnl_pct:.1%}; partial_tp={position.partial_take_profit_count}",
+        )
 
     if position.cooldown_until > run_timestamp:
         return Signal("HOLD", 0.0, 0.0, 0.0, f"同一市场冷却中，cooldown_until={position.cooldown_until}")
     return None
+
+
+def _paper_close_value(position: PaperPositionState, current_price: float, market, config) -> float:
+    gross_proceeds = position.shares * current_price
+    fee = fee_amount(gross_proceeds, current_price, market.effective_taker_fee_rate(config.backtest.taker_fee_rate))
+    return position.realized_pnl + gross_proceeds - fee - position.notional
+
+
+def _paper_partial_close(position: PaperPositionState, current_price: float, market, config) -> tuple[PaperPositionState, float]:
+    fraction = min(max(config.risk.partial_take_profit_fraction, 0.0), 1.0)
+    if fraction <= 0.0:
+        return position, 0.0
+    shares_sold = position.shares * fraction
+    cost_basis_sold = position.notional * fraction
+    gross_proceeds = shares_sold * current_price
+    fee = fee_amount(gross_proceeds, current_price, market.effective_taker_fee_rate(config.backtest.taker_fee_rate))
+    partial_realized_pnl = gross_proceeds - fee - cost_basis_sold
+    return (
+        _replace_paper_position(
+            position,
+            shares=position.shares - shares_sold,
+            notional=position.notional - cost_basis_sold,
+            realized_pnl=position.realized_pnl + partial_realized_pnl,
+        ),
+        partial_realized_pnl,
+    )
+
+
+def _replace_paper_position(position: PaperPositionState, **changes) -> PaperPositionState:
+    values = {
+        "market_id": position.market_id,
+        "side": position.side,
+        "entry_price": position.entry_price,
+        "shares": position.shares,
+        "notional": position.notional,
+        "opened_at": position.opened_at,
+        "status": position.status,
+        "closed_at": position.closed_at,
+        "realized_pnl": position.realized_pnl,
+        "cooldown_until": position.cooldown_until,
+        "peak_price": position.peak_price,
+        "partial_take_profit_count": position.partial_take_profit_count,
+    }
+    values.update(changes)
+    return PaperPositionState(**values)
 
 
 def _save_paper_position(config, storage, market, execution_plan, yes_price: float, run_timestamp: int) -> None:
@@ -438,6 +527,8 @@ def _save_paper_position(config, storage, market, execution_plan, yes_price: flo
             closed_at=None,
             realized_pnl=0.0,
             cooldown_until=0,
+            peak_price=execution_price,
+            partial_take_profit_count=0,
         )
     )
 

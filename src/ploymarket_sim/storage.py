@@ -49,6 +49,8 @@ class PaperPositionState:
     closed_at: int | None
     realized_pnl: float
     cooldown_until: int
+    peak_price: float
+    partial_take_profit_count: int
 
 
 class Storage:
@@ -142,8 +144,19 @@ class Storage:
                     status TEXT NOT NULL,
                     closed_at INTEGER,
                     realized_pnl REAL NOT NULL,
-                    cooldown_until INTEGER NOT NULL
+                    cooldown_until INTEGER NOT NULL,
+                    peak_price REAL NOT NULL DEFAULT 0,
+                    partial_take_profit_count INTEGER NOT NULL DEFAULT 0
                 )
+                """
+            )
+            _ensure_column(connection, "paper_positions", "peak_price", "REAL NOT NULL DEFAULT 0")
+            _ensure_column(connection, "paper_positions", "partial_take_profit_count", "INTEGER NOT NULL DEFAULT 0")
+            connection.execute(
+                """
+                UPDATE paper_positions
+                SET peak_price = entry_price
+                WHERE status = 'open' AND peak_price <= 0
                 """
             )
 
@@ -428,8 +441,8 @@ class Storage:
                 """
                 INSERT INTO paper_positions (
                     market_id, side, entry_price, shares, notional, opened_at,
-                    status, closed_at, realized_pnl, cooldown_until
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    status, closed_at, realized_pnl, cooldown_until, peak_price, partial_take_profit_count
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(market_id) DO UPDATE SET
                     side=excluded.side,
                     entry_price=excluded.entry_price,
@@ -439,7 +452,9 @@ class Storage:
                     status=excluded.status,
                     closed_at=excluded.closed_at,
                     realized_pnl=excluded.realized_pnl,
-                    cooldown_until=excluded.cooldown_until
+                    cooldown_until=excluded.cooldown_until,
+                    peak_price=excluded.peak_price,
+                    partial_take_profit_count=excluded.partial_take_profit_count
                 """,
                 (
                     position.market_id,
@@ -452,6 +467,33 @@ class Storage:
                     position.closed_at,
                     position.realized_pnl,
                     position.cooldown_until,
+                    position.peak_price,
+                    position.partial_take_profit_count,
+                ),
+            )
+
+    def update_open_paper_position(self, position: PaperPositionState) -> None:
+        if not self.enabled:
+            return
+        self.init()
+        with self._connect() as connection:
+            connection.execute(
+                """
+                UPDATE paper_positions
+                SET shares = ?,
+                    notional = ?,
+                    realized_pnl = ?,
+                    peak_price = ?,
+                    partial_take_profit_count = ?
+                WHERE market_id = ? AND status = 'open'
+                """,
+                (
+                    position.shares,
+                    position.notional,
+                    position.realized_pnl,
+                    position.peak_price,
+                    position.partial_take_profit_count,
+                    position.market_id,
                 ),
             )
 
@@ -480,7 +522,7 @@ class Storage:
             row = connection.execute(
                 """
                 SELECT market_id, side, entry_price, shares, notional, opened_at,
-                       status, closed_at, realized_pnl, cooldown_until
+                       status, closed_at, realized_pnl, cooldown_until, peak_price, partial_take_profit_count
                 FROM paper_positions
                 WHERE market_id = ?
                 """,
@@ -499,6 +541,8 @@ class Storage:
             closed_at=int(row[7]) if row[7] is not None else None,
             realized_pnl=float(row[8]),
             cooldown_until=int(row[9]),
+            peak_price=float(row[10]),
+            partial_take_profit_count=int(row[11]),
         )
 
     def _connect(self) -> sqlite3.Connection:

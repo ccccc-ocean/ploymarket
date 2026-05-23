@@ -46,7 +46,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-
 - `replay-backtest` 可以只使用 SQLite 本地数据离线回放。
 - `data-quality` 输出本地市场和历史价格覆盖情况。
 - `paper_snapshots` 保存每轮模拟盘信号和执行计划。
-- `paper_positions` 保存实时模拟盘的同市场持仓状态；已有模拟持仓时不会每轮重复 TAKER，止盈/止损后进入冷却。
+- `paper_positions` 保存实时模拟盘的同市场持仓状态；已有模拟持仓时不会每轮重复 TAKER，分批止盈会降低仓位，止盈后短冷却，止损后长冷却。
 - `stale_tokens` 记录最近 CLOB 404 的 token，避免 `spread-scan` 反复扫描已失效订单簿。
 - 默认路径：`data/ploymarket.sqlite`
 - SQLite 文件已加入 `.gitignore`。
@@ -272,11 +272,14 @@ Maker 参数位于 `config/default.toml` 的 `[execution]` 区块。当前默认
 - `max_market_exposure_usdc`: 单个市场最大敞口。
 - `max_total_exposure_usdc`: 总持仓敞口。
 - `max_open_positions`: 最大同时持仓数。
-- `paper_reentry_cooldown_seconds`: 模拟盘同一市场止盈/止损后再次入场前的冷却时间。
+- `paper_reentry_cooldown_seconds`: 模拟盘同一市场止损后再次入场前的冷却时间。
+- `paper_take_profit_reentry_cooldown_seconds`: 止盈后同市场短冷却；止盈是落袋为安，不代表完全停止交易。
 - `daily_loss_limit_usdc`: 日内亏损上限。
 - `max_drawdown_pct`: 最大账户回撤。
 - `stop_loss_pct`: 单笔止损比例。
 - `take_profit_pct`: 单笔止盈比例。
+- `partial_take_profit_pct` / `partial_take_profit_fraction`: 浮盈达到阈值后先卖出一部分，剩余仓位继续跟踪。
+- `trailing_stop_activation_pct` / `trailing_stop_drawdown_pct`: 浮盈达到启动阈值后，如果从峰值回吐过多，则保护性退出剩余仓位。
 - `max_spread`: 最大允许价差。
 - `min_price` / `max_price`: 不交易过于极端的价格。
 

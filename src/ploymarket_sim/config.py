@@ -94,6 +94,11 @@ class RiskConfig:
     min_price: float
     max_price: float
     paper_reentry_cooldown_seconds: int = 3600
+    paper_take_profit_reentry_cooldown_seconds: int = 600
+    partial_take_profit_pct: float = 0.125
+    partial_take_profit_fraction: float = 0.5
+    trailing_stop_activation_pct: float = 0.12
+    trailing_stop_drawdown_pct: float = 0.06
 
 
 @dataclass(frozen=True)
