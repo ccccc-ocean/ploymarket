@@ -23,8 +23,9 @@ class BacktestTests(unittest.TestCase):
         )
         market = Market("m1", "Will BTC hit $100,000?", "btc-hit-100k", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
         history = [PricePoint(i, 0.40) for i in range(4)] + [PricePoint(4 + i, 0.60) for i in range(4)]
+        btc_candles = [BtcCandle(i, 98500.0, 99000.0, 98500.0, 98500.0) for i in range(len(history))]
 
-        result = backtest_market(market, history, config)
+        result = backtest_market(market, history, config, btc_candles)
 
         self.assertGreaterEqual(result.ending_cash, 0.0)
         self.assertTrue(any(trade.fee > 0 for trade in result.trades))
@@ -105,3 +106,69 @@ class BacktestTests(unittest.TestCase):
         result = backtest_market(market, history, config, btc_candles)
 
         self.assertTrue(any(trade.action == "BUY_NO" for trade in result.trades))
+
+    def test_far_price_target_reach_is_rejected_by_spot_distance(self) -> None:
+        config = AppConfig(
+            api=ApiConfig("", "", 1),
+            cache=CacheConfig(False, ".cache/http", 60, False),
+            storage=StorageConfig(False, "unused.sqlite"),
+            btc_price=BtcPriceConfig("coinbase_public", "https://api.coinbase.com", "BTC-USD", "FIVE_MINUTE"),
+            btc_filter=BtcFilterConfig(False, 1, -0.0025, 0.50),
+            universe=UniverseConfig(["btc"], 1, 1, "volume", True, False, 0.0, True),
+            signal=SignalConfig("1w", 60, 2, 4, 0.01, 0.01, 0.0, 0.98, 0.02),
+            execution=ExecutionConfig(False, 0.01, 0.015, 0.0, 300),
+            risk=RiskConfig(100.0, 50.0, 50.0, 50.0, 1, 100.0, 1.0, 0.9, 0.9, 1.0, 0.01, 0.99),
+            backtest=BacktestConfig(10.0, 0.0, 0, "data"),
+        )
+        market = Market("m1", "Will Bitcoin reach $80,000 May 18-24?", "btc-reach-80k", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
+        history = [PricePoint(i * 300, price) for i, price in enumerate([0.50, 0.50, 0.52, 0.58, 0.60])]
+        btc_candles = [BtcCandle(i * 300, 75000.0, 76000.0, 75500.0, 75500.0) for i in range(5)]
+
+        result = backtest_market(market, history, config, btc_candles)
+
+        self.assertFalse(any(trade.action == "BUY_YES" for trade in result.trades))
+        self.assertTrue(any("距离过远" in trade.reason for trade in result.trades))
+
+    def test_near_price_target_dip_can_trade_before_reversal(self) -> None:
+        config = AppConfig(
+            api=ApiConfig("", "", 1),
+            cache=CacheConfig(False, ".cache/http", 60, False),
+            storage=StorageConfig(False, "unused.sqlite"),
+            btc_price=BtcPriceConfig("coinbase_public", "https://api.coinbase.com", "BTC-USD", "FIVE_MINUTE"),
+            btc_filter=BtcFilterConfig(False, 1, -0.0025, 0.50),
+            universe=UniverseConfig(["btc"], 1, 1, "volume", True, False, 0.0, True),
+            signal=SignalConfig("1w", 60, 2, 4, 0.01, 0.01, 0.0, 0.98, 0.02),
+            execution=ExecutionConfig(False, 0.01, 0.015, 0.0, 300),
+            risk=RiskConfig(100.0, 50.0, 50.0, 50.0, 1, 100.0, 1.0, 0.9, 0.9, 1.0, 0.01, 0.99),
+            backtest=BacktestConfig(10.0, 0.0, 0, "data"),
+        )
+        market = Market("m1", "Will Bitcoin dip to $74,000 May 18-24?", "btc-dip-74k", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
+        history = [PricePoint(i * 300, price) for i, price in enumerate([0.50, 0.50, 0.52, 0.58, 0.60])]
+        btc_candles = [BtcCandle(i * 300, 75400.0, 75800.0, 75600.0, 75600.0) for i in range(5)]
+
+        result = backtest_market(market, history, config, btc_candles)
+
+        self.assertTrue(any(trade.action == "BUY_YES" for trade in result.trades))
+
+    def test_price_target_stop_loss_sets_reentry_cooldown(self) -> None:
+        config = AppConfig(
+            api=ApiConfig("", "", 1),
+            cache=CacheConfig(False, ".cache/http", 60, False),
+            storage=StorageConfig(False, "unused.sqlite"),
+            btc_price=BtcPriceConfig("coinbase_public", "https://api.coinbase.com", "BTC-USD", "FIVE_MINUTE"),
+            btc_filter=BtcFilterConfig(False, 1, -0.0025, 0.50),
+            universe=UniverseConfig(["btc"], 1, 1, "volume", True, False, 0.0, True),
+            signal=SignalConfig("1w", 60, 2, 4, 0.01, 0.01, 0.0, 0.98, 0.02),
+            execution=ExecutionConfig(False, 0.01, 0.015, 0.0, 300),
+            risk=RiskConfig(100.0, 50.0, 50.0, 50.0, 1, 100.0, 1.0, 0.10, 0.9, 1.0, 0.01, 0.99, target_stop_cooldown_seconds=3600),
+            backtest=BacktestConfig(10.0, 0.0, 0, "data"),
+        )
+        market = Market("m1", "Will Bitcoin reach $80,000 May 18-24?", "btc-reach-80k", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
+        prices = [0.50, 0.50, 0.52, 0.58, 0.60, 0.48, 0.50, 0.54, 0.60, 0.66]
+        history = [PricePoint(i * 300, price) for i, price in enumerate(prices)]
+        btc_candles = [BtcCandle(i * 300, 79000.0, 79500.0, 79200.0, 79200.0) for i in range(len(prices))]
+
+        result = backtest_market(market, history, config, btc_candles)
+
+        self.assertTrue(any(trade.action == "SELL_YES" and "止损" in trade.reason for trade in result.trades))
+        self.assertTrue(any(trade.action == "REJECTED" and "冷却中" in trade.reason for trade in result.trades))

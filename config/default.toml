@@ -86,6 +86,8 @@ trailing_stop_activation_pct = 0.12
 trailing_stop_drawdown_pct = 0.06
 paper_full_take_profit_pct = 0.25
 paper_reentry_edge_multiplier = 2.0
+target_market_max_distance_pct = 0.025
+target_stop_cooldown_seconds = 21600
 
 [backtest]
 trade_size_usdc = 25.0

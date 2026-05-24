@@ -29,6 +29,41 @@ def blocks_btc_strike_entry(market: Market, timestamp: int, btc_candles: list[Bt
     return False, ""
 
 
+def blocks_price_target_entry(
+    market: Market,
+    action: str,
+    timestamp: int,
+    btc_candles: list[BtcCandle],
+    max_distance_pct: float = 0.03,
+) -> tuple[bool, str]:
+    classification = classify_market(market).market_type
+    if classification not in {"price_target", "price_target_daily"}:
+        return False, ""
+    if action != "BUY_YES":
+        return False, ""
+
+    strike = extract_usd_strike(market.question)
+    direction = infer_strike_direction(market.question)
+    candle = latest_btc_candle_at_or_before(btc_candles, timestamp)
+    if strike is None or direction == "unknown":
+        return True, "price_target 缺少可识别 strike/方向，暂停 BUY_YES"
+    if candle is None or candle.close <= 0:
+        return True, "price_target 缺少 BTC 现货确认，暂停 BUY_YES"
+
+    distance_pct = (strike - candle.close) / candle.close
+    if direction == "above" and distance_pct > max_distance_pct:
+        return (
+            True,
+            f"price_target 距离过远，暂停 BUY_YES: BTC={candle.close:.2f}, strike={strike:.2f}, distance={distance_pct:.2%}, max={max_distance_pct:.2%}",
+        )
+    if direction == "below" and -distance_pct > max_distance_pct:
+        return (
+            True,
+            f"price_target 距离过远，暂停 BUY_YES: BTC={candle.close:.2f}, strike={strike:.2f}, distance={distance_pct:.2%}, max={max_distance_pct:.2%}",
+        )
+    return False, ""
+
+
 def extract_usd_strike(question: str) -> float | None:
     match = re.search(r"\$\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+(?:\.[0-9]+)?)(k)?", question.lower())
     if not match:
@@ -43,7 +78,7 @@ def infer_strike_direction(question: str) -> str:
     text = question.lower()
     if any(term in text for term in ["above", "over", "higher than", "reach", "hit"]):
         return "above"
-    if any(term in text for term in ["below", "under", "lower than"]):
+    if any(term in text for term in ["below", "under", "lower than", "dip", "drop", "fall to"]):
         return "below"
     return "unknown"
 

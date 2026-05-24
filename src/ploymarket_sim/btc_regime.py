@@ -51,7 +51,8 @@ def blocks_directional_entry(
 ) -> tuple[bool, str]:
     if signal.action not in {"BUY_YES", "BUY_NO"}:
         return False, ""
-    if classify_market(market).market_type != "price_range_daily":
+    market_type = classify_market(market).market_type
+    if market_type not in {"price_range_daily", "price_target", "price_target_daily"}:
         return False, ""
 
     strike = extract_usd_strike(market.question)
@@ -62,6 +63,13 @@ def blocks_directional_entry(
 
     distance_to_strike = (strike - regime.close) / regime.close
     near_strike = abs(distance_to_strike) <= near_strike_pct
+
+    if market_type in {"price_target", "price_target_daily"}:
+        if direction == "above" and signal.action == "BUY_YES" and regime.label == "downtrend":
+            return True, _reason("BUY_YES", regime, "target above 市场遇到 BTC 下跌趋势")
+        if direction == "below" and signal.action == "BUY_YES" and regime.label == "uptrend":
+            return True, _reason("BUY_YES", regime, "target below/dip 市场遇到 BTC 上涨趋势")
+        return False, ""
 
     if direction == "above":
         if signal.action == "BUY_YES" and regime.label == "downtrend":

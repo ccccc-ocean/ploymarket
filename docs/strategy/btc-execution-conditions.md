@@ -120,6 +120,8 @@ strike_distance_pct = (strike - current_btc_price) / current_btc_price
 
 - 市场属于 `price_range_daily` 或 `price_target`。
 - 当前 market strike 与 BTC 现货关系可解释，不是盲目固定 strike。
+- 对 `price_target` / `price_target_daily`，必须能拿到 BTC 现货确认；缺少 BTC 现货时不允许入场。
+- 对 `price_target` / `price_target_daily`，目标 strike 与 BTC 现货距离默认不能超过 `2.5%`；更远的 `reach/hit/dip/drop` 目标只观察，不吃单。
 - 对 `above` 市场，不能在 `far_above_spot + NO_PRESSURE` 时买 YES。
 - 对 `under/below` 市场，不能在 `far_below_spot + NO_PRESSURE` 时买 YES。
 - `near_spot + YES_PRESSURE` 可以进入候选，但仍要通过净 edge、价差和风控。
@@ -136,6 +138,7 @@ strike_distance_pct = (strike - current_btc_price) / current_btc_price
 - 单日亏损、最大回撤、总敞口、单市场敞口触发风控。
 - 同一市场已有模拟持仓时，不重复开仓。
 - 同一市场刚触发止损后，必须等待较长冷却期结束。
+- `price_target` 止损后的同方向冷却更长，当前默认 `21600` 秒，避免在同一个 weekly target 上连续补刀式亏损。
 - 同一市场触发止盈后只进入短冷却；止盈是兑现利润，冷却结束后仍允许重新评估开仓。
 - 止盈后重新入场必须满足更高 edge 门槛，避免“卖出落袋后马上追进”导致手续费和滑点变多。
 - 浮盈达到分批止盈阈值时，先卖出部分仓位，剩余仓位继续用移动止盈保护。

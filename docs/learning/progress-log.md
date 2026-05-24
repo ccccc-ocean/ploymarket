@@ -1368,3 +1368,34 @@ Kalshi 也有 BTC 事件合约，且公开市场数据 API 可以不认证读取
 - Kalshi 费用模型。
 - 同一事件的结算规则校验，尤其 Polymarket 和 Kalshi 的 BTC 价格源、时间窗口和结算时区可能不同。
 - 跨平台路由回测：同一信号只选择净 edge 更高、盘口更深的平台，而不是简单双倍下注。
+
+## 2026-05-24：修复 price_target 远离 strike 仍反复入场
+
+### 观察
+
+`Will Bitcoin reach $80,000 May 18-24?` 在 BTC 仍距离 80k 较远时出现多次 BUY_YES，并连续止损。`Will Bitcoin dip to $74,000 May 18-24?` 初期更接近 strike，入场逻辑相对能理解，但后续受宏观消息反转影响，也出现止损后重复进场风险。
+
+根因不是简单的止损参数，而是 `price_target` 复用了普通 YES 动量逻辑，没有强制检查 BTC 现货距离，也没有针对 target 市场设置足够长的止损后冷却。更糟的是，当 BTC 现货数据缺失时，旧逻辑会默认放行。
+
+### 已调整
+
+- `price_target` / `price_target_daily` 入场前必须能识别 strike 和方向。
+- `dip/drop/fall to` 现在会被识别为 below 方向，而不是 unknown。
+- `price_target` / `price_target_daily` 入场前必须有 BTC 现货确认；没有现货上下文时拒绝交易。
+- target 市场默认只允许距离 strike `2.5%` 内的 BUY_YES 候选，远端 reach/dip 只观察。
+- target 市场如果方向与 BTC regime 明显相反，例如 above 遇到 downtrend、dip/below 遇到 uptrend，会拒绝追 YES。
+- target 市场止损后同方向冷却 `21600` 秒，避免连续在同一周内目标上反复亏损。
+
+### 验证
+
+本地 replay 结果：
+
+- 全市场 PnL 从上一轮约 `+67.84` 提升到 `+163.61`。
+- `price_target` 从约 `-73.45` 收窄到 `-2.94`。
+- `Will Bitcoin reach $80,000 May 18-24?` 从多次重复交易缩到 1 次完整交易，PnL 约 `-8.54`；大量远离 strike 或缺少 BTC 现货确认的信号被拒绝。
+- `Will Bitcoin dip to $74,000 May 18-24?` 从明显亏损收敛到约 `+0.75`，保留了临近 strike 的机会，同时减少无现货确认和止损后重复入场。
+- 最新 daily report：`readiness=candidate`，`trades=156`，`pnl=163.61`，MTM 最大回撤 `5.8%`。
+
+### 判断
+
+这是一次有效修复，但仍不能直接实盘。当前结果说明“动态现货距离 + 缺数据拒绝 + target 冷却”明显优于只看 Polymarket YES 动量。下一步需要继续观察 paper-run 是否也能在实时环境下稳定遵守这些拒绝规则，并重点看网络数据缺失是否会让可交易样本过少。

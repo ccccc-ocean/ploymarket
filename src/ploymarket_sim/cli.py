@@ -21,6 +21,7 @@ from .execution import plan_execution
 from .flow_scan import print_flow_scan_summary, scan_market_flows, write_flow_scan_csv
 from .http import HttpError
 from .kalshi import discover_kalshi_btc_markets
+from .market_rules import blocks_price_target_entry
 from .market_type_report import build_market_type_report, print_market_type_report, write_market_type_report_csv
 from .portfolio import build_mark_to_market_curve, build_portfolio_curve, summarize_portfolio
 from .paper import build_paper_signal_row, summarize_paper_rows
@@ -379,6 +380,15 @@ def _run_paper_scan(config, market_type: str) -> None:
             signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, "当前市场类型暂不交易，只记录观察")
         else:
             signal = build_signal(market, history, market_config.signal, market_config.backtest)
+            blocked, reason = blocks_price_target_entry(
+                market,
+                signal.action,
+                history[-1].timestamp,
+                btc_candles,
+                config.risk.target_market_max_distance_pct,
+            )
+            if blocked:
+                signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, reason)
             blocked, reason = blocks_directional_entry(market, signal, btc_candles, history[-1].timestamp)
             if blocked:
                 signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, reason)
@@ -425,7 +435,12 @@ def _paper_position_state_signal(config, storage, market, yes_price: float, run_
 
         if pnl_pct <= -config.risk.stop_loss_pct:
             realized_pnl = _paper_close_value(position, current_price, market, config)
-            cooldown_until = run_timestamp + config.risk.paper_reentry_cooldown_seconds
+            cooldown_seconds = (
+                config.risk.target_stop_cooldown_seconds
+                if classify_market(market).market_type in {"price_target", "price_target_daily"}
+                else config.risk.paper_reentry_cooldown_seconds
+            )
+            cooldown_until = run_timestamp + cooldown_seconds
             storage.close_paper_position(market.id, run_timestamp, realized_pnl, cooldown_until)
             return Signal("HOLD", 0.0, 0.0, 0.0, f"模拟持仓触发止损，进入同市场冷却; pnl_pct={pnl_pct:.1%}; cooldown_until={cooldown_until}")
         elif pnl_pct >= config.risk.paper_full_take_profit_pct:
