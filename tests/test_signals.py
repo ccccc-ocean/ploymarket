@@ -74,3 +74,26 @@ class SignalTests(unittest.TestCase):
 
         self.assertEqual(signal.action, "HOLD")
         self.assertIn("NO 价格太接近 0", signal.reason)
+
+    def test_negative_price_target_momentum_generates_buy_no(self) -> None:
+        market = Market(
+            "1",
+            "Will Bitcoin reach $80,000 May 18-24?",
+            "btc-reach-80k",
+            None,
+            5000,
+            1000,
+            True,
+            ["Yes", "No"],
+            [0.5, 0.5],
+            ["yes", "no"],
+            False,
+            None,
+            None,
+        )
+        history = [PricePoint(i, 0.55) for i in range(24)] + [PricePoint(24 + i, 0.45) for i in range(6)]
+        config = SignalConfig("1w", 60, 6, 24, 0.01, 0.015, 0.0, 0.92, 0.08)
+
+        signal = build_signal(market, history, config)
+
+        self.assertEqual(signal.action, "BUY_NO")

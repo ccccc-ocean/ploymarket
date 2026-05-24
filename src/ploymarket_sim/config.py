@@ -114,6 +114,8 @@ class RiskConfig:
     paper_reentry_edge_multiplier: float = 2.0
     target_market_max_distance_pct: float = 0.025
     target_stop_cooldown_seconds: int = 21600
+    target_buy_yes_max_price: float = 0.65
+    target_buy_no_max_price: float = 0.75
 
 
 @dataclass(frozen=True)

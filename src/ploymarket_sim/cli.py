@@ -386,6 +386,9 @@ def _run_paper_scan(config, market_type: str) -> None:
                 history[-1].timestamp,
                 btc_candles,
                 config.risk.target_market_max_distance_pct,
+                history[-1].price,
+                config.risk.target_buy_yes_max_price,
+                config.risk.target_buy_no_max_price,
             )
             if blocked:
                 signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, reason)

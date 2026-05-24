@@ -1399,3 +1399,29 @@ Kalshi 也有 BTC 事件合约，且公开市场数据 API 可以不认证读取
 ### 判断
 
 这是一次有效修复，但仍不能直接实盘。当前结果说明“动态现货距离 + 缺数据拒绝 + target 冷却”明显优于只看 Polymarket YES 动量。下一步需要继续观察 paper-run 是否也能在实时环境下稳定遵守这些拒绝规则，并重点看网络数据缺失是否会让可交易样本过少。
+
+## 2026-05-24：把 price_target 扩展到 BUY_NO 候选
+
+### 观察
+
+`price_target` 如果只做 BUY_YES，会错过 `reach 80k` 这种远端目标失败时的 NO 收益。但直接给所有 target 打开 BUY_NO 会恶化结果：`dip to 74k` 的 NO 价格一度接近 `0.80`，赔率太薄，消息反转时容易一次亏掉多轮小收益。
+
+### 已调整
+
+- 主信号层允许 `price_target` / `price_target_daily` 在 YES 动量转弱、NO 扣除成本后仍有净 edge 时产生 `BUY_NO`。
+- target `BUY_NO` 复用现货距离过滤：above/reach 市场接近或站上 strike 时不做 NO；below/dip 市场接近或跌破 strike 时不做 NO。
+- target `BUY_NO` 增加趋势过滤：above/reach 遇到 BTC uptrend 不逆势做 NO；below/dip 遇到 BTC downtrend 不逆势做 NO。
+- target 增加赔率过滤：`BUY_YES` 价格默认不高于 `0.65`，`BUY_NO` 的 NO 价格默认不高于 `0.75`。
+
+### 验证
+
+本地 replay 结果：
+
+- 第一版直接打开 target BUY_NO 后，全市场 PnL 降到约 `+149.23`，`price_target` 降到约 `-17.06`，说明不能无差别启用。
+- 加入 target 赔率过滤后，全市场 PnL 提升到 `+166.51`，`price_target` 从上一稳定版约 `-2.94` 改善到 `+0.21`。
+- `Will Bitcoin reach $80,000 May 18-24?` 通过 `BUY_NO` 获利约 `+8.36`。
+- `Will Bitcoin dip to $74,000 May 18-24?` 中高价 NO / 高价 YES 被拦截，避免了第一版新增 BUY_NO 后的主要亏损。
+
+### 判断
+
+`price_target` 可以加入 BUY_NO，但必须是“失败突破/远离目标 + 合理 NO 价格 + 不逆 BTC regime”的候选，而不是所有 YES 下跌都买 NO。当前只把 BUY_NO 纳入主策略，真正的“止损后自动反转”还需要继续单独做更严格的回测，不能直接并入模拟盘。

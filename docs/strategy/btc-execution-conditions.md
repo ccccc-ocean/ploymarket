@@ -122,6 +122,8 @@ strike_distance_pct = (strike - current_btc_price) / current_btc_price
 - 当前 market strike 与 BTC 现货关系可解释，不是盲目固定 strike。
 - 对 `price_target` / `price_target_daily`，必须能拿到 BTC 现货确认；缺少 BTC 现货时不允许入场。
 - 对 `price_target` / `price_target_daily`，目标 strike 与 BTC 现货距离默认不能超过 `2.5%`；更远的 `reach/hit/dip/drop` 目标只观察，不吃单。
+- 对 `price_target`，允许在 YES 动量转弱且净 edge 足够时评估 `BUY_NO`，但必须同时满足现货距离、趋势和赔率过滤。
+- 对 `price_target`，`BUY_YES` 当前价格默认不能高于 `0.65`，`BUY_NO` 当前 NO 价格默认不能高于 `0.75`；否则即使方向正确，赔率也可能不足以覆盖一次反转亏损。
 - 对 `above` 市场，不能在 `far_above_spot + NO_PRESSURE` 时买 YES。
 - 对 `under/below` 市场，不能在 `far_below_spot + NO_PRESSURE` 时买 YES。
 - `near_spot + YES_PRESSURE` 可以进入候选，但仍要通过净 edge、价差和风控。

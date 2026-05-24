@@ -192,6 +192,9 @@ def backtest_market(
             current.timestamp,
             btc_candles or [],
             config.risk.target_market_max_distance_pct,
+            current.price,
+            config.risk.target_buy_yes_max_price,
+            config.risk.target_buy_no_max_price,
         )
         if target_blocked:
             trades.append(Trade(current.timestamp, market.id, "REJECTED", current.price, 0.0, 0.0, 0.0, 0.0, signal.net_edge, target_reason))

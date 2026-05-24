@@ -45,11 +45,7 @@ def build_signal(
         confidence = min(1.0, net_edge / (config.min_edge * 3))
         return Signal("BUY_YES", confidence, momentum, net_edge, "扣除费用、滑点和安全边际后仍有正 edge")
 
-    if (
-        classify_market(market).market_type == "price_range_daily"
-        and momentum <= -config.min_momentum
-        and no_net_edge >= config.min_edge
-    ):
+    if classify_market(market).market_type in {"price_range_daily", "price_target", "price_target_daily"} and momentum <= -config.min_momentum and no_net_edge >= config.min_edge:
         if no_price >= config.buy_below:
             return Signal("HOLD", 0.0, -momentum, no_net_edge, "NO 价格太接近 1，盈亏比不够")
         if no_price <= config.sell_above:

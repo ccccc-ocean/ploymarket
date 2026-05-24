@@ -69,6 +69,10 @@ def blocks_directional_entry(
             return True, _reason("BUY_YES", regime, "target above 市场遇到 BTC 下跌趋势")
         if direction == "below" and signal.action == "BUY_YES" and regime.label == "uptrend":
             return True, _reason("BUY_YES", regime, "target below/dip 市场遇到 BTC 上涨趋势")
+        if direction == "above" and signal.action == "BUY_NO" and regime.label == "uptrend":
+            return True, _reason("BUY_NO", regime, "target above 市场遇到 BTC 上涨趋势，不逆势做 NO")
+        if direction == "below" and signal.action == "BUY_NO" and regime.label == "downtrend":
+            return True, _reason("BUY_NO", regime, "target below/dip 市场遇到 BTC 下跌趋势，不逆势做 NO")
         return False, ""
 
     if direction == "above":

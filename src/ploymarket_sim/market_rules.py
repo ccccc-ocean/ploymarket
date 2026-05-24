@@ -35,11 +35,14 @@ def blocks_price_target_entry(
     timestamp: int,
     btc_candles: list[BtcCandle],
     max_distance_pct: float = 0.03,
+    yes_price: float | None = None,
+    buy_yes_max_price: float = 0.65,
+    buy_no_max_price: float = 0.75,
 ) -> tuple[bool, str]:
     classification = classify_market(market).market_type
     if classification not in {"price_target", "price_target_daily"}:
         return False, ""
-    if action != "BUY_YES":
+    if action not in {"BUY_YES", "BUY_NO"}:
         return False, ""
 
     strike = extract_usd_strike(market.question)
@@ -49,17 +52,34 @@ def blocks_price_target_entry(
         return True, "price_target 缺少可识别 strike/方向，暂停 BUY_YES"
     if candle is None or candle.close <= 0:
         return True, "price_target 缺少 BTC 现货确认，暂停 BUY_YES"
+    if yes_price is not None:
+        if action == "BUY_YES" and yes_price > buy_yes_max_price:
+            return True, f"price_target BUY_YES 价格过高，盈亏比不足: yes={yes_price:.3f}, max={buy_yes_max_price:.3f}"
+        if action == "BUY_NO":
+            no_price = max(0.0, 1.0 - yes_price)
+            if no_price > buy_no_max_price:
+                return True, f"price_target BUY_NO 价格过高，盈亏比不足: no={no_price:.3f}, max={buy_no_max_price:.3f}"
 
     distance_pct = (strike - candle.close) / candle.close
-    if direction == "above" and distance_pct > max_distance_pct:
+    if direction == "above" and action == "BUY_YES" and distance_pct > max_distance_pct:
         return (
             True,
             f"price_target 距离过远，暂停 BUY_YES: BTC={candle.close:.2f}, strike={strike:.2f}, distance={distance_pct:.2%}, max={max_distance_pct:.2%}",
         )
-    if direction == "below" and -distance_pct > max_distance_pct:
+    if direction == "below" and action == "BUY_YES" and -distance_pct > max_distance_pct:
         return (
             True,
             f"price_target 距离过远，暂停 BUY_YES: BTC={candle.close:.2f}, strike={strike:.2f}, distance={distance_pct:.2%}, max={max_distance_pct:.2%}",
+        )
+    if direction == "above" and action == "BUY_NO" and distance_pct <= max_distance_pct:
+        return (
+            True,
+            f"price_target 接近/站上 above strike，暂停 BUY_NO: BTC={candle.close:.2f}, strike={strike:.2f}, distance={distance_pct:.2%}, max={max_distance_pct:.2%}",
+        )
+    if direction == "below" and action == "BUY_NO" and -distance_pct <= max_distance_pct:
+        return (
+            True,
+            f"price_target 接近/跌破 below strike，暂停 BUY_NO: BTC={candle.close:.2f}, strike={strike:.2f}, distance={distance_pct:.2%}, max={max_distance_pct:.2%}",
         )
     return False, ""
 
