@@ -4,8 +4,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 PROJECT_DIR="$(pwd)"
-SCHEDULE="${1:-*/10 * * * *}"
-CONFIG_PATH="${2:-config/vps.local.toml}"
+LIVE_SCHEDULE="${1:-*/5 * * * *}"
+RESEARCH_SCHEDULE="${2:-17 * * * *}"
+CONFIG_PATH="${3:-config/vps.local.toml}"
 BEGIN_MARKER="# BEGIN ploymarket-research-cycle"
 END_MARKER="# END ploymarket-research-cycle"
 
@@ -22,9 +23,11 @@ FILTERED="$(
 {
   printf '%s\n' "$FILTERED"
   printf '%s\n' "$BEGIN_MARKER"
+  printf '%s cd %s && PLOYMARKET_CONFIG=%s %s/scripts/live_paper_cycle.sh >> %s/logs/live_paper_cycle.out.log 2>> %s/logs/live_paper_cycle.err.log\n' \
+    "$LIVE_SCHEDULE" "$PROJECT_DIR" "$CONFIG_PATH" "$PROJECT_DIR" "$PROJECT_DIR" "$PROJECT_DIR"
   printf '%s cd %s && PLOYMARKET_CONFIG=%s %s/scripts/research_cycle.sh >> %s/logs/research_cycle.out.log 2>> %s/logs/research_cycle.err.log\n' \
-    "$SCHEDULE" "$PROJECT_DIR" "$CONFIG_PATH" "$PROJECT_DIR" "$PROJECT_DIR" "$PROJECT_DIR"
+    "$RESEARCH_SCHEDULE" "$PROJECT_DIR" "$CONFIG_PATH" "$PROJECT_DIR" "$PROJECT_DIR" "$PROJECT_DIR"
   printf '%s\n' "$END_MARKER"
 } | crontab -
 
-echo "research_cycle_cron | schedule=$SCHEDULE | config=$CONFIG_PATH | logs=$PROJECT_DIR/logs"
+echo "research_cycle_cron | live_schedule=$LIVE_SCHEDULE | research_schedule=$RESEARCH_SCHEDULE | config=$CONFIG_PATH | logs=$PROJECT_DIR/logs"

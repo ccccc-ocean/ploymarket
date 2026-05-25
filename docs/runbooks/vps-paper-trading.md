@@ -45,26 +45,30 @@ tail -n 40 logs/research_cycle.err.log
 
 ## 定时运行
 
-安装用户级 `cron`，默认每 10 分钟尝试运行一次：
+安装用户级 `cron`，默认每 5 分钟运行实时模拟链、每小时运行一次深度研究链：
 
 ```bash
 scripts/install_research_cycle_cron.sh
 crontab -l
 ```
 
-自定义为每 15 分钟：
+实时模拟链执行 `btc-price`、`paper-run`、`paper-report`、`spread-scan` 和 `flow-scan`，通常几十秒内完成。深度研究链执行回测、对齐统计与参数扫描，耗时可能数分钟，不应阻塞实时观察。
+
+自定义为实时每 10 分钟、深度研究每小时第 27 分钟：
 
 ```bash
-scripts/install_research_cycle_cron.sh '*/15 * * * *'
+scripts/install_research_cycle_cron.sh '*/10 * * * *' '27 * * * *'
 ```
 
-研究脚本含进程锁；如果完整回测超过调度间隔，新的 tick 会跳过而不是并行污染数据。
+两条链各自包含进程锁；如果同类型上一轮仍未结束，新的 tick 会跳过而不是并行污染数据。
 
 ## 查看结果
 
 ```bash
 tail -f logs/research_cycle.out.log
 tail -f logs/research_cycle.err.log
+tail -f logs/live_paper_cycle.out.log
+tail -f logs/live_paper_cycle.err.log
 cat runtime/data/daily_report.csv
 cat runtime/data/paper_report.csv
 cat runtime/data/portfolio_mtm_summary.csv

@@ -95,7 +95,7 @@ PLOYMARKET_CONFIG=config/vps.local.toml scripts/research_cycle.sh
 scripts/install_research_cycle_cron.sh
 ```
 
-默认每 10 分钟尝试运行一轮；若上一轮未结束，脚本锁会安全跳过本轮。详细步骤见 [VPS 模拟盘运行手册](docs/runbooks/vps-paper-trading.md)。
+VPS 默认每 5 分钟运行一次实时模拟扫描，每小时执行一次深度回测研究；若同类上一轮未结束，脚本锁会安全跳过本轮。详细步骤见 [VPS 模拟盘运行手册](docs/runbooks/vps-paper-trading.md)。
 
 `paper-run` 输出里的 `execution_mode` 含义：
 
