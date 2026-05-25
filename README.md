@@ -12,6 +12,7 @@
 - 生成模拟订单状态机 CSV，为未来持续模拟盘和实盘订单生命周期做准备。
 - `paper-run` 已区分 `TAKER`、`MAKER`、`SKIP` 执行计划；实时扫描必须使用 live 市场和 live 历史，网络降级时不会把本地 SQLite 缓存当作可交易依据。
 - VPS 实时模拟还会禁用 HTTP stale cache，并用 CLOB 实时 ask/bid 模拟开仓与退出；BTC spot 过期时不允许新开方向仓位。
+- 每轮 `paper-run` 会生成 `execution_stress_<timestamp>.csv` 影子报告，模拟发单延迟引起的价格恶化、部分成交、签名/余额/撤单失败时的保护动作。
 - 主回测和 paper-run 已支持 `BUY_NO` 候选，但仍只用于研究和模拟盘，不会下实盘订单。
 - `spread-scan` 会读取 YES/NO 真实订单簿，检查完整组合价差机会，输出 `data/spread_scan.csv`。
 - `flow-scan` 会读取 Polymarket 交易流，观察大额钱包、YES/NO 净资金压力和动态 strike 风险，输出 `data/flow_scan.csv`。
@@ -34,6 +35,7 @@
 - [当前系统状态](docs/system/current-state.md)
 - [学习进度记录](docs/learning/progress-log.md)
 - [BTC 策略执行条件](docs/strategy/btc-execution-conditions.md)
+- [实盘执行风险与压力模拟](docs/strategy/live-execution-risk-controls.md)
 - [模拟盘运行手册](docs/runbooks/paper-trading.md)
 
 ## 快速开始
@@ -102,6 +104,8 @@ VPS 默认每 5 分钟运行一次实时模拟扫描，每小时执行一次深�
 - `TAKER`: 净 edge 扣除 taker fee、滑点、安全边际后仍过线，可以作为模拟吃单候选。
 - `MAKER`: gross edge 为正，但 taker 成本后不过线，只能作为更低限价的挂单候选。默认关闭，需在 `[execution]` 中显式启用后研究。
 - `SKIP`: 不满足交易条件，继续观察。
+
+`execution_stress_<timestamp>.csv` 仍然不下单，也暂不改变主 paper PnL。它用于观察候选在更差成交路径下是否仍保留 edge；只有长期通过这层压力测试的信号，才有资格进入后续极小额实盘准备。
 
 可以用 `--market-type` 只观察某一类市场：
 

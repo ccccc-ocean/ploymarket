@@ -91,6 +91,17 @@ class ExecutionConfig:
 
 
 @dataclass(frozen=True)
+class ExecutionStressConfig:
+    enabled: bool = True
+    adverse_price_moves: list[float] = field(default_factory=lambda: [0.0025, 0.01])
+    partial_fill_fractions: list[float] = field(default_factory=lambda: [0.5, 0.25])
+    min_surviving_net_edge: float = 0.003
+    max_unfilled_fraction: float = 0.5
+    operational_failure_pause_seconds: int = 900
+    consecutive_failure_circuit_breaker: int = 3
+
+
+@dataclass(frozen=True)
 class RiskConfig:
     starting_cash: float
     max_position_usdc: float
@@ -139,6 +150,7 @@ class AppConfig:
     risk: RiskConfig
     backtest: BacktestConfig
     kalshi: KalshiConfig = field(default_factory=KalshiConfig)
+    execution_stress: ExecutionStressConfig = field(default_factory=ExecutionStressConfig)
 
 
 def load_config(path: str | Path) -> AppConfig:
@@ -155,6 +167,7 @@ def load_config(path: str | Path) -> AppConfig:
         risk=RiskConfig(**data["risk"]),
         backtest=BacktestConfig(**data["backtest"]),
         kalshi=KalshiConfig(**data.get("kalshi", {})),
+        execution_stress=ExecutionStressConfig(**data.get("execution_stress", {})),
     )
 
 

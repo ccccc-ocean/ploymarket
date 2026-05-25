@@ -18,6 +18,7 @@ from .cross_platform import match_btc_markets, print_cross_platform_summary, wri
 from .daily_report import build_daily_report, write_daily_report_csv
 from .edge_report import build_edge_buckets, load_alignment_rows_csv
 from .execution import plan_execution
+from .execution_stress import build_execution_stress_rows, summarize_execution_stress, write_execution_stress_csv
 from .flow_scan import print_flow_scan_summary, scan_market_flows, write_flow_scan_csv
 from .http import HttpError
 from .kalshi import discover_kalshi_btc_markets
@@ -426,6 +427,15 @@ def _run_paper_scan(config, market_type: str) -> None:
         f"hold={summary['hold']} | avoid={summary['avoid']} | taker={summary['taker']} | "
         f"maker={summary['maker']} | skip={summary['skip']} | {path}"
     )
+    if config.execution_stress.enabled:
+        stress_rows = build_execution_stress_rows(rows, config.execution_stress, config.backtest.trade_size_usdc)
+        stress_path = write_execution_stress_csv(stress_rows, config.backtest.output_dir, run_timestamp)
+        stress_summary = summarize_execution_stress(stress_rows)
+        print(
+            f"execution_stress | candidates={stress_summary.candidates} | scenarios={stress_summary.scenarios} | "
+            f"robust={stress_summary.robust_candidates} | blocks={stress_summary.market_stress_blocks} | "
+            f"fail_safe={stress_summary.fail_safe_scenarios} | {stress_path}"
+        )
 
 
 def _paper_markets(config, storage):

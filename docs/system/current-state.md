@@ -41,7 +41,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-
 - 存储价格历史点。
 - 可以从 SQLite 读取已存市场和价格历史。
 - `discover`、`signals`、`backtest` 会自动写入。
-- `paper-run` 和 `spread-scan` 是实时扫描：必须使用 live 市场；如果当前 live discovery 抖动，只允许回退到最近 `fresh_market_ttl_seconds` 内 live 观察过的市场，不再把任意旧 SQLite 缓存当作可交易依据。
+- `paper-run` 和 `spread-scan` 是实时扫描：必须使用 live 市场；VPS 严格实时配置的 `fresh_market_ttl_seconds=0`，live discovery 抖动时不生成新开仓依据。
 - `paper-run` 的价格历史和 `spread-scan` 的订单簿仍必须实时拉取；历史缓存只用于离线研究和回测。
 - `kalshi-discover` 是 Kalshi 只读公开市场发现，当前只抓 BTC 相关市场，不登录、不签名、不下单。
 - `cross-platform-report` 会把 Polymarket/Kalshi BTC 市场按 strike、方向和日期归一化匹配，输出 `data/cross_platform_matches.csv`；当前是跨平台快照匹配，还不是 Kalshi 历史回测。
@@ -264,6 +264,18 @@ pmset -g custom
 
 Maker 参数位于 `config/default.toml` 的 `[execution]` 区块。当前默认 `maker_enabled = false`，因为本地小样本中启用 Maker 成交模拟会显著恶化回测结果。
 
+### 执行压力模拟
+
+代码位置：[src/ploymarket_sim/execution_stress.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/execution_stress.py)
+
+每个实时 `TAKER` 候选还会生成一份独立的 `execution_stress_<timestamp>.csv`：
+
+- `latency_adverse_*` 用价格向不利方向变化模拟发单与网络延迟，edge 不再过线时标记 `REJECT_NEW_ORDER`。
+- `partial_fill_*` 模拟只成交部分仓位，未成交残量超过阈值时标记 `CANCEL_REMAINDER`。
+- `signature_or_auth_failure`、`balance_or_allowance_failure`、`cancel_failure_after_partial_fill` 模拟操作故障，并给出暂停新单或冻结单市场的 fail-safe 动作。
+
+该报告目前是影子评估，不改写主 paper PnL，也不发送订单。参数位于 `[execution_stress]`，下一步需用积累的实时候选判断哪些门槛应提升为硬拦截。
+
 ### 风控
 
 代码位置：[src/ploymarket_sim/risk.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/risk.py)
@@ -390,8 +402,9 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 
 - 执行一轮模拟盘信号扫描。
 - 默认适合按 `price_target` 市场运行。
-- 优先使用 SQLite 里的本地市场和历史价格，减少对外部 API 的依赖。
+- 实时链必须使用 live 市场发现与 live CLOB 数据；SQLite 仅保存观察结果和持仓状态，不作为 VPS 新开仓的旧价回退来源。
 - 输出 `data/paper_run_<timestamp>.csv`。
+- 同轮输出 `data/execution_stress_<timestamp>.csv` 执行风险影子报告。
 - `paper-loop` 可以按固定间隔重复执行 `paper-run`。
 - CSV 包含 `execution_mode`、`execution_side`、`limit_price`、`expected_net_edge` 和 `execution_reason`。
 
@@ -408,7 +421,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 
 - 没有真实订单执行。
 - 有持续 `paper-loop`，但还没有系统级守护进程、告警和自动日报。
-- SQLite 已用于 paper-run 本地读取和 replay-backtest 离线回放，但样本数量仍然很小。
+- SQLite 已用于保存 paper-run 快照/持仓与 replay-backtest 离线回放，但严格实时链不使用历史缓存替代 live 开仓数据。
 - 已有 BTC/Polymarket 时间对齐报告，但还没有按信号、市场类型、流动性分层评估 edge。
 - 已有第一版 edge 分层报告、资金流扫描和 BUY_NO/反转实验；`BUY_NO` 已进入候选执行层，但还没有通过足够长时间的模拟盘稳定性验证。
 - 没有盘口深度模拟。
@@ -419,7 +432,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 - Maker/Taker 已在执行计划层分离，Maker 已支持限价挂单、TTL 取消和价格触及成交；但还没有盘口排队位置、部分成交和更真实的成交概率。
 - 市场分类还是关键词规则，后续要用真实样本不断修正。
 - 逐 bar mark-to-market 已实现，但仍基于当前 CLOB 历史价格，不包含盘口深度和成交概率。
-- 订单状态机还没有真实的失败、撤单、部分成交和链上 settlement 查询。
+- 已有第一阶段的失败、撤单和部分成交影子压力场景，但还没有 pending/partial-filled 实时订单状态持久化、链上 settlement 查询和真实订单对账。
 
 ## 知识库状态
 

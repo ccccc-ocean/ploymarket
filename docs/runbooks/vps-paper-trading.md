@@ -42,6 +42,7 @@ tail -n 40 logs/research_cycle.err.log
 - `paper-run` 的 Polymarket 历史价格每轮 live 请求，不使用 HTTP cache 或 SQLite 回退生成交易依据。
 - 产生 BUY 候选后，必须读取对应 YES/NO CLOB 实时订单簿；入场以 ask 模拟，退出判断以 bid 模拟。
 - 实时盘口缺失、价差超过风控阈值、或按 ask 重估后净 edge 不足时，跳过开仓。
+- 每个 `TAKER` 候选还会写入 `execution_stress_<timestamp>.csv`，影子模拟延迟价格恶化、部分成交和操作失败；该报告不发送订单，也暂不改写主 paper PnL。
 
 ## 定时运行
 
@@ -72,6 +73,7 @@ tail -f logs/live_paper_cycle.err.log
 cat runtime/data/daily_report.csv
 cat runtime/data/paper_report.csv
 cat runtime/data/portfolio_mtm_summary.csv
+ls -t runtime/data/execution_stress_*.csv | head -n 1 | xargs cat
 ```
 
 关注项目：
@@ -80,6 +82,7 @@ cat runtime/data/portfolio_mtm_summary.csv
 - `paper_report.csv` 中 `paper_runs` 是否稳定增加，实时扫描是否覆盖足够市场。
 - `daily_report.csv` 和 `portfolio_mtm_summary.csv` 中的 `PnL` 与最大回撤是否在新样本期内稳定。
 - `TAKER` 信号是否过度集中于一个市场或一个 strike。
+- `execution_stress` 中候选在延迟/部分成交场景下是否仍通过，若理论 TAKER 多但 `robust` 长期为零，则不能进入实盘。
 
 ## 实盘边界
 
