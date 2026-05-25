@@ -21,7 +21,7 @@ from .execution import plan_execution
 from .flow_scan import print_flow_scan_summary, scan_market_flows, write_flow_scan_csv
 from .http import HttpError
 from .kalshi import discover_kalshi_btc_markets
-from .market_rules import blocks_price_target_entry
+from .market_rules import blocks_btc_strike_entry, blocks_price_target_entry
 from .market_type_report import build_market_type_report, print_market_type_report, write_market_type_report_csv
 from .portfolio import build_mark_to_market_curve, build_portfolio_curve, summarize_portfolio
 from .paper import build_paper_signal_row, summarize_paper_rows
@@ -380,6 +380,14 @@ def _run_paper_scan(config, market_type: str) -> None:
             signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, "当前市场类型暂不交易，只记录观察")
         else:
             signal = build_signal(market, history, market_config.signal, market_config.backtest)
+            blocked, reason = blocks_btc_strike_entry(
+                market,
+                history[-1].timestamp,
+                btc_candles,
+                signal.action,
+            )
+            if blocked:
+                signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, reason)
             blocked, reason = blocks_price_target_entry(
                 market,
                 signal.action,

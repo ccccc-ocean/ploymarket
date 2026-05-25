@@ -7,7 +7,13 @@ from .classifier import classify_market
 from .polymarket import Market
 
 
-def blocks_btc_strike_entry(market: Market, timestamp: int, btc_candles: list[BtcCandle], tolerance_pct: float = 0.0015) -> tuple[bool, str]:
+def blocks_btc_strike_entry(
+    market: Market,
+    timestamp: int,
+    btc_candles: list[BtcCandle],
+    action: str = "BUY_YES",
+    tolerance_pct: float = 0.0015,
+) -> tuple[bool, str]:
     if classify_market(market).market_type != "price_range_daily":
         return False, ""
     strike = extract_usd_strike(market.question)
@@ -15,6 +21,8 @@ def blocks_btc_strike_entry(market: Market, timestamp: int, btc_candles: list[Bt
         return False, ""
     candle = latest_btc_candle_at_or_before(btc_candles, timestamp)
     if candle is None:
+        return True, f"price_range_daily 缺少 BTC 现货确认，暂停 {action}"
+    if action != "BUY_YES":
         return False, ""
 
     text = market.question.lower()

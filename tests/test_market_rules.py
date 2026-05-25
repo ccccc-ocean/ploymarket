@@ -38,6 +38,19 @@ class MarketRulesTests(unittest.TestCase):
 
         self.assertFalse(blocked)
 
+    def test_allows_buy_no_when_above_strike_is_far_away(self) -> None:
+        market = Market("m1", "Will the price of Bitcoin be above $78,000 on May 21?", "btc-above", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
+        blocked, _reason = blocks_btc_strike_entry(market, 300, [BtcCandle(300, 76000, 77000, 76500, 76500)], "BUY_NO")
+
+        self.assertFalse(blocked)
+
+    def test_blocks_directional_entry_without_btc_confirmation(self) -> None:
+        market = Market("m1", "Will the price of Bitcoin be above $78,000 on May 21?", "btc-above", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
+        blocked, reason = blocks_btc_strike_entry(market, 300, [], "BUY_NO")
+
+        self.assertTrue(blocked)
+        self.assertIn("缺少 BTC 现货确认", reason)
+
 
 if __name__ == "__main__":
     unittest.main()

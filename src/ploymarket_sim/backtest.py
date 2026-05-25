@@ -13,7 +13,7 @@ from .orders import OrderEvent, canceled_events, lifecycle_events, make_order_id
 from .polymarket import Market
 from .risk import Portfolio, Position, approve_entry, should_exit
 from .signals import build_signal
-from .market_rules import blocks_price_target_entry, latest_btc_candle_at_or_before
+from .market_rules import blocks_btc_strike_entry, blocks_price_target_entry, latest_btc_candle_at_or_before
 from .strategy_profiles import is_tradeable_market, strategy_config_for_market
 
 
@@ -74,7 +74,7 @@ def backtest_market(
         return BacktestResult(market.id, market.question, trades, portfolio.cash, 0.0, order_events)
 
     pending_order: PendingMakerOrder | None = None
-    side_cooldown_until: dict[str, int] = {}
+    market_cooldown_until = 0
     for index in range(config.signal.long_window, len(history)):
         visible_history = history[: index + 1]
         current = visible_history[-1]
@@ -162,15 +162,20 @@ def backtest_market(
                 order_side = _order_side("SELL", position.side)
                 order_events.extend(lifecycle_events(current.timestamp, order_id, market.id, order_side, current_side_price, proceeds, reason))
                 trades.append(Trade(current.timestamp, market.id, _trade_action("SELL", position.side), current_side_price, proceeds, fee, 0.0, pnl, 0.0, reason))
-                if market_type in {"price_target", "price_target_daily"} and "止损" in reason:
-                    side_cooldown_until[position.side] = current.timestamp + config.risk.target_stop_cooldown_seconds
+                if "止损" in reason:
+                    cooldown_seconds = (
+                        config.risk.target_stop_cooldown_seconds
+                        if market_type in {"price_target", "price_target_daily"}
+                        else config.risk.paper_reentry_cooldown_seconds
+                    )
+                    market_cooldown_until = current.timestamp + cooldown_seconds
             continue
 
         signal = build_signal(market, visible_history, config.signal, config.backtest)
         if _blocked_by_btc_filter(signal, current, config, btc_candles or []):
             continue
         entry_side = _signal_entry_side(signal.action)
-        if market_type in {"price_target", "price_target_daily"} and entry_side and current.timestamp < side_cooldown_until.get(entry_side, 0):
+        if entry_side and current.timestamp < market_cooldown_until:
             trades.append(
                 Trade(
                     current.timestamp,
@@ -182,9 +187,18 @@ def backtest_market(
                     0.0,
                     0.0,
                     signal.net_edge,
-                    f"同一市场 {entry_side} 止损后冷却中，cooldown_until={side_cooldown_until[entry_side]}",
+                    f"同一市场止损后冷却中，cooldown_until={market_cooldown_until}",
                 )
             )
+            continue
+        strike_blocked, strike_reason = blocks_btc_strike_entry(
+            market,
+            current.timestamp,
+            btc_candles or [],
+            signal.action,
+        )
+        if strike_blocked:
+            trades.append(Trade(current.timestamp, market.id, "REJECTED", current.price, 0.0, 0.0, 0.0, 0.0, signal.net_edge, strike_reason))
             continue
         target_blocked, target_reason = blocks_price_target_entry(
             market,
