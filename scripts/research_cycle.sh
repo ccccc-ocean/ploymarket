@@ -3,6 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+CONFIG_PATH="${PLOYMARKET_CONFIG:-config/default.toml}"
 LOCK_DIR="${TMPDIR:-/tmp}/ploymarket-research-cycle.lock"
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   echo "research_cycle | another run is still active, skipping this tick"
@@ -12,7 +13,7 @@ trap 'rmdir "$LOCK_DIR"' EXIT
 
 run() {
   env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache \
-    python3 -m ploymarket_sim.cli --config config/default.toml "$@"
+    python3 -m ploymarket_sim.cli --config "$CONFIG_PATH" "$@"
 }
 
 run btc-price

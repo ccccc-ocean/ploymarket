@@ -7,5 +7,7 @@ venv/
 .obsidian/
 .cache/
 logs/
+runtime/
+config/*.local.toml
 *.sqlite
 *.sqlite3

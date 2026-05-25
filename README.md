@@ -86,6 +86,16 @@ scripts/uninstall_research_cycle_launchd.sh
 
 日志写入 `logs/`，该目录不会提交到 Git。
 
+在 Linux VPS 上用独立的前瞻样本目录运行，不混用仓库已有的研究输出：
+
+```bash
+scripts/setup_vps_runtime.sh
+PLOYMARKET_CONFIG=config/vps.local.toml scripts/research_cycle.sh
+scripts/install_research_cycle_cron.sh
+```
+
+默认每 10 分钟尝试运行一轮；若上一轮未结束，脚本锁会安全跳过本轮。详细步骤见 [VPS 模拟盘运行手册](docs/runbooks/vps-paper-trading.md)。
+
 `paper-run` 输出里的 `execution_mode` 含义：
 
 - `TAKER`: 净 edge 扣除 taker fee、滑点、安全边际后仍过线，可以作为模拟吃单候选。
