@@ -1471,3 +1471,29 @@ Kalshi 也有 BTC 事件合约，且公开市场数据 API 可以不认证读取
 ### 判断
 
 这次变化主要消除了不可验证样本与无冷却重复交易，不应被解读为策略已经转为稳定盈利。当前有效交易仅 `10` 笔，且 `readiness=not_ready`；下一步必须继续在 VPS 积累有完整 BTC 对齐背景的新样本，再判断 `BUY_NO` 的定价过滤、趋势过滤和止盈机制是否需要调整。
+
+## 2026-05-25：VPS 实时候选链关闭缓存并按订单簿成交
+
+### 审计发现
+
+- `paper-run` 的市场发现和 CLOB 价格历史原本已经直接请求 live API，`spread-scan` 的订单簿和 `flow-scan` 的成交流也未使用 HTTP cache。
+- 但 VPS 配置仍允许 HTTP stale cache，并允许市场发现降级时使用最近观察过的市场池；这不适合作为接近实盘的模拟开仓依据。
+- 更重要的是，旧 `paper-run` 生成 TAKER 时使用 Gamma 市场快照价格，而不是对应方向订单簿的实时 ask；持仓退出也依据历史价格而非实时 bid，模拟成交偏乐观或不一致。
+
+### 已调整
+
+- VPS 专用配置关闭 HTTP cache、关闭 stale fallback、关闭 live market pool 回退；实时市场发现失败时不生成新的开仓候选。
+- `paper-run` 产生 BUY 候选后，读取对应 YES/NO token 的 CLOB 实时订单簿：以 ask 作为模拟入场基础，以 bid 作为开放持仓的止盈/止损判断基础。
+- 若实时盘口缺失、bid/ask spread 超过阈值，或按 ask 重估后净 edge 不足，则跳过模拟开仓。
+- BTC spot 上下文若超过 `15` 分钟没有新 K 线，方向性新开仓会被拦截。
+- 将调度拆成两条链：`live_paper_cycle.sh` 每 `5` 分钟执行实时模拟；`research_cycle.sh` 每小时执行深度回测和参数研究。
+
+### 验证
+
+- VPS 严格实时配置显示 `cache.enabled=false`、`stale_if_error=false`、`fresh_market_ttl_seconds=0`，缓存目录文件数为 `0`。
+- 快速实时链手工验证耗时 `16` 秒：BTC live `1` 秒、paper-run `5` 秒、spread scan `4` 秒、flow scan `6` 秒；错误日志为空。
+- 已有模拟持仓由实时 bid 估值：May 25 `above 78k` 的 `BUY_NO` bid 约 `0.998`、浮盈约 `8.8%`；May 26 `above 76k` 的 `BUY_YES` bid 约 `0.93`、浮盈约 `4.8%`。
+
+### 边界
+
+实时 ask/bid 模拟明显比快照价更可信，但仍不等同于真实下单。未来进入极小额实盘前，还需要验证订单发出延迟、部分成交、撤单、余额与签名错误、盘口成交深度以及异常断连时的保护动作。
