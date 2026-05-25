@@ -273,8 +273,10 @@ Maker 参数位于 `config/default.toml` 的 `[execution]` 区块。当前默认
 - `latency_adverse_*` 用价格向不利方向变化模拟发单与网络延迟，edge 不再过线时标记 `REJECT_NEW_ORDER`。
 - `partial_fill_*` 模拟只成交部分仓位，未成交残量超过阈值时标记 `CANCEL_REMAINDER`。
 - `signature_or_auth_failure`、`balance_or_allowance_failure`、`cancel_failure_after_partial_fill` 模拟操作故障，并给出暂停新单或冻结单市场的 fail-safe 动作。
+- `shadow_order_events_<timestamp>.csv` 输出 `SUBMITTED`、`FILLED`、`PARTIALLY_FILLED`、`CANCELED_REMAINDER`、`CANCEL_PENDING` 与 `REJECTED` 事件；撤单待确认时仍预留完整名义敞口。
+- `execution_stress_report.csv` 汇总所有实时轮次的候选数、延迟压力通过数、部分成交撤单数和 fail-safe 数。
 
-该报告目前是影子评估，不改写主 paper PnL，也不发送订单。参数位于 `[execution_stress]`，下一步需用积累的实时候选判断哪些门槛应提升为硬拦截。
+这些报告目前是影子评估，不改写主 paper PnL，也不发送订单。部分成交的可控撤余单不再错误降低 `robust` 指标；下一步需将跨轮未确认影子订单持久化并验证阻止冲突新单。
 
 ### 风控
 
@@ -405,6 +407,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 - 实时链必须使用 live 市场发现与 live CLOB 数据；SQLite 仅保存观察结果和持仓状态，不作为 VPS 新开仓的旧价回退来源。
 - 输出 `data/paper_run_<timestamp>.csv`。
 - 同轮输出 `data/execution_stress_<timestamp>.csv` 执行风险影子报告。
+- 同轮输出 `data/shadow_order_events_<timestamp>.csv`，并维护累计 `data/execution_stress_report.csv`。
 - `paper-loop` 可以按固定间隔重复执行 `paper-run`。
 - CSV 包含 `execution_mode`、`execution_side`、`limit_price`、`expected_net_edge` 和 `execution_reason`。
 

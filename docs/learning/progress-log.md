@@ -1515,3 +1515,16 @@ Kalshi 也有 BTC 事件合约，且公开市场数据 API 可以不认证读取
 ### 判断
 
 这解决的是“理论交易在执行层是否还站得住”的验证缺口，并不证明策略已适合实盘。下一步先在 VPS 实时链上积累压力报告，再加入持久化的 pending/partial/cancel-pending 订单状态模拟；在执行压力通过率与前瞻 PnL 都稳定前，仍不建议实盘。
+
+## 2026-05-26：影子订单事件与执行风险累计统计
+
+### 修正与新增
+
+- 修正 `robust` 统计口径：部分成交后撤销残单属于风险处理动作，不等同于价格 edge 已失效；`robust` 只由基准成交与延迟价格恶化场景决定。
+- 每轮新增 `shadow_order_events_<timestamp>.csv`，把候选展开为 `SUBMITTED`、`FILLED`、`PARTIALLY_FILLED`、`CANCELED_REMAINDER`、`CANCEL_PENDING` 或 `REJECTED` 事件。
+- 当模拟出现部分成交后撤单未确认，影子事件仍以完整名义金额作为 `reserved_exposure`，避免未来实现中在状态未知时再次加仓。
+- 新增累计 `execution_stress_report.csv`，分开记录实时观察轮数、理论候选数、延迟压力通过/拦截、按 `FAK` 路径发生的部分成交撤余单和 fail-safe 场景数。
+
+### 当前边界
+
+这一层已经能审计“如果订单生命周期变复杂，应采取什么动作”，但仍属于影子文件事件，而不是会跨轮拦截主 paper 仓位的持久化订单账本。下一步应让 `CANCEL_PENDING` 等未确认状态跨轮保留并阻止冲突新单，然后才能更接近极小额实盘演练。

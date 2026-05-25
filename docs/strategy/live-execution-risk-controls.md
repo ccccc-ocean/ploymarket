@@ -21,17 +21,17 @@ tags: #btc #paper-trading #execution #risk
 
 配置位置：`config/default.toml` 的 `[execution_stress]`。
 
-输出位置：每轮 `paper-run` 同时生成 `data/execution_stress_<timestamp>.csv`；VPS 隔离运行时输出到 `runtime/data/`。
+输出位置：每轮 `paper-run` 同时生成 `data/execution_stress_<timestamp>.csv` 与 `data/shadow_order_events_<timestamp>.csv`；累计汇总为 `data/execution_stress_report.csv`。VPS 隔离运行时输出到 `runtime/data/`。
 
 | 风险场景 | 当前模拟方式 | 保护动作 |
 | --- | --- | --- |
 | 发单延迟/盘口变差 | 入场 ask 向不利方向增加 `0.0025`、`0.01` | 剩余净 edge 低于 `0.003` 时拒绝新单，不追价 |
-| 部分成交 | 模拟只成交 `50%` 或 `25%` 仓位 | 未成交比例超过 `50%` 时撤销剩余订单，仅管理已成交部分 |
+| 部分成交 | 按 `FAK` 路径模拟只成交 `50%` 或 `25%` 仓位 | 撤销未成交余量；残量超过 `50%` 时禁止追补，仅管理已成交部分 |
 | 签名/鉴权失败 | 订单无法可靠提交 | 不记录持仓，暂停新单 `900` 秒；连续 `3` 次则熔断 |
 | 余额/allowance 不足 | 订单被拒绝 | 不重试追单，暂停新单并要求重新核对可用余额 |
 | 部分成交后撤单失败 | 剩余委托状态未知 | 按最坏敞口预留资金，冻结该市场的新单并先对账 |
 
-这些行中的 `FAIL_SAFE` 不是说策略本身一定失败，而是确认故障发生时系统必须安全停止扩大风险。
+这些行中的 `FAIL_SAFE` 不是说策略本身一定失败，而是确认故障发生时系统必须安全停止扩大风险。部分成交需要撤残单属于可管理的执行路径，不再被误算为候选 edge 失败；`robust_candidates` 只统计基准和延迟价格恶化测试是否通过。
 
 未来实际使用 `FOK` 还是 `FAK` 不能凭直觉决定：`FOK` 会减少残仓管理复杂度，但可能让交易机会大量不成交；`FAK` 提高成交概率，却必须能可靠管理残量和撤单对账。我们先用影子报告比较这种执行摩擦对 edge 的伤害。
 
@@ -45,9 +45,9 @@ tags: #btc #paper-trading #execution #risk
 
 ## 下一步实现顺序
 
-1. 继续在 VPS 积累 `execution_stress` 样本，统计有多少理论候选经延迟/部分成交后被淘汰。
-2. 为 paper 层加入 `PENDING`、`PARTIALLY_FILLED`、`CANCEL_PENDING`、`REJECTED` 状态和预留敞口，不再把所有 TAKER 直接视作完全成交。
-3. 在没有真实资金的条件下做故障注入回放，验证熔断后不会继续累计风险。
+1. 继续在 VPS 积累 `execution_stress_report.csv`，分别统计延迟淘汰的候选和需要撤残单的场景。
+2. 已为影子路径输出 `SUBMITTED`、`PARTIALLY_FILLED`、`CANCEL_PENDING`、`REJECTED` 等事件；下一步把仍未确认的影子订单跨轮持久化并阻止冲突新单。
+3. 在没有真实资金的条件下做跨轮故障注入回放，验证熔断后不会继续累计风险。
 4. 只有当策略 PnL、执行压力通过率、最大回撤、数据链稳定性同时达标，才讨论极小额实盘验证。
 
 ## 当前结论

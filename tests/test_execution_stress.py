@@ -3,7 +3,16 @@ import unittest
 from pathlib import Path
 
 from ploymarket_sim.config import ExecutionStressConfig
-from ploymarket_sim.execution_stress import build_execution_stress_rows, summarize_execution_stress, write_execution_stress_csv
+from ploymarket_sim.execution_stress import (
+    build_execution_stress_rows,
+    build_shadow_order_events,
+    load_execution_stress_history,
+    summarize_execution_stress,
+    summarize_execution_stress_history,
+    write_execution_stress_csv,
+    write_execution_stress_report_csv,
+    write_shadow_order_events_csv,
+)
 from ploymarket_sim.paper import PaperSignalRow
 
 
@@ -35,8 +44,9 @@ class ExecutionStressTests(unittest.TestCase):
 
         self.assertEqual(summary.candidates, 1)
         self.assertEqual(summary.scenarios, 8)
-        self.assertEqual(summary.robust_candidates, 0)
-        self.assertEqual(summary.market_stress_blocks, 1)
+        self.assertEqual(summary.robust_candidates, 1)
+        self.assertEqual(summary.market_stress_blocks, 0)
+        self.assertEqual(summary.partial_fill_cancels, 2)
         self.assertEqual(summary.fail_safe_scenarios, 3)
         self.assertTrue(any(row.scenario == "cancel_failure_after_partial_fill" for row in rows))
 
@@ -53,3 +63,32 @@ class ExecutionStressTests(unittest.TestCase):
 
             self.assertEqual(path, Path(directory) / "execution_stress_123.csv")
             self.assertIn("signature_or_auth_failure", path.read_text(encoding="utf-8"))
+
+    def test_shadow_order_events_reserve_full_exposure_until_cancel_is_confirmed(self) -> None:
+        rows = build_execution_stress_rows([candidate()], ExecutionStressConfig(), 25.0)
+        events = build_shadow_order_events(rows)
+        pending = [event for event in events if event.status == "CANCEL_PENDING"]
+
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0].filled_notional, 12.5)
+        self.assertEqual(pending[0].reserved_exposure, 25.0)
+
+    def test_history_report_counts_latency_survival_separately_from_partial_cancel(self) -> None:
+        rows = build_execution_stress_rows([candidate()], ExecutionStressConfig(), 25.0)
+        with tempfile.TemporaryDirectory() as directory:
+            write_execution_stress_csv(rows, directory, 123)
+            write_shadow_order_events_csv(build_shadow_order_events(rows), directory, 123)
+            summary = summarize_execution_stress_history(load_execution_stress_history(directory))
+            report_path = write_execution_stress_report_csv(summary, directory)
+
+            self.assertEqual(summary.runs, 1)
+            self.assertEqual(summary.robust_candidates, 1)
+            self.assertEqual(summary.partial_fill_cancels, 2)
+            self.assertIn("robust_candidates", report_path.read_text(encoding="utf-8"))
+            self.assertEqual(len(load_execution_stress_history(directory)), len(rows))
+
+    def test_empty_observed_runs_are_retained_in_history_count(self) -> None:
+        summary = summarize_execution_stress_history([], observed_run_count=4)
+
+        self.assertEqual(summary.runs, 4)
+        self.assertEqual(summary.candidates, 0)
