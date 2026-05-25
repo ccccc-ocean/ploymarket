@@ -12,8 +12,11 @@ fi
 trap 'rmdir "$LOCK_DIR"' EXIT
 
 run() {
+  local start_seconds=$SECONDS
+  local step_name="$1"
   env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache \
     python3 -m ploymarket_sim.cli --config "$CONFIG_PATH" "$@"
+  echo "research_cycle_timing | step=${step_name} | elapsed_seconds=$((SECONDS - start_seconds))"
 }
 
 run btc-price
