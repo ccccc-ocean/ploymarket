@@ -11,6 +11,7 @@
 - 生成逐 bar mark-to-market 组合曲线，用价格历史观察持仓期间回撤。
 - 生成模拟订单状态机 CSV，为未来持续模拟盘和实盘订单生命周期做准备。
 - `paper-run` 已区分 `TAKER`、`MAKER`、`SKIP` 执行计划；实时扫描必须使用 live 市场和 live 历史，网络降级时不会把本地 SQLite 缓存当作可交易依据。
+- VPS 实时模拟还会禁用 HTTP stale cache，并用 CLOB 实时 ask/bid 模拟开仓与退出；BTC spot 过期时不允许新开方向仓位。
 - 主回测和 paper-run 已支持 `BUY_NO` 候选，但仍只用于研究和模拟盘，不会下实盘订单。
 - `spread-scan` 会读取 YES/NO 真实订单簿，检查完整组合价差机会，输出 `data/spread_scan.csv`。
 - `flow-scan` 会读取 Polymarket 交易流，观察大额钱包、YES/NO 净资金压力和动态 strike 风险，输出 `data/flow_scan.csv`。

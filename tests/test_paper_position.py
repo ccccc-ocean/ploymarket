@@ -1,9 +1,14 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from ploymarket_sim.btc_price import BtcCandle
 from ploymarket_sim.cli import _paper_position_state_signal
 from ploymarket_sim.cli import _paper_reentry_edge_too_weak
+from ploymarket_sim.cli import _fresh_paper_btc_candles
+from ploymarket_sim.cli import _live_paper_entry_plan
+from ploymarket_sim.clob import TokenQuote
 from ploymarket_sim.config import (
     ApiConfig,
     AppConfig,
@@ -18,6 +23,7 @@ from ploymarket_sim.config import (
     UniverseConfig,
 )
 from ploymarket_sim.polymarket import Market
+from ploymarket_sim.signals import Signal
 from ploymarket_sim.storage import PaperPositionState, Storage
 
 
@@ -72,6 +78,32 @@ def market() -> Market:
 
 
 class PaperPositionTests(unittest.TestCase):
+    def test_stale_btc_candles_are_not_accepted_for_paper_entries(self) -> None:
+        config = app_config("unused.sqlite")
+        candles = [BtcCandle(100, 1.0, 1.0, 1.0, 1.0)]
+
+        self.assertEqual(_fresh_paper_btc_candles(config, candles, 100 + 901), [])
+        self.assertEqual(_fresh_paper_btc_candles(config, candles, 100 + 900), candles)
+
+    def test_live_entry_uses_orderbook_ask(self) -> None:
+        config = app_config("unused.sqlite")
+        signal = Signal("BUY_NO", 1.0, 0.05, 0.04, "edge")
+        with patch("ploymarket_sim.cli.get_token_quote", return_value=TokenQuote("no", bid=0.68, ask=0.70)):
+            repriced_signal, plan = _live_paper_entry_plan(config, market(), signal, config, 0.32)
+
+        self.assertEqual(repriced_signal.action, "BUY_NO")
+        self.assertEqual(plan.mode, "TAKER")
+        self.assertAlmostEqual(plan.limit_price or 0.0, 0.70)
+
+    def test_live_entry_skips_when_orderbook_spread_is_too_wide(self) -> None:
+        config = app_config("unused.sqlite")
+        signal = Signal("BUY_NO", 1.0, 0.05, 0.04, "edge")
+        with patch("ploymarket_sim.cli.get_token_quote", return_value=TokenQuote("no", bid=0.55, ask=0.70)):
+            repriced_signal, plan = _live_paper_entry_plan(config, market(), signal, config, 0.32)
+
+        self.assertEqual(repriced_signal.action, "HOLD")
+        self.assertEqual(plan.mode, "SKIP")
+
     def test_partial_take_profit_keeps_remainder_open(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             config = app_config(str(Path(directory) / "paper.sqlite"))

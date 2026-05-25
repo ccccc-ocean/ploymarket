@@ -11,7 +11,7 @@ from .btc_regime import blocks_directional_entry
 from .btc_price import get_btc_candles, load_btc_candles_csv, merge_btc_candles
 from .cache import CachePolicy, JsonCache
 from .classifier import MARKET_TYPES, is_market_type
-from .clob import get_price_history
+from .clob import get_price_history, get_token_quote
 from .config import load_config
 from .costs import fee_amount, taker_fee_rate
 from .cross_platform import match_btc_markets, print_cross_platform_summary, write_cross_platform_matches_csv
@@ -363,6 +363,7 @@ def _run_paper_scan(config, market_type: str) -> None:
     storage = storage_from_config(config)
     markets = _filter_markets(_paper_markets(config, storage), market_type)
     btc_candles = load_btc_candles_csv(Path(config.backtest.output_dir) / "btc_price_candles.csv")
+    btc_candles = _fresh_paper_btc_candles(config, btc_candles, run_timestamp)
     rows = []
     for market in markets:
         history = _safe_history(config, market, storage, prefer_local=False, use_cache=False, allow_local_fallback=False)
@@ -370,9 +371,9 @@ def _run_paper_scan(config, market_type: str) -> None:
             continue
         storage.save_price_history(market.yes_token_id or "", history)
         market_config = strategy_config_for_market(config, market)
-        state_signal = _paper_position_state_signal(config, storage, market, history[-1].price, run_timestamp)
+        state_signal = _paper_position_signal_with_live_quote(config, storage, market, history[-1].price, run_timestamp)
         if state_signal is not None:
-            execution_plan = plan_execution(market, state_signal, market_config.signal, market_config.backtest, market_config.execution)
+            execution_plan = plan_execution(market, state_signal, market_config.signal, market_config.backtest, market_config.execution, history[-1].price)
             rows.append(build_paper_signal_row(market, state_signal, config.backtest.taker_fee_rate, run_timestamp, execution_plan))
             continue
         if not is_tradeable_market(market):
@@ -403,7 +404,7 @@ def _run_paper_scan(config, market_type: str) -> None:
             blocked, reason = blocks_directional_entry(market, signal, btc_candles, history[-1].timestamp)
             if blocked:
                 signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, reason)
-        execution_plan = plan_execution(market, signal, market_config.signal, market_config.backtest, market_config.execution)
+        signal, execution_plan = _live_paper_entry_plan(config, market, signal, market_config, history[-1].price)
         if execution_plan.mode == "TAKER" and _paper_reentry_edge_too_weak(
             config,
             storage,
@@ -412,9 +413,9 @@ def _run_paper_scan(config, market_type: str) -> None:
             market_config.signal.min_edge,
         ):
             signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, "止盈后重新入场 edge 不够强，避免频繁止盈/再开仓消耗手续费")
-            execution_plan = plan_execution(market, signal, market_config.signal, market_config.backtest, market_config.execution)
+            execution_plan = plan_execution(market, signal, market_config.signal, market_config.backtest, market_config.execution, history[-1].price)
         if execution_plan.mode == "TAKER":
-            _save_paper_position(config, storage, market, execution_plan, history[-1].price, run_timestamp)
+            _save_paper_position(config, storage, market, execution_plan, run_timestamp)
         rows.append(build_paper_signal_row(market, signal, config.backtest.taker_fee_rate, run_timestamp, execution_plan))
     storage.save_paper_snapshots(rows)
     path = write_paper_signal_rows_csv(rows, config.backtest.output_dir, run_timestamp)
@@ -431,13 +432,75 @@ def _paper_markets(config, storage):
     return _discover_live_markets_or_empty(config, storage, "paper-run")
 
 
-def _paper_position_state_signal(config, storage, market, yes_price: float, run_timestamp: int) -> Signal | None:
+def _fresh_paper_btc_candles(config, candles, run_timestamp: int):
+    if not candles:
+        return []
+    max_age_seconds = max(15 * 60, config.signal.history_fidelity_minutes * 60 * 3)
+    age_seconds = max(0, run_timestamp - candles[-1].timestamp)
+    if age_seconds > max_age_seconds:
+        print(
+            f"warning: BTC spot context stale for paper-run: age_seconds={age_seconds} max_age_seconds={max_age_seconds}; blocking new directional entries",
+            file=sys.stderr,
+        )
+        return []
+    return candles
+
+
+def _paper_position_signal_with_live_quote(config, storage, market, yes_price: float, run_timestamp: int) -> Signal | None:
+    position = storage.load_paper_position(market.id)
+    if position is None or position.status != "open":
+        return _paper_position_state_signal(config, storage, market, yes_price, run_timestamp)
+    token_id = market.yes_token_id if position.side == "YES" else market.no_token_id
+    if not token_id:
+        return Signal("HOLD", 0.0, 0.0, 0.0, "已有模拟持仓，但缺少对应 token，无法用实时 bid 退出")
+    try:
+        quote = get_token_quote(config, token_id)
+    except HttpError as exc:
+        return Signal("HOLD", 0.0, 0.0, 0.0, f"已有模拟持仓，但实时 bid 获取失败，暂停退出判断: {exc}")
+    if quote.bid is None:
+        return Signal("HOLD", 0.0, 0.0, 0.0, "已有模拟持仓，但订单簿缺少实时 bid，暂停退出判断")
+    return _paper_position_state_signal(config, storage, market, yes_price, run_timestamp, quote.bid)
+
+
+def _live_paper_entry_plan(config, market, signal, market_config, reference_yes_price: float):
+    default_plan = plan_execution(market, signal, market_config.signal, market_config.backtest, market_config.execution, reference_yes_price)
+    if signal.action not in {"BUY_YES", "BUY_NO"}:
+        return signal, default_plan
+    token_id = market.yes_token_id if signal.action == "BUY_YES" else market.no_token_id
+    if not token_id:
+        hold = Signal("HOLD", 0.0, signal.edge, signal.net_edge, "缺少对应 token，无法读取实时 ask")
+        return hold, plan_execution(market, hold, market_config.signal, market_config.backtest, market_config.execution, reference_yes_price)
+    try:
+        quote = get_token_quote(config, token_id)
+    except HttpError as exc:
+        hold = Signal("HOLD", 0.0, signal.edge, signal.net_edge, f"实时 ask 获取失败，跳过模拟开仓: {exc}")
+        return hold, plan_execution(market, hold, market_config.signal, market_config.backtest, market_config.execution, reference_yes_price)
+    if quote.ask is None:
+        hold = Signal("HOLD", 0.0, signal.edge, signal.net_edge, "订单簿缺少实时 ask，跳过模拟开仓")
+        return hold, plan_execution(market, hold, market_config.signal, market_config.backtest, market_config.execution, reference_yes_price)
+    if quote.spread is None or quote.spread > config.risk.max_spread:
+        hold = Signal("HOLD", 0.0, signal.edge, signal.net_edge, f"实时订单簿价差过宽或不完整，跳过模拟开仓: spread={quote.spread}")
+        return hold, plan_execution(market, hold, market_config.signal, market_config.backtest, market_config.execution, reference_yes_price)
+    reference_side_price = reference_yes_price if signal.action == "BUY_YES" else max(0.0, 1.0 - reference_yes_price)
+    adverse_repricing = max(0.0, quote.ask - reference_side_price)
+    repriced_edge = signal.net_edge - adverse_repricing
+    if repriced_edge < market_config.signal.min_edge:
+        hold = Signal("HOLD", 0.0, signal.edge, repriced_edge, f"实时 ask 重定价后净 edge 不足，跳过模拟开仓: ask={quote.ask:.3f}")
+        return hold, plan_execution(market, hold, market_config.signal, market_config.backtest, market_config.execution, reference_yes_price)
+    repriced_signal = Signal(signal.action, signal.confidence, signal.edge, repriced_edge, f"{signal.reason}; 实时 ask 已确认")
+    return (
+        repriced_signal,
+        plan_execution(market, repriced_signal, market_config.signal, market_config.backtest, market_config.execution, reference_yes_price, quote.ask),
+    )
+
+
+def _paper_position_state_signal(config, storage, market, yes_price: float, run_timestamp: int, current_side_price: float | None = None) -> Signal | None:
     position = storage.load_paper_position(market.id)
     if position is None:
         return None
 
     if position.status == "open":
-        current_price = _paper_side_price(position.side, yes_price)
+        current_price = current_side_price if current_side_price is not None else _paper_side_price(position.side, yes_price)
         peak_price = max(position.peak_price, position.entry_price, current_price)
         pnl_pct = (current_price - position.entry_price) / position.entry_price if position.entry_price > 0 else 0.0
         peak_pnl_pct = (peak_price - position.entry_price) / position.entry_price if position.entry_price > 0 else 0.0
@@ -557,11 +620,11 @@ def _replace_paper_position(position: PaperPositionState, **changes) -> PaperPos
     return PaperPositionState(**values)
 
 
-def _save_paper_position(config, storage, market, execution_plan, yes_price: float, run_timestamp: int) -> None:
+def _save_paper_position(config, storage, market, execution_plan, run_timestamp: int) -> None:
     if execution_plan.side not in {"BUY_YES", "BUY_NO"} or execution_plan.limit_price is None:
         return
     side = "NO" if execution_plan.side == "BUY_NO" else "YES"
-    entry_price = _paper_side_price(side, yes_price)
+    entry_price = execution_plan.limit_price
     entry_fee_rate = taker_fee_rate(entry_price, market.effective_taker_fee_rate(config.backtest.taker_fee_rate))
     slippage_rate = config.backtest.slippage_bps / 10_000
     notional = config.backtest.trade_size_usdc

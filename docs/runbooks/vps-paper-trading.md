@@ -8,7 +8,7 @@ VPS 目前只用于实时公开行情抓取、信号、回测和 paper-run，不
 
 仓库中的 `data/` 包含既有研究结果，不能把它与 VPS 新产生的样本直接混合作为上线依据。服务器运行时使用未提交的 `config/vps.local.toml`：
 
-- HTTP 缓存：`runtime/cache/http/`
+- HTTP 缓存：VPS 实时候选链禁用，不使用 stale HTTP 响应
 - SQLite 存储：`runtime/data/ploymarket.sqlite`
 - 报告输出：`runtime/data/`
 - 运行日志：`logs/`
@@ -22,6 +22,8 @@ scripts/setup_vps_runtime.sh
 
 策略参数仍以 `config/default.toml` 为源；每次更新策略后重新运行初始化脚本，会同步最新参数并只覆盖路径到 VPS 独立目录。
 
+VPS 专用配置还会关闭 HTTP cache 和 live market 回退：实时市场发现失败时该轮不产生开仓候选，不用旧市场池替代。
+
 ## 首轮验证
 
 先手工执行一轮，确认公开 API、数据写入和报告生成都健康：
@@ -33,6 +35,13 @@ tail -n 40 logs/research_cycle.err.log
 ```
 
 首轮结果只说明流水线可运行。需要多日、不同时段和足够交易样本后，才能评估策略是否达到进入小额实盘观察的标准。
+
+实时模拟成交约束：
+
+- BTC spot 每轮从 Coinbase live 请求；若最新 K 线超过 15 分钟，禁止新的方向性开仓。
+- `paper-run` 的 Polymarket 历史价格每轮 live 请求，不使用 HTTP cache 或 SQLite 回退生成交易依据。
+- 产生 BUY 候选后，必须读取对应 YES/NO CLOB 实时订单簿；入场以 ask 模拟，退出判断以 bid 模拟。
+- 实时盘口缺失、价差超过风控阈值、或按 ask 重估后净 edge 不足时，跳过开仓。
 
 ## 定时运行
 

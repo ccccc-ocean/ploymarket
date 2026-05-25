@@ -25,13 +25,14 @@ def plan_execution(
     backtest_config: BacktestConfig,
     execution_config: ExecutionConfig,
     current_price: float | None = None,
+    taker_price: float | None = None,
 ) -> ExecutionPlan:
     price = current_price if current_price is not None else market.yes_price
     if price is None:
         return ExecutionPlan("SKIP", "", None, 0.0, 0.0, "缺少 YES 价格，无法制定执行计划")
 
     if signal.action in {"BUY_YES", "BUY_NO"}:
-        execution_price = price if signal.action == "BUY_YES" else max(0.0, 1.0 - price)
+        execution_price = taker_price if taker_price is not None else (price if signal.action == "BUY_YES" else max(0.0, 1.0 - price))
         fee_rate = market.effective_taker_fee_rate(backtest_config.taker_fee_rate)
         return ExecutionPlan(
             mode="TAKER",
