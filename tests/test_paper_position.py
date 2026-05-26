@@ -8,7 +8,6 @@ from ploymarket_sim.cli import _paper_position_state_signal
 from ploymarket_sim.cli import _paper_reentry_edge_too_weak
 from ploymarket_sim.cli import _fresh_paper_btc_candles
 from ploymarket_sim.cli import _live_paper_entry_plan
-from ploymarket_sim.cli import _paper_execution_stress_blocks_entry
 from ploymarket_sim.cli import _market_discovery_is_healthy
 from ploymarket_sim.cli import _realtime_market_discovery_is_healthy
 from ploymarket_sim.clob import TokenQuote
@@ -26,7 +25,6 @@ from ploymarket_sim.config import (
     UniverseConfig,
 )
 from ploymarket_sim.polymarket import Market
-from ploymarket_sim.paper import PaperSignalRow
 from ploymarket_sim.signals import Signal
 from ploymarket_sim.storage import PaperPositionState, Storage
 
@@ -114,30 +112,6 @@ class PaperPositionTests(unittest.TestCase):
 
         self.assertEqual(repriced_signal.action, "HOLD")
         self.assertEqual(plan.mode, "SKIP")
-
-    def test_execution_stress_blocks_thin_edge_before_new_paper_position(self) -> None:
-        config = app_config("unused.sqlite")
-        thin_candidate = PaperSignalRow(
-            123, "m1", "price_range_daily", "BTC above 78000?", 0.4, 0.02,
-            "BUY_NO", 1.0, 0.01, 0.002, "edge", "TAKER", "BUY_NO", 0.7, 0.002, "live ask",
-        )
-
-        blocked, reason = _paper_execution_stress_blocks_entry(config, thin_candidate)
-
-        self.assertTrue(blocked)
-        self.assertIn("执行压力拒绝开仓", reason)
-
-    def test_execution_stress_allows_edge_that_survives_latency_price_move(self) -> None:
-        config = app_config("unused.sqlite")
-        candidate = PaperSignalRow(
-            123, "m1", "price_range_daily", "BTC above 78000?", 0.4, 0.02,
-            "BUY_NO", 1.0, 0.05, 0.02, "edge", "TAKER", "BUY_NO", 0.7, 0.02, "live ask",
-        )
-
-        blocked, reason = _paper_execution_stress_blocks_entry(config, candidate)
-
-        self.assertFalse(blocked)
-        self.assertEqual(reason, "")
 
     def test_partial_take_profit_keeps_remainder_open(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

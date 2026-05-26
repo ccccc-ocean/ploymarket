@@ -273,10 +273,10 @@ Maker 参数位于 `config/default.toml` 的 `[execution]` 区块。当前默认
 - `latency_adverse_*` 用价格向不利方向变化模拟发单与网络延迟，edge 不再过线时标记 `REJECT_NEW_ORDER`。
 - `partial_fill_*` 模拟只成交部分仓位，未成交残量超过阈值时标记 `CANCEL_REMAINDER`。
 - `signature_or_auth_failure`、`balance_or_allowance_failure`、`cancel_failure_after_partial_fill` 模拟操作故障，并给出暂停新单或冻结单市场的 fail-safe 动作。
-- `shadow_order_events_<timestamp>.csv` 输出 `SUBMITTED`、`FILLED`、`PARTIALLY_FILLED`、`CANCELED_REMAINDER`、`CANCEL_PENDING` 与 `REJECTED` 事件；撤单待确认时仍预留完整名义敞口。
+- `shadow_order_events_<timestamp>.csv` 输出 `SUBMITTED`、`FILLED`、`CANCELED_UNFILLED`、`PARTIALLY_FILLED`、`CANCELED_REMAINDER`、`CANCEL_PENDING` 与 `REJECTED` 事件；撤单待确认时仍预留完整名义敞口。
 - `execution_stress_report.csv` 汇总所有实时轮次的候选数、延迟压力通过数、部分成交撤单数和 fail-safe 数。
 
-延迟价格压力目前已作为新开 paper 持仓的前置安全闸：拟 `TAKER` 若无法通过基准及不利价格场景，不会建立新持仓，但仍写入压力报告供复盘。订单故障事件仍是影子评估，不发送订单；下一步需将跨轮未确认影子订单持久化并验证阻止冲突新单。
+主 paper 路径以实时 ask 下可立即成交作为基线；延迟恶化、`FOK` 未成交、`FAK` 部分成交和订单故障作为并行影子评估，不再用固定压力情景直接删除主策略样本。系统不发送真实订单；下一步需为执行路径分别计算 PnL，并将跨轮未确认影子订单持久化。
 
 ### 风控
 

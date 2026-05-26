@@ -43,12 +43,14 @@ class ExecutionStressTests(unittest.TestCase):
         summary = summarize_execution_stress(rows)
 
         self.assertEqual(summary.candidates, 1)
-        self.assertEqual(summary.scenarios, 8)
+        self.assertEqual(summary.scenarios, 9)
         self.assertEqual(summary.robust_candidates, 1)
         self.assertEqual(summary.market_stress_blocks, 0)
         self.assertEqual(summary.partial_fill_cancels, 2)
+        self.assertEqual(summary.no_fill_scenarios, 1)
         self.assertEqual(summary.fail_safe_scenarios, 3)
         self.assertTrue(any(row.scenario == "cancel_failure_after_partial_fill" for row in rows))
+        self.assertTrue(any(row.scenario == "fok_unfilled_no_liquidity" for row in rows))
 
     def test_latency_slippage_blocks_edge_that_does_not_survive(self) -> None:
         rows = build_execution_stress_rows([candidate(0.005)], ExecutionStressConfig(), 25.0)
@@ -68,10 +70,13 @@ class ExecutionStressTests(unittest.TestCase):
         rows = build_execution_stress_rows([candidate()], ExecutionStressConfig(), 25.0)
         events = build_shadow_order_events(rows)
         pending = [event for event in events if event.status == "CANCEL_PENDING"]
+        unfilled = [event for event in events if event.status == "CANCELED_UNFILLED"]
 
         self.assertEqual(len(pending), 1)
         self.assertEqual(pending[0].filled_notional, 12.5)
         self.assertEqual(pending[0].reserved_exposure, 25.0)
+        self.assertEqual(len(unfilled), 1)
+        self.assertEqual(unfilled[0].filled_notional, 0.0)
 
     def test_history_report_counts_latency_survival_separately_from_partial_cancel(self) -> None:
         rows = build_execution_stress_rows([candidate()], ExecutionStressConfig(), 25.0)
@@ -84,6 +89,7 @@ class ExecutionStressTests(unittest.TestCase):
             self.assertEqual(summary.runs, 1)
             self.assertEqual(summary.robust_candidates, 1)
             self.assertEqual(summary.partial_fill_cancels, 2)
+            self.assertEqual(summary.no_fill_scenarios, 1)
             self.assertIn("robust_candidates", report_path.read_text(encoding="utf-8"))
             self.assertEqual(len(load_execution_stress_history(directory)), len(rows))
 

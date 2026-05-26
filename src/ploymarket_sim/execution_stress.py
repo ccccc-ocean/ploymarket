@@ -34,6 +34,7 @@ class ExecutionStressSummary:
     robust_candidates: int
     market_stress_blocks: int
     partial_fill_cancels: int
+    no_fill_scenarios: int
     fail_safe_scenarios: int
 
 
@@ -59,6 +60,7 @@ class ExecutionStressHistory:
     robust_candidates: int
     latency_blocked_candidates: int
     partial_fill_cancels: int
+    no_fill_scenarios: int
     fail_safe_scenarios: int
 
 
@@ -81,6 +83,7 @@ def build_execution_stress_rows(
         for fill_fraction in config.partial_fill_fractions:
             label = f"partial_fill_{fill_fraction:.2f}"
             rows.append(_market_stress_row(candidate, label, 0.0, fill_fraction, config, trade_size_usdc))
+        rows.append(_no_fill_row(candidate, trade_size_usdc))
         rows.extend(_operational_failure_rows(candidate, config, trade_size_usdc))
     return rows
 
@@ -100,6 +103,7 @@ def summarize_execution_stress(rows: list[ExecutionStressRow]) -> ExecutionStres
         partial_fill_cancels=len(
             [row for row in rows if row.scenario.startswith("partial_fill_") and row.control_action == "CANCEL_REMAINDER"]
         ),
+        no_fill_scenarios=len([row for row in rows if row.outcome == "NO_FILL"]),
         fail_safe_scenarios=len([row for row in rows if row.outcome == "FAIL_SAFE"]),
     )
 
@@ -172,6 +176,13 @@ def build_shadow_order_events(rows: list[ExecutionStressRow]) -> list[ShadowOrde
                     _event(row, 1, "SUBMITTED", 0.0, requested),
                     _event(row, 2, "PARTIALLY_FILLED", row.filled_notional, row.filled_notional),
                     _event(row, 3, "CANCELED_REMAINDER", row.filled_notional, row.filled_notional),
+                ]
+            )
+        elif row.outcome == "NO_FILL":
+            events.extend(
+                [
+                    _event(row, 1, "SUBMITTED", 0.0, requested),
+                    _event(row, 2, "CANCELED_UNFILLED", 0.0, 0.0),
                 ]
             )
         elif row.scenario == "cancel_failure_after_partial_fill":
@@ -278,6 +289,7 @@ def summarize_execution_stress_history(
         partial_fill_cancels=len(
             [row for row in rows if row.scenario.startswith("partial_fill_") and row.control_action == "CANCEL_REMAINDER"]
         ),
+        no_fill_scenarios=len([row for row in rows if row.outcome == "NO_FILL"]),
         fail_safe_scenarios=len([row for row in rows if row.outcome == "FAIL_SAFE"]),
     )
 
@@ -295,6 +307,7 @@ def write_execution_stress_report_csv(summary: ExecutionStressHistory, output_di
                 "robust_candidates",
                 "latency_blocked_candidates",
                 "partial_fill_cancels",
+                "no_fill_scenarios",
                 "fail_safe_scenarios",
             ]
         )
@@ -305,6 +318,7 @@ def write_execution_stress_report_csv(summary: ExecutionStressHistory, output_di
                 summary.robust_candidates,
                 summary.latency_blocked_candidates,
                 summary.partial_fill_cancels,
+                summary.no_fill_scenarios,
                 summary.fail_safe_scenarios,
             ]
         )
@@ -374,6 +388,26 @@ def _operational_failure_rows(
             fill_fraction=0.5,
         ),
     ]
+
+
+def _no_fill_row(candidate: PaperSignalRow, trade_size_usdc: float) -> ExecutionStressRow:
+    return ExecutionStressRow(
+        run_timestamp=candidate.run_timestamp,
+        market_id=candidate.market_id,
+        question=candidate.question,
+        side=candidate.execution_side,
+        scenario="fok_unfilled_no_liquidity",
+        reference_price=float(candidate.limit_price or 0.0),
+        stressed_price=None,
+        expected_net_edge=candidate.expected_net_edge,
+        stressed_net_edge=None,
+        fill_fraction=0.0,
+        filled_notional=0.0,
+        unfilled_notional=trade_size_usdc,
+        outcome="NO_FILL",
+        control_action="NO_POSITION",
+        reason="模拟 FOK 因可成交深度不足而整笔不成交，不建立仓位",
+    )
 
 
 def _fail_safe_row(
