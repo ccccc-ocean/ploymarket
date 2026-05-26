@@ -17,7 +17,7 @@ from .costs import fee_amount, taker_fee_rate
 from .cross_platform import match_btc_markets, print_cross_platform_summary, write_cross_platform_matches_csv
 from .daily_report import build_daily_report, write_daily_report_csv
 from .edge_report import build_edge_buckets, load_alignment_rows_csv
-from .execution import plan_execution
+from .execution import ExecutionPlan, plan_execution
 from .execution_stress import (
     build_execution_stress_rows,
     build_shadow_order_events,
@@ -375,6 +375,7 @@ def _run_paper_scan(config, market_type: str) -> None:
     btc_candles = load_btc_candles_csv(Path(config.backtest.output_dir) / "btc_price_candles.csv")
     btc_candles = _fresh_paper_btc_candles(config, btc_candles, run_timestamp)
     rows = []
+    stress_candidates = []
     for market in markets:
         history = _safe_history(config, market, storage, prefer_local=False, use_cache=False, allow_local_fallback=False)
         if not history:
@@ -425,6 +426,15 @@ def _run_paper_scan(config, market_type: str) -> None:
             signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, "止盈后重新入场 edge 不够强，避免频繁止盈/再开仓消耗手续费")
             execution_plan = plan_execution(market, signal, market_config.signal, market_config.backtest, market_config.execution, history[-1].price)
         if execution_plan.mode == "TAKER":
+            stress_candidate = build_paper_signal_row(
+                market, signal, config.backtest.taker_fee_rate, run_timestamp, execution_plan
+            )
+            stress_candidates.append(stress_candidate)
+            blocked, reason = _paper_execution_stress_blocks_entry(config, stress_candidate)
+            if blocked:
+                signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, reason)
+                execution_plan = ExecutionPlan("SKIP", "", None, 0.0, stress_candidate.expected_net_edge, reason)
+        if execution_plan.mode == "TAKER":
             _save_paper_position(config, storage, market, execution_plan, run_timestamp)
         rows.append(build_paper_signal_row(market, signal, config.backtest.taker_fee_rate, run_timestamp, execution_plan))
     storage.save_paper_snapshots(rows)
@@ -437,7 +447,9 @@ def _run_paper_scan(config, market_type: str) -> None:
         f"maker={summary['maker']} | skip={summary['skip']} | {path}"
     )
     if config.execution_stress.enabled:
-        stress_rows = build_execution_stress_rows(rows, config.execution_stress, config.backtest.trade_size_usdc)
+        stress_rows = build_execution_stress_rows(
+            stress_candidates, config.execution_stress, config.backtest.trade_size_usdc
+        )
         stress_path = write_execution_stress_csv(stress_rows, config.backtest.output_dir, run_timestamp)
         stress_summary = summarize_execution_stress(stress_rows)
         event_path = write_shadow_order_events_csv(
@@ -464,6 +476,24 @@ def _run_paper_scan(config, market_type: str) -> None:
 
 def _paper_markets(config, storage):
     return _discover_live_markets_or_empty(config, storage, "paper-run")
+
+
+def _paper_execution_stress_blocks_entry(config, candidate) -> tuple[bool, str]:
+    if not config.execution_stress.enabled:
+        return False, ""
+    rows = build_execution_stress_rows([candidate], config.execution_stress, config.backtest.trade_size_usdc)
+    summary = summarize_execution_stress(rows)
+    if summary.robust_candidates == 1:
+        return False, ""
+    failed_scenarios = [
+        row.scenario
+        for row in rows
+        if row.outcome == "BLOCK" and (row.scenario == "baseline" or row.scenario.startswith("latency_adverse_"))
+    ]
+    reason = "执行压力拒绝开仓：实时 ask 候选无法在延迟价格恶化后保留最低净 edge"
+    if failed_scenarios:
+        reason += f" ({', '.join(failed_scenarios)})"
+    return True, reason
 
 
 def _fresh_paper_btc_candles(config, candles, run_timestamp: int):

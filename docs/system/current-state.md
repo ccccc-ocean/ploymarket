@@ -276,7 +276,7 @@ Maker 参数位于 `config/default.toml` 的 `[execution]` 区块。当前默认
 - `shadow_order_events_<timestamp>.csv` 输出 `SUBMITTED`、`FILLED`、`PARTIALLY_FILLED`、`CANCELED_REMAINDER`、`CANCEL_PENDING` 与 `REJECTED` 事件；撤单待确认时仍预留完整名义敞口。
 - `execution_stress_report.csv` 汇总所有实时轮次的候选数、延迟压力通过数、部分成交撤单数和 fail-safe 数。
 
-这些报告目前是影子评估，不改写主 paper PnL，也不发送订单。部分成交的可控撤余单不再错误降低 `robust` 指标；下一步需将跨轮未确认影子订单持久化并验证阻止冲突新单。
+延迟价格压力目前已作为新开 paper 持仓的前置安全闸：拟 `TAKER` 若无法通过基准及不利价格场景，不会建立新持仓，但仍写入压力报告供复盘。订单故障事件仍是影子评估，不发送订单；下一步需将跨轮未确认影子订单持久化并验证阻止冲突新单。
 
 ### 风控
 

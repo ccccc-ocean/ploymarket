@@ -42,7 +42,7 @@ tail -n 40 logs/research_cycle.err.log
 - `paper-run` 的 Polymarket 历史价格每轮 live 请求，不使用 HTTP cache 或 SQLite 回退生成交易依据。
 - 产生 BUY 候选后，必须读取对应 YES/NO CLOB 实时订单簿；入场以 ask 模拟，退出判断以 bid 模拟。
 - 实时盘口缺失、价差超过风控阈值、或按 ask 重估后净 edge 不足时，跳过开仓。
-- 每个 `TAKER` 候选还会写入 `execution_stress_<timestamp>.csv` 与 `shadow_order_events_<timestamp>.csv`，影子模拟延迟价格恶化、部分成交和操作失败；`execution_stress_report.csv` 累计汇总这些结果。报告不发送订单，也暂不改写主 paper PnL。
+- 每个拟 `TAKER` 候选还会写入 `execution_stress_<timestamp>.csv` 与 `shadow_order_events_<timestamp>.csv`；延迟价格恶化测试不通过时，paper 新开仓会直接转为 `SKIP`，但候选仍被审计。`execution_stress_report.csv` 累计汇总这些结果；系统仍不发送真实订单。
 
 ## 定时运行
 
@@ -84,7 +84,7 @@ ls -t runtime/data/shadow_order_events_*.csv | head -n 1 | xargs cat
 - `paper_report.csv` 中 `paper_runs` 是否稳定增加，实时扫描是否覆盖足够市场。
 - `daily_report.csv` 和 `portfolio_mtm_summary.csv` 中的 `PnL` 与最大回撤是否在新样本期内稳定。
 - `TAKER` 信号是否过度集中于一个市场或一个 strike。
-- `execution_stress` 中候选在延迟价格恶化后是否仍通过，若理论 TAKER 多但 `robust` 长期为零，则不能进入实盘；部分成交撤残单需单独观察其发生频率。
+- `execution_stress` 中候选在延迟价格恶化后是否仍通过；若理论候选多但 `robust` 长期为零，安全闸会持续拒绝模拟新仓，更不能进入实盘。部分成交撤残单需单独观察其发生频率。
 
 ## 实盘边界
 
