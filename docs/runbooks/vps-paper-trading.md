@@ -23,6 +23,7 @@ scripts/setup_vps_runtime.sh
 策略参数仍以 `config/default.toml` 为源；每次更新策略后重新运行初始化脚本，会同步最新参数并只覆盖路径到 VPS 独立目录。
 
 VPS 专用配置还会关闭 HTTP cache 和 live market 回退：实时市场发现失败时该轮不产生开仓候选，不用旧市场池替代。
+实时健康检查依据当轮返回的活跃 live BTC 市场覆盖数量，而不是与 SQLite 中不断积累的历史研究市场总量比较；否则历史样本增长会错误停止实时扫描。
 
 ## 首轮验证
 

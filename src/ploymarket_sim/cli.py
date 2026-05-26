@@ -334,7 +334,7 @@ def _discover_live_markets_or_empty(config, storage, purpose: str):
     except Exception as exc:
         print(f"warning: live market discovery failed for {purpose}: {exc}", file=sys.stderr)
         live_markets = []
-    if _market_discovery_is_healthy(live_markets, local_markets):
+    if _realtime_market_discovery_is_healthy(live_markets):
         storage.save_markets(live_markets)
         return live_markets
     if live_markets:
@@ -359,6 +359,12 @@ def _market_discovery_is_healthy(live_markets, local_markets) -> bool:
     if len(live_markets) >= 10:
         return not local_markets or len(live_markets) >= len(local_markets) * 0.5
     return bool(live_markets) and not local_markets
+
+
+def _realtime_market_discovery_is_healthy(live_markets) -> bool:
+    # The local store accumulates expired/research markets and is not a valid
+    # coverage baseline for current live-only trading decisions.
+    return len(live_markets) >= 10
 
 
 def _fresh_live_markets(config, storage):

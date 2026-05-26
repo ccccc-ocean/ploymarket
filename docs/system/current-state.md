@@ -41,7 +41,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-
 - 存储价格历史点。
 - 可以从 SQLite 读取已存市场和价格历史。
 - `discover`、`signals`、`backtest` 会自动写入。
-- `paper-run` 和 `spread-scan` 是实时扫描：必须使用 live 市场；VPS 严格实时配置的 `fresh_market_ttl_seconds=0`，live discovery 抖动时不生成新开仓依据。
+- `paper-run` 和 `spread-scan` 是实时扫描：必须使用 live 市场；VPS 严格实时配置的 `fresh_market_ttl_seconds=0`，live discovery 不足时不生成新开仓依据。实时健康度只检查本轮活跃 live 覆盖，不拿不断累积的历史研究市场数当分母。
 - `paper-run` 的价格历史和 `spread-scan` 的订单簿仍必须实时拉取；历史缓存只用于离线研究和回测。
 - `kalshi-discover` 是 Kalshi 只读公开市场发现，当前只抓 BTC 相关市场，不登录、不签名、不下单。
 - `cross-platform-report` 会把 Polymarket/Kalshi BTC 市场按 strike、方向和日期归一化匹配，输出 `data/cross_platform_matches.csv`；当前是跨平台快照匹配，还不是 Kalshi 历史回测。
