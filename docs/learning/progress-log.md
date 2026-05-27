@@ -1626,6 +1626,7 @@ watchdog 可以自行恢复短暂网络故障、任务卡死和遗留锁，但�
 ### 已调整
 
 - 无人值守实时链运行 `paper-run --market-type all` 时，只要没有写出任何 live 市场观察，就以失败退出；watchdog 会识别并重试，`daily-report` 也无法将这类空轮作为健康依据。
+- 新增 `paper_position_history` 已关闭仓位账本；`paper_positions` 继续承担当前状态和冷却控制，同一市场止盈后再开仓不再覆盖历史已实现盈亏。
 - Gamma 旧分页端点已返回弃用提示，官方推荐 `/markets/keyset` cursor 分页；初步探测中直接携带现有排序参数迁移会出现服务端错误，因此暂不仓促替换，后续需做市场覆盖对照后上线。
 
 ### 判断

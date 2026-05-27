@@ -126,6 +126,29 @@ class StorageTests(unittest.TestCase):
             assert closed is not None
             self.assertEqual(closed.status, "closed")
             self.assertEqual(closed.cooldown_until, 4056)
+            history = storage.load_closed_paper_position_history()
+            self.assertEqual(len(history), 1)
+            self.assertAlmostEqual(history[0].realized_pnl, 1.5)
+            storage.save_open_paper_position(
+                PaperPositionState(
+                    market_id="m1",
+                    side="NO",
+                    entry_price=0.6,
+                    shares=10,
+                    notional=6,
+                    opened_at=789,
+                    status="open",
+                    closed_at=None,
+                    realized_pnl=0.0,
+                    cooldown_until=0,
+                    peak_price=0.6,
+                    partial_take_profit_count=0,
+                )
+            )
+            storage.close_paper_position("m1", 900, -1.0, 4500)
+            history = storage.load_closed_paper_position_history()
+            self.assertEqual(len(history), 2)
+            self.assertAlmostEqual(sum(position.realized_pnl for position in history), 0.5)
 
     def test_disabled_storage_reports_zero_counts(self) -> None:
         storage = Storage(False, "unused.sqlite")

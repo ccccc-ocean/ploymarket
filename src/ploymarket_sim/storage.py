@@ -150,6 +150,25 @@ class Storage:
                 )
                 """
             )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS paper_position_history (
+                    market_id TEXT NOT NULL,
+                    side TEXT NOT NULL,
+                    entry_price REAL NOT NULL,
+                    shares REAL NOT NULL,
+                    notional REAL NOT NULL,
+                    opened_at INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    closed_at INTEGER NOT NULL,
+                    realized_pnl REAL NOT NULL,
+                    cooldown_until INTEGER NOT NULL,
+                    peak_price REAL NOT NULL DEFAULT 0,
+                    partial_take_profit_count INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (market_id, opened_at)
+                )
+                """
+            )
             _ensure_column(connection, "paper_positions", "peak_price", "REAL NOT NULL DEFAULT 0")
             _ensure_column(connection, "paper_positions", "partial_take_profit_count", "INTEGER NOT NULL DEFAULT 0")
             connection.execute(
@@ -157,6 +176,18 @@ class Storage:
                 UPDATE paper_positions
                 SET peak_price = entry_price
                 WHERE status = 'open' AND peak_price <= 0
+                """
+            )
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO paper_position_history (
+                    market_id, side, entry_price, shares, notional, opened_at,
+                    status, closed_at, realized_pnl, cooldown_until, peak_price, partial_take_profit_count
+                )
+                SELECT market_id, side, entry_price, shares, notional, opened_at,
+                       status, closed_at, realized_pnl, cooldown_until, peak_price, partial_take_profit_count
+                FROM paper_positions
+                WHERE status = 'closed' AND closed_at IS NOT NULL
                 """
             )
 
@@ -513,6 +544,25 @@ class Storage:
                 """,
                 (closed_at, realized_pnl, cooldown_until, market_id),
             )
+            connection.execute(
+                """
+                INSERT INTO paper_position_history (
+                    market_id, side, entry_price, shares, notional, opened_at,
+                    status, closed_at, realized_pnl, cooldown_until, peak_price, partial_take_profit_count
+                )
+                SELECT market_id, side, entry_price, shares, notional, opened_at,
+                       status, closed_at, realized_pnl, cooldown_until, peak_price, partial_take_profit_count
+                FROM paper_positions
+                WHERE market_id = ? AND status = 'closed' AND closed_at IS NOT NULL
+                ON CONFLICT(market_id, opened_at) DO UPDATE SET
+                    closed_at=excluded.closed_at,
+                    realized_pnl=excluded.realized_pnl,
+                    cooldown_until=excluded.cooldown_until,
+                    peak_price=excluded.peak_price,
+                    partial_take_profit_count=excluded.partial_take_profit_count
+                """,
+                (market_id,),
+            )
 
     def load_paper_position(self, market_id: str) -> PaperPositionState | None:
         if not self.enabled or not Path(self.sqlite_path).exists():
@@ -544,6 +594,37 @@ class Storage:
             peak_price=float(row[10]),
             partial_take_profit_count=int(row[11]),
         )
+
+    def load_closed_paper_position_history(self) -> list[PaperPositionState]:
+        if not self.enabled or not Path(self.sqlite_path).exists():
+            return []
+        self.init()
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT market_id, side, entry_price, shares, notional, opened_at,
+                       status, closed_at, realized_pnl, cooldown_until, peak_price, partial_take_profit_count
+                FROM paper_position_history
+                ORDER BY closed_at, market_id, opened_at
+                """
+            ).fetchall()
+        return [
+            PaperPositionState(
+                market_id=str(row[0]),
+                side=str(row[1]),
+                entry_price=float(row[2]),
+                shares=float(row[3]),
+                notional=float(row[4]),
+                opened_at=int(row[5]),
+                status=str(row[6]),
+                closed_at=int(row[7]),
+                realized_pnl=float(row[8]),
+                cooldown_until=int(row[9]),
+                peak_price=float(row[10]),
+                partial_take_profit_count=int(row[11]),
+            )
+            for row in rows
+        ]
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.sqlite_path)
