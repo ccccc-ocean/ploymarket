@@ -50,6 +50,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-
 - `paper_snapshots` 保存每轮模拟盘信号和执行计划。
 - `paper_positions` 保存实时模拟盘的同市场持仓状态；已有模拟持仓时不会每轮重复 TAKER，分批止盈会降低仓位，止盈后短冷却，止损后长冷却。
 - `paper_position_history` 保存每笔已关闭模拟仓位的历史快照；同市场冷却后重新开仓不再覆盖此前的已实现盈亏记录。
+- `paper-run` 的新开仓候选必须来自当轮 live discovery；但任何尚未关闭的模拟仓位即使不在当轮发现列表中，也必须继续用实时历史和订单簿检查退出条件，避免风险敞口失去监控。
 - `stale_tokens` 记录最近 CLOB 404 的 token，避免 `spread-scan` 反复扫描已失效订单簿。
 - 默认路径：`data/ploymarket.sqlite`
 - SQLite 文件已加入 `.gitignore`。

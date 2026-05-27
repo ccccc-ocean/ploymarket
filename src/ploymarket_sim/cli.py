@@ -377,7 +377,8 @@ def _fresh_live_markets(config, storage):
 def _run_paper_scan(config, market_type: str) -> None:
     run_timestamp = int(time())
     storage = storage_from_config(config)
-    markets = _filter_markets(_paper_markets(config, storage), market_type)
+    live_markets = _filter_markets(_paper_markets(config, storage), market_type)
+    markets = _paper_markets_including_open_positions(storage, live_markets, market_type)
     btc_candles = load_btc_candles_csv(Path(config.backtest.output_dir) / "btc_price_candles.csv")
     btc_candles = _fresh_paper_btc_candles(config, btc_candles, run_timestamp)
     rows = []
@@ -476,7 +477,7 @@ def _run_paper_scan(config, market_type: str) -> None:
             f"fail_safe={history.fail_safe_scenarios} | "
             f"{history_path}"
         )
-    if _paper_run_data_degraded(market_type, rows):
+    if _paper_run_data_degraded(market_type, live_markets):
         raise SystemExit("paper-run realtime data degraded: no live market observations written")
 
 
@@ -484,10 +485,19 @@ def _paper_markets(config, storage):
     return _discover_live_markets_or_empty(config, storage, "paper-run")
 
 
-def _paper_run_data_degraded(market_type: str, rows: list[dict]) -> bool:
+def _paper_markets_including_open_positions(storage, live_markets, market_type: str):
+    by_id = {market.id: market for market in live_markets}
+    open_market_ids = storage.load_open_paper_market_ids()
+    for market in _filter_markets(storage.load_markets(), market_type):
+        if market.id in open_market_ids and market.id not in by_id:
+            by_id[market.id] = market
+    return list(by_id.values())
+
+
+def _paper_run_data_degraded(market_type: str, live_markets: list) -> bool:
     # The unattended live cycle scans all markets; an empty all-market run
-    # means market discovery or live quotes failed, not a valid no-trade tick.
-    return market_type == "all" and not rows
+    # means market discovery failed even if stored open positions were checked.
+    return market_type == "all" and not live_markets
 
 
 def _fresh_paper_btc_candles(config, candles, run_timestamp: int):

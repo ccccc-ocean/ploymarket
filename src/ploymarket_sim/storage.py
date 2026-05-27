@@ -595,6 +595,20 @@ class Storage:
             partial_take_profit_count=int(row[11]),
         )
 
+    def load_open_paper_market_ids(self) -> set[str]:
+        if not self.enabled or not Path(self.sqlite_path).exists():
+            return set()
+        self.init()
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT market_id
+                FROM paper_positions
+                WHERE status = 'open'
+                """
+            ).fetchall()
+        return {str(row[0]) for row in rows}
+
     def load_closed_paper_position_history(self) -> list[PaperPositionState]:
         if not self.enabled or not Path(self.sqlite_path).exists():
             return []

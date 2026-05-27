@@ -10,6 +10,7 @@ from ploymarket_sim.cli import _fresh_paper_btc_candles
 from ploymarket_sim.cli import _live_paper_entry_plan
 from ploymarket_sim.cli import _market_discovery_is_healthy
 from ploymarket_sim.cli import _paper_run_data_degraded
+from ploymarket_sim.cli import _paper_markets_including_open_positions
 from ploymarket_sim.cli import _realtime_market_discovery_is_healthy
 from ploymarket_sim.clob import TokenQuote
 from ploymarket_sim.config import (
@@ -109,7 +110,34 @@ class PaperPositionTests(unittest.TestCase):
     def test_empty_all_market_paper_run_is_a_live_pipeline_failure(self) -> None:
         self.assertTrue(_paper_run_data_degraded("all", []))
         self.assertFalse(_paper_run_data_degraded("price_target", []))
-        self.assertFalse(_paper_run_data_degraded("all", [{"market_id": "m1"}]))
+        self.assertFalse(_paper_run_data_degraded("all", [market()]))
+
+    def test_open_position_market_is_monitored_when_not_in_live_discovery(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = app_config(str(Path(directory) / "paper.sqlite"))
+            storage = Storage(True, config.storage.sqlite_path)
+            stored_market = target_market()
+            storage.save_markets([stored_market])
+            storage.save_open_paper_position(
+                PaperPositionState(
+                    market_id=stored_market.id,
+                    side="YES",
+                    entry_price=0.7,
+                    shares=10.0,
+                    notional=7.0,
+                    opened_at=100,
+                    status="open",
+                    closed_at=None,
+                    realized_pnl=0.0,
+                    cooldown_until=0,
+                    peak_price=0.7,
+                    partial_take_profit_count=0,
+                )
+            )
+
+            markets = _paper_markets_including_open_positions(storage, [market()], "all")
+
+            self.assertEqual({item.id for item in markets}, {"m1", "target-1"})
 
     def test_stale_btc_candles_are_not_accepted_for_paper_entries(self) -> None:
         config = app_config("unused.sqlite")

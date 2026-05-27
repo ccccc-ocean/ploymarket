@@ -96,6 +96,7 @@ class StorageTests(unittest.TestCase):
             )
             position = storage.load_paper_position("m1")
             self.assertIsNotNone(position)
+            self.assertEqual(storage.load_open_paper_market_ids(), {"m1"})
             assert position is not None
             self.assertEqual(position.side, "NO")
             self.assertEqual(position.peak_price, 0.7)
@@ -126,6 +127,7 @@ class StorageTests(unittest.TestCase):
             assert closed is not None
             self.assertEqual(closed.status, "closed")
             self.assertEqual(closed.cooldown_until, 4056)
+            self.assertEqual(storage.load_open_paper_market_ids(), set())
             history = storage.load_closed_paper_position_history()
             self.assertEqual(len(history), 1)
             self.assertAlmostEqual(history[0].realized_pnl, 1.5)
