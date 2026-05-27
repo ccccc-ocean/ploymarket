@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-mkdir -p runtime/cache/http runtime/data logs
+mkdir -p runtime/cache/http runtime/data/health logs
 sed \
   -e '/^\[cache\]/,/^\[/{ s/^enabled = true$/enabled = false/; s/^ttl_seconds = 900$/ttl_seconds = 0/; s/^stale_if_error = true$/stale_if_error = false/; }' \
   -e '/^\[storage\]/,/^\[/{ s/^fresh_market_ttl_seconds = 900$/fresh_market_ttl_seconds = 0/; }' \

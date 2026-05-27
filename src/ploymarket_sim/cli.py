@@ -942,6 +942,7 @@ def _run_daily_report(config) -> None:
         f"daily_report | readiness={report.readiness} | paper_runs={report.paper_runs} | "
         f"trades={report.replay_trade_count} | pnl={report.replay_pnl:.2f} | "
         f"max_drawdown={report.replay_max_drawdown:.1%} | "
+        f"live_health={report.live_pipeline_healthy}/{report.live_pipeline_reason} | "
         f"spread_buy_both={report.spread_buy_both_count} | best_buy_edge={report.spread_best_buy_edge:.4f} | "
         f"reason={report.reason}"
     )

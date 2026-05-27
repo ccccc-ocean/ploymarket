@@ -11,6 +11,7 @@ VPS 目前只用于实时公开行情抓取、信号、回测和 paper-run，不
 - HTTP 缓存：VPS 实时候选链禁用，不使用 stale HTTP 响应
 - SQLite 存储：`runtime/data/ploymarket.sqlite`
 - 报告输出：`runtime/data/`
+- 健康状态与恢复事件：`runtime/data/health/`
 - 运行日志：`logs/`
 
 初始化目录和配置：
@@ -47,7 +48,7 @@ tail -n 40 logs/research_cycle.err.log
 
 ## 定时运行
 
-安装用户级 `cron`，默认每 5 分钟运行实时模拟链、每小时运行一次深度研究链：
+安装用户级 `cron`，默认每 5 分钟运行实时模拟链、每小时运行一次深度研究链，并在每个五分钟窗口的第 2 分钟执行 watchdog：
 
 ```bash
 scripts/install_research_cycle_cron.sh
@@ -62,7 +63,19 @@ crontab -l
 scripts/install_research_cycle_cron.sh '*/10 * * * *' '27 * * * *'
 ```
 
-两条链各自包含进程锁；如果同类型上一轮仍未结束，新的 tick 会跳过而不是并行污染数据。
+两条链各自包含进程锁与状态文件；如果同类型上一轮仍在健康执行，新的 tick 会跳过而不是并行污染数据。
+
+## 自动发现与恢复
+
+每次执行会原子写入 `runtime/data/health/live_paper_cycle.json` 或 `research_cycle.json`，记录 `running`、`success`、`failed`、最后执行步骤和最后成功时间。watchdog 将恢复动作追加到 `runtime/data/health/watchdog_events.csv`。
+
+- 实时链最后成功超过 `10` 分钟，或运行超过 `4` 分钟仍未结束，会被判定异常并重试。
+- 深度链最后成功超过 `2` 小时，或运行超过 `1` 小时仍未结束，会被判定异常并重试。
+- 单个实时步骤最多运行 `90` 秒，深度研究步骤最多运行 `900` 秒；超时会以失败状态退出，等待 watchdog 重试。
+- 进程异常退出留下的锁目录会被识别为遗留锁并自动移除；仍有活跃进程的锁不会强行抢占。
+- 实时链状态缺失、失败或过期时，`daily-report` 强制输出 `not_ready`，不会把可能不完整的样本当成进入实盘的证据。
+
+watchdog 能自动恢复暂时性网络失败、卡住的任务和遗留锁；持续存在的代码缺陷仍需要修复代码，而不是盲目重复模拟交易。此时状态会持续为失败并留痕，必须在恢复健康后再评价 PnL。
 
 ## 查看结果
 
@@ -71,6 +84,11 @@ tail -f logs/research_cycle.out.log
 tail -f logs/research_cycle.err.log
 tail -f logs/live_paper_cycle.out.log
 tail -f logs/live_paper_cycle.err.log
+tail -f logs/watchdog_cycle.out.log
+tail -f logs/watchdog_cycle.err.log
+cat runtime/data/health/live_paper_cycle.json
+cat runtime/data/health/research_cycle.json
+cat runtime/data/health/watchdog_events.csv
 cat runtime/data/daily_report.csv
 cat runtime/data/paper_report.csv
 cat runtime/data/portfolio_mtm_summary.csv
@@ -82,6 +100,7 @@ ls -t runtime/data/shadow_order_events_*.csv | head -n 1 | xargs cat
 关注项目：
 
 - `logs/research_cycle.err.log` 是否持续为空，尤其是 `IncompleteRead`、超时或订单簿 `404`。
+- 两个健康 JSON 是否保持 `success` 或短时 `running`；`watchdog_events.csv` 中持续重试失败必须立即调查。
 - `paper_report.csv` 中 `paper_runs` 是否稳定增加，实时扫描是否覆盖足够市场。
 - `daily_report.csv` 和 `portfolio_mtm_summary.csv` 中的 `PnL` 与最大回撤是否在新样本期内稳定。
 - `TAKER` 信号是否过度集中于一个市场或一个 strike。

@@ -192,6 +192,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 - 汇总 paper report、离线回放、alignment、edge report。
 - 输出 `data/daily_report.csv`。
 - 给出 `not_ready` / `candidate` 状态和原因。
+- 实时模拟链的健康状态缺失、失败或超时未成功时，强制维持 `not_ready`。
 
 ### 一键研究流水线
 
@@ -201,6 +202,16 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 - 主观察命令现在使用 `--market-type all`，以免短周期 BTC 市场被分类出来但没有进入模拟观察闭环。
 - 适合后续接入 cron 或其他本地调度器。
 
+### VPS 无人值守健康监控
+
+脚本位置：
+
+- [scripts/live_paper_cycle.sh](/Users/pizza_yang/code/ploymarket/scripts/live_paper_cycle.sh)
+- [scripts/watchdog_cycle.sh](/Users/pizza_yang/code/ploymarket/scripts/watchdog_cycle.sh)
+- [src/ploymarket_sim/pipeline_health.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/pipeline_health.py)
+
+VPS 实时链和深度链会在 `runtime/data/health/` 写入状态。watchdog 每五分钟错峰检查，自动重试失败或过期链路，并清除没有存活进程的遗留锁。实时链失败会直接阻断 `readiness`；持续代码错误仍需修复后重新验证，不会被自动重试伪装成健康。
+
 ### macOS 定时任务
 
 脚本位置：
@@ -208,7 +219,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 - [scripts/install_research_cycle_launchd.sh](/Users/pizza_yang/code/ploymarket/scripts/install_research_cycle_launchd.sh)
 - [scripts/uninstall_research_cycle_launchd.sh](/Users/pizza_yang/code/ploymarket/scripts/uninstall_research_cycle_launchd.sh)
 
-当前本地定时任务每 5 分钟运行一次 `research_cycle.sh`，日志写入 `logs/`。脚本内部有锁，上一轮没结束时会跳过本轮，避免重叠。
+本地定时任务目前已暂停，避免与 VPS 前瞻样本混淆；持续模拟盘与健康监控以 VPS 为准。
 
 ### macOS 系统防睡眠设置
 
@@ -423,7 +434,7 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explai
 ## 当前限制
 
 - 没有真实订单执行。
-- 有持续 `paper-loop`，但还没有系统级守护进程、告警和自动日报。
+- VPS 已有状态文件与 watchdog 自动重试；仍缺少外部告警通道和对持续代码故障的自动代码修复闭环。
 - SQLite 已用于保存 paper-run 快照/持仓与 replay-backtest 离线回放，但严格实时链不使用历史缓存替代 live 开仓数据。
 - 已有 BTC/Polymarket 时间对齐报告，但还没有按信号、市场类型、流动性分层评估 edge。
 - 已有第一版 edge 分层报告、资金流扫描和 BUY_NO/反转实验；`BUY_NO` 已进入候选执行层，但还没有通过足够长时间的模拟盘稳定性验证。

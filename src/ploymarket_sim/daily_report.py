@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from time import time
 
+from .pipeline_health import assess_health, load_state
+
 
 @dataclass(frozen=True)
 class DailyReport:
@@ -24,6 +26,8 @@ class DailyReport:
     spread_sell_both_count: int
     spread_best_buy_edge: float
     spread_best_sell_edge: float
+    live_pipeline_healthy: bool
+    live_pipeline_reason: str
     readiness: str
     reason: str
 
@@ -51,12 +55,28 @@ def build_daily_report(output_dir: str) -> DailyReport:
     spread_sell_both_count = len([row for row in spread_rows if row.get("recommendation") == "SELL_BOTH"])
     spread_best_buy_edge = _max_float(spread_rows, "buy_pair_edge")
     spread_best_sell_edge = _max_float(spread_rows, "sell_pair_edge")
+    generated_at = int(time())
+    live_health = assess_health(
+        load_state(directory / "health", "live_paper_cycle"),
+        generated_at,
+        max_success_age_seconds=600,
+        max_running_age_seconds=240,
+    )
 
     latest_markets = int(_float(latest_paper.get("market_count")))
-    readiness, reason = _readiness(replay_pnl, replay_max_drawdown, replay_trade_count, alignment_samples_1h, len(paper_rows), latest_markets)
+    readiness, reason = _readiness(
+        live_health.healthy,
+        live_health.reason,
+        replay_pnl,
+        replay_max_drawdown,
+        replay_trade_count,
+        alignment_samples_1h,
+        len(paper_rows),
+        latest_markets,
+    )
 
     return DailyReport(
-        generated_at=int(time()),
+        generated_at=generated_at,
         paper_runs=len(paper_rows),
         latest_markets=latest_markets,
         latest_taker=int(_float(latest_paper.get("taker_count"))),
@@ -72,6 +92,8 @@ def build_daily_report(output_dir: str) -> DailyReport:
         spread_sell_both_count=spread_sell_both_count,
         spread_best_buy_edge=spread_best_buy_edge,
         spread_best_sell_edge=spread_best_sell_edge,
+        live_pipeline_healthy=live_health.healthy,
+        live_pipeline_reason=live_health.reason,
         readiness=readiness,
         reason=reason,
     )
@@ -101,6 +123,8 @@ def write_daily_report_csv(report: DailyReport, output_dir: str) -> Path:
                 "spread_sell_both_count",
                 "spread_best_buy_edge",
                 "spread_best_sell_edge",
+                "live_pipeline_healthy",
+                "live_pipeline_reason",
                 "readiness",
                 "reason",
             ]
@@ -123,6 +147,8 @@ def write_daily_report_csv(report: DailyReport, output_dir: str) -> Path:
                 report.spread_sell_both_count,
                 report.spread_best_buy_edge,
                 report.spread_best_sell_edge,
+                report.live_pipeline_healthy,
+                report.live_pipeline_reason,
                 report.readiness,
                 report.reason,
             ]
@@ -131,6 +157,8 @@ def write_daily_report_csv(report: DailyReport, output_dir: str) -> Path:
 
 
 def _readiness(
+    live_pipeline_healthy: bool,
+    live_pipeline_reason: str,
     replay_pnl: float,
     replay_max_drawdown: float,
     replay_trade_count: int,
@@ -138,6 +166,8 @@ def _readiness(
     paper_runs: int,
     latest_markets: int,
 ) -> tuple[str, str]:
+    if not live_pipeline_healthy:
+        return "not_ready", f"实时模拟链路不健康（{live_pipeline_reason}），禁止进入实盘判断"
     if latest_markets == 0:
         return "not_ready", "最新 paper-run 没有实时市场数据，禁止把本地缓存当作实盘依据"
     if paper_runs < 14:

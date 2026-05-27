@@ -27,7 +27,9 @@ FILTERED="$(
     "$LIVE_SCHEDULE" "$PROJECT_DIR" "$CONFIG_PATH" "$PROJECT_DIR" "$PROJECT_DIR" "$PROJECT_DIR"
   printf '%s cd %s && PLOYMARKET_CONFIG=%s %s/scripts/research_cycle.sh >> %s/logs/research_cycle.out.log 2>> %s/logs/research_cycle.err.log\n' \
     "$RESEARCH_SCHEDULE" "$PROJECT_DIR" "$CONFIG_PATH" "$PROJECT_DIR" "$PROJECT_DIR" "$PROJECT_DIR"
+  printf '%s cd %s && PLOYMARKET_CONFIG=%s %s/scripts/watchdog_cycle.sh >> %s/logs/watchdog_cycle.out.log 2>> %s/logs/watchdog_cycle.err.log\n' \
+    '2-57/5 * * * *' "$PROJECT_DIR" "$CONFIG_PATH" "$PROJECT_DIR" "$PROJECT_DIR" "$PROJECT_DIR"
   printf '%s\n' "$END_MARKER"
 } | crontab -
 
-echo "research_cycle_cron | live_schedule=$LIVE_SCHEDULE | research_schedule=$RESEARCH_SCHEDULE | config=$CONFIG_PATH | logs=$PROJECT_DIR/logs"
+echo "research_cycle_cron | live_schedule=$LIVE_SCHEDULE | research_schedule=$RESEARCH_SCHEDULE | watchdog_schedule=2-57/5 * * * * | config=$CONFIG_PATH | logs=$PROJECT_DIR/logs"

@@ -12,6 +12,7 @@
 - 生成模拟订单状态机 CSV，为未来持续模拟盘和实盘订单生命周期做准备。
 - `paper-run` 已区分 `TAKER`、`MAKER`、`SKIP` 执行计划；实时扫描必须使用 live 市场和 live 历史，网络降级时不会把本地 SQLite 缓存当作可交易依据。
 - VPS 实时模拟还会禁用 HTTP stale cache，并用 CLOB 实时 ask/bid 模拟开仓与退出；BTC spot 过期时不允许新开方向仓位。
+- VPS 运行链会写出健康状态并由 `watchdog_cycle.sh` 监测失败、超时和遗留锁；实时链不健康时 `daily-report` 强制保持 `not_ready`。
 - 每轮 `paper-run` 会生成 `execution_stress_<timestamp>.csv` 和 `shadow_order_events_<timestamp>.csv`，并累计 `execution_stress_report.csv`；实时 ask 可成交的 paper 基线与延迟恶化、`FOK` 不成交、`FAK` 部分成交压力路径会分开记录。
 - 主回测和 paper-run 已支持 `BUY_NO` 候选，但仍只用于研究和模拟盘，不会下实盘订单。
 - `spread-scan` 会读取 YES/NO 真实订单簿，检查完整组合价差机会，输出 `data/spread_scan.csv`。
@@ -97,7 +98,7 @@ PLOYMARKET_CONFIG=config/vps.local.toml scripts/research_cycle.sh
 scripts/install_research_cycle_cron.sh
 ```
 
-VPS 默认每 5 分钟运行一次实时模拟扫描，每小时执行一次深度回测研究；若同类上一轮未结束，脚本锁会安全跳过本轮。详细步骤见 [VPS 模拟盘运行手册](docs/runbooks/vps-paper-trading.md)。
+VPS 默认每 5 分钟运行一次实时模拟扫描，每小时执行一次深度回测研究，并以错峰 watchdog 自动重试失败或停滞的链路；遗留锁会被安全清理。详细步骤见 [VPS 模拟盘运行手册](docs/runbooks/vps-paper-trading.md)。
 
 `paper-run` 输出里的 `execution_mode` 含义：
 

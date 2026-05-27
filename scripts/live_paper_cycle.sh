@@ -5,18 +5,22 @@ cd "$(dirname "$0")/.."
 
 CONFIG_PATH="${PLOYMARKET_CONFIG:-config/default.toml}"
 LOCK_DIR="${TMPDIR:-/tmp}/ploymarket-live-paper-cycle.lock"
-if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-  echo "live_paper_cycle | another run is still active, skipping this tick"
+source scripts/pipeline_guard.sh
+PIPELINE_TIMING_PREFIX="live_paper"
+set +e
+pipeline_guard_begin "live_paper_cycle" "$LOCK_DIR"
+GUARD_STATUS="$?"
+set -e
+if [[ "$GUARD_STATUS" -eq 1 ]]; then
   exit 0
 fi
-trap 'rmdir "$LOCK_DIR"' EXIT
+if [[ "$GUARD_STATUS" -ne 0 ]]; then
+  exit "$GUARD_STATUS"
+fi
 
 run() {
-  local start_seconds=$SECONDS
   local step_name="$1"
-  env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache \
-    python3 -m ploymarket_sim.cli --config "$CONFIG_PATH" "$@"
-  echo "live_paper_timing | step=${step_name} | elapsed_seconds=$((SECONDS - start_seconds))"
+  pipeline_run_step "${PLOYMARKET_LIVE_STEP_TIMEOUT_SECONDS:-90}" "$step_name" --config "$CONFIG_PATH" "$@"
 }
 
 run btc-price
