@@ -79,6 +79,24 @@ def market() -> Market:
     )
 
 
+def target_market() -> Market:
+    return Market(
+        "target-1",
+        "Will Bitcoin reach $85,000 in May?",
+        "bitcoin-reach-85000-in-may",
+        None,
+        1000,
+        100,
+        True,
+        ["Yes", "No"],
+        [0.3, 0.7],
+        ["yes", "no"],
+        False,
+        None,
+        None,
+    )
+
+
 class PaperPositionTests(unittest.TestCase):
     def test_realtime_live_discovery_is_not_rejected_by_accumulated_research_universe(self) -> None:
         live_markets = [market()] * 56
@@ -180,6 +198,38 @@ class PaperPositionTests(unittest.TestCase):
             self.assertEqual(position.status, "closed")
             self.assertEqual(position.cooldown_until, 800)
             self.assertGreater(position.realized_pnl, 0.0)
+
+    def test_target_stop_loss_uses_longer_cooldown(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = app_config(str(Path(directory) / "paper.sqlite"))
+            storage = Storage(True, config.storage.sqlite_path)
+            storage.save_open_paper_position(
+                PaperPositionState(
+                    market_id="target-1",
+                    side="YES",
+                    entry_price=0.7,
+                    shares=50.0,
+                    notional=35.0,
+                    opened_at=100,
+                    status="open",
+                    closed_at=None,
+                    realized_pnl=0.0,
+                    cooldown_until=0,
+                    peak_price=0.7,
+                    partial_take_profit_count=0,
+                )
+            )
+
+            signal = _paper_position_state_signal(config, storage, target_market(), yes_price=0.5, run_timestamp=200)
+
+            self.assertIsNotNone(signal)
+            assert signal is not None
+            self.assertIn("触发止损", signal.reason)
+            position = storage.load_paper_position("target-1")
+            self.assertIsNotNone(position)
+            assert position is not None
+            self.assertEqual(position.status, "closed")
+            self.assertEqual(position.cooldown_until, 200 + config.risk.target_stop_cooldown_seconds)
 
     def test_profitable_reentry_requires_stronger_edge(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

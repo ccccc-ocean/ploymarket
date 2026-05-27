@@ -10,7 +10,7 @@ from .backtest import backtest_market
 from .btc_regime import blocks_directional_entry
 from .btc_price import get_btc_candles, load_btc_candles_csv, merge_btc_candles
 from .cache import CachePolicy, JsonCache
-from .classifier import MARKET_TYPES, is_market_type
+from .classifier import MARKET_TYPES, classify_market, is_market_type
 from .clob import get_price_history, get_token_quote
 from .config import load_config
 from .costs import fee_amount, taker_fee_rate
