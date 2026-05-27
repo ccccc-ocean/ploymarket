@@ -27,6 +27,8 @@ class Market:
     taker_fee_rate: float | None
     fee_type: str | None
     condition_id: str | None = None
+    closed: bool = False
+    resolution_status: str | None = None
 
     @property
     def yes_token_id(self) -> str | None:
@@ -72,6 +74,18 @@ def discover_btc_markets(config: AppConfig, use_cache: bool = True) -> list[Mark
     markets = _discover_with_search(config, cache)
     markets.extend(_discover_with_market_pages(config, cache))
     return _dedupe(markets)
+
+
+def get_market_by_id(config: AppConfig, market_id: str, use_cache: bool = False) -> Market | None:
+    cache = _cache_from_config(config) if use_cache else None
+    payload = get_json(
+        config.api.gamma_base_url,
+        f"/markets/{market_id}",
+        {},
+        timeout=config.api.request_timeout_seconds,
+        cache=cache,
+    )
+    return _parse_market(payload) if isinstance(payload, dict) else None
 
 
 def _discover_with_search(config: AppConfig, cache: JsonCache | None) -> list[Market]:
@@ -173,6 +187,8 @@ def _parse_market(item: dict[str, Any]) -> Market | None:
             taker_fee_rate=_parse_taker_fee_rate(item),
             fee_type=str(item.get("feeType")) if item.get("feeType") else None,
             condition_id=str(item.get("conditionId")) if item.get("conditionId") else None,
+            closed=bool(item.get("closed")),
+            resolution_status=str(item.get("umaResolutionStatus")) if item.get("umaResolutionStatus") else None,
         )
     except (TypeError, ValueError, json.JSONDecodeError):
         return None

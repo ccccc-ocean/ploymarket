@@ -36,7 +36,7 @@ from .market_type_report import build_market_type_report, print_market_type_repo
 from .portfolio import build_mark_to_market_curve, build_portfolio_curve, summarize_portfolio
 from .paper import build_paper_signal_row, summarize_paper_rows
 from .paper_report import load_paper_run_summaries
-from .polymarket import discover_btc_markets
+from .polymarket import discover_btc_markets, get_market_by_id
 from .reporting import (
     print_aggregate_summary,
     print_market_table,
@@ -524,8 +524,14 @@ def _paper_position_signal_with_live_quote(config, storage, market, yes_price: f
     try:
         quote = get_token_quote(config, token_id)
     except HttpError as exc:
+        settlement_signal = _paper_settlement_signal(config, storage, market, position, run_timestamp)
+        if settlement_signal is not None:
+            return settlement_signal
         return Signal("HOLD", 0.0, 0.0, 0.0, f"已有模拟持仓，但实时 bid 获取失败，暂停退出判断: {exc}")
     if quote.bid is None:
+        settlement_signal = _paper_settlement_signal(config, storage, market, position, run_timestamp)
+        if settlement_signal is not None:
+            return settlement_signal
         return Signal("HOLD", 0.0, 0.0, 0.0, "已有模拟持仓，但订单簿缺少实时 bid，暂停退出判断")
     return _paper_position_state_signal(config, storage, market, yes_price, run_timestamp, quote.bid)
 
@@ -633,6 +639,41 @@ def _paper_position_state_signal(config, storage, market, yes_price: float, run_
     if position.cooldown_until > run_timestamp:
         return Signal("HOLD", 0.0, 0.0, 0.0, f"同一市场冷却中，cooldown_until={position.cooldown_until}")
     return None
+
+
+def _paper_settlement_signal(config, storage, market, position: PaperPositionState, run_timestamp: int) -> Signal | None:
+    try:
+        resolved_market = get_market_by_id(config, market.id, use_cache=False)
+    except HttpError:
+        return None
+    if resolved_market is None or not resolved_market.closed or resolved_market.resolution_status != "resolved":
+        return None
+    settlement_price = _resolved_side_price(resolved_market, position.side)
+    if settlement_price is None:
+        return None
+    storage.save_markets([resolved_market])
+    realized_pnl = position.realized_pnl + position.shares * settlement_price - position.notional
+    storage.close_paper_position(market.id, run_timestamp, realized_pnl, run_timestamp)
+    return Signal(
+        "HOLD",
+        0.0,
+        0.0,
+        0.0,
+        f"模拟持仓按已解析结果结算; side={position.side}; payout={settlement_price:.0f}; realized_pnl={realized_pnl:.2f}",
+    )
+
+
+def _resolved_side_price(market, side: str) -> float | None:
+    yes_price = market.yes_price
+    no_price = market.no_price
+    if yes_price is None or no_price is None:
+        return None
+    if not (
+        (yes_price >= 0.999 and no_price <= 0.001)
+        or (no_price >= 0.999 and yes_price <= 0.001)
+    ):
+        return None
+    return yes_price if side == "YES" else no_price
 
 
 def _paper_reentry_edge_too_weak(config, storage, market, expected_net_edge: float, min_edge: float) -> bool:

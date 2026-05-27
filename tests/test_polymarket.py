@@ -20,6 +20,8 @@ class PolymarketParsingTests(unittest.TestCase):
                 "feeType": "crypto_fees",
                 "feeSchedule": {"rate": 0.04, "takerOnly": True},
                 "conditionId": "0xdd22472e552920b8438158ea7238bfadfa4f736aa4cee91a6b86c39ead110917",
+                "closed": True,
+                "umaResolutionStatus": "resolved",
             }
         )
 
@@ -33,6 +35,8 @@ class PolymarketParsingTests(unittest.TestCase):
         self.assertEqual(market.taker_fee_rate, 0.04)
         self.assertEqual(market.effective_taker_fee_rate(0.02), 0.04)
         self.assertEqual(market.condition_id, "0xdd22472e552920b8438158ea7238bfadfa4f736aa4cee91a6b86c39ead110917")
+        self.assertTrue(market.closed)
+        self.assertEqual(market.resolution_status, "resolved")
 
     def test_falls_back_to_default_fee_when_market_fee_missing(self) -> None:
         market = Market("1", "Will BTC be above X?", "btc", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)

@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from ploymarket_sim.btc_price import BtcCandle
 from ploymarket_sim.cli import _paper_position_state_signal
+from ploymarket_sim.cli import _paper_position_signal_with_live_quote
 from ploymarket_sim.cli import _paper_reentry_edge_too_weak
 from ploymarket_sim.cli import _fresh_paper_btc_candles
 from ploymarket_sim.cli import _live_paper_entry_plan
@@ -13,6 +14,7 @@ from ploymarket_sim.cli import _paper_run_data_degraded
 from ploymarket_sim.cli import _paper_markets_including_open_positions
 from ploymarket_sim.cli import _realtime_market_discovery_is_healthy
 from ploymarket_sim.clob import TokenQuote
+from ploymarket_sim.http import HttpError
 from ploymarket_sim.config import (
     ApiConfig,
     AppConfig,
@@ -99,6 +101,26 @@ def target_market() -> Market:
     )
 
 
+def resolved_market(yes_price: float, no_price: float) -> Market:
+    return Market(
+        "m1",
+        "Will BTC be above 76000 on May 23?",
+        "btc-above-76000-may-23",
+        "2026-05-23T16:00:00Z",
+        1000,
+        100,
+        True,
+        ["Yes", "No"],
+        [yes_price, no_price],
+        ["yes", "no"],
+        False,
+        None,
+        None,
+        closed=True,
+        resolution_status="resolved",
+    )
+
+
 class PaperPositionTests(unittest.TestCase):
     def test_realtime_live_discovery_is_not_rejected_by_accumulated_research_universe(self) -> None:
         live_markets = [market()] * 56
@@ -164,6 +186,58 @@ class PaperPositionTests(unittest.TestCase):
 
         self.assertEqual(repriced_signal.action, "HOLD")
         self.assertEqual(plan.mode, "SKIP")
+
+    def test_resolved_position_is_settled_when_orderbook_is_unavailable(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = app_config(str(Path(directory) / "paper.sqlite"))
+            storage = Storage(True, config.storage.sqlite_path)
+            storage.save_open_paper_position(
+                PaperPositionState(
+                    market_id="m1",
+                    side="NO",
+                    entry_price=0.9,
+                    shares=10.0,
+                    notional=9.0,
+                    opened_at=100,
+                    status="open",
+                    closed_at=None,
+                    realized_pnl=0.0,
+                    cooldown_until=0,
+                    peak_price=0.9,
+                    partial_take_profit_count=0,
+                )
+            )
+
+            with patch("ploymarket_sim.cli.get_token_quote", side_effect=HttpError("HTTP Error 404: Not Found")):
+                with patch("ploymarket_sim.cli.get_market_by_id", return_value=resolved_market(0.0, 1.0)):
+                    signal = _paper_position_signal_with_live_quote(config, storage, market(), 0.0, 200)
+
+            self.assertIsNotNone(signal)
+            assert signal is not None
+            self.assertIn("按已解析结果结算", signal.reason)
+            position = storage.load_paper_position("m1")
+            self.assertIsNotNone(position)
+            assert position is not None
+            self.assertEqual(position.status, "closed")
+            self.assertAlmostEqual(position.realized_pnl, 1.0)
+
+    def test_unresolved_position_stays_open_when_orderbook_is_unavailable(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = app_config(str(Path(directory) / "paper.sqlite"))
+            storage = Storage(True, config.storage.sqlite_path)
+            storage.save_open_paper_position(
+                PaperPositionState("m1", "YES", 0.7, 10.0, 7.0, 100, "open", None, 0.0, 0, 0.7, 0)
+            )
+
+            unresolved = market()
+            with patch("ploymarket_sim.cli.get_token_quote", side_effect=HttpError("HTTP Error 404: Not Found")):
+                with patch("ploymarket_sim.cli.get_market_by_id", return_value=unresolved):
+                    signal = _paper_position_signal_with_live_quote(config, storage, market(), 0.3, 200)
+
+            self.assertIsNotNone(signal)
+            assert signal is not None
+            self.assertIn("实时 bid 获取失败", signal.reason)
+            self.assertEqual(storage.load_paper_position("m1").status, "open")
 
     def test_partial_take_profit_keeps_remainder_open(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
