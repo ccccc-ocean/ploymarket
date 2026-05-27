@@ -476,10 +476,18 @@ def _run_paper_scan(config, market_type: str) -> None:
             f"fail_safe={history.fail_safe_scenarios} | "
             f"{history_path}"
         )
+    if _paper_run_data_degraded(market_type, rows):
+        raise SystemExit("paper-run realtime data degraded: no live market observations written")
 
 
 def _paper_markets(config, storage):
     return _discover_live_markets_or_empty(config, storage, "paper-run")
+
+
+def _paper_run_data_degraded(market_type: str, rows: list[dict]) -> bool:
+    # The unattended live cycle scans all markets; an empty all-market run
+    # means market discovery or live quotes failed, not a valid no-trade tick.
+    return market_type == "all" and not rows
 
 
 def _fresh_paper_btc_candles(config, candles, run_timestamp: int):

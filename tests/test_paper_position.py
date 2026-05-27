@@ -9,6 +9,7 @@ from ploymarket_sim.cli import _paper_reentry_edge_too_weak
 from ploymarket_sim.cli import _fresh_paper_btc_candles
 from ploymarket_sim.cli import _live_paper_entry_plan
 from ploymarket_sim.cli import _market_discovery_is_healthy
+from ploymarket_sim.cli import _paper_run_data_degraded
 from ploymarket_sim.cli import _realtime_market_discovery_is_healthy
 from ploymarket_sim.clob import TokenQuote
 from ploymarket_sim.config import (
@@ -104,6 +105,11 @@ class PaperPositionTests(unittest.TestCase):
 
         self.assertFalse(_market_discovery_is_healthy(live_markets, local_markets))
         self.assertTrue(_realtime_market_discovery_is_healthy(live_markets))
+
+    def test_empty_all_market_paper_run_is_a_live_pipeline_failure(self) -> None:
+        self.assertTrue(_paper_run_data_degraded("all", []))
+        self.assertFalse(_paper_run_data_degraded("price_target", []))
+        self.assertFalse(_paper_run_data_degraded("all", [{"market_id": "m1"}]))
 
     def test_stale_btc_candles_are_not_accepted_for_paper_entries(self) -> None:
         config = app_config("unused.sqlite")
