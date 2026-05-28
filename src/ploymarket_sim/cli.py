@@ -998,7 +998,7 @@ def _run_strike_report(config) -> None:
 
 
 def _run_daily_report(config) -> None:
-    report = build_daily_report(config.backtest.output_dir)
+    report = build_daily_report(config.backtest.output_dir, config.risk.readiness_max_drawdown_pct)
     path = write_daily_report_csv(report, config.backtest.output_dir)
     print(
         f"daily_report | readiness={report.readiness} | paper_runs={report.paper_runs} | "

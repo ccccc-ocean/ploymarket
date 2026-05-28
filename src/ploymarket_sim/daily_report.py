@@ -32,7 +32,7 @@ class DailyReport:
     reason: str
 
 
-def build_daily_report(output_dir: str) -> DailyReport:
+def build_daily_report(output_dir: str, readiness_max_drawdown_pct: float = 0.08) -> DailyReport:
     directory = Path(output_dir)
     paper_rows = _read_csv(directory / "paper_report.csv")
     portfolio_rows = _read_csv(directory / "portfolio_mtm_summary.csv")
@@ -73,6 +73,7 @@ def build_daily_report(output_dir: str) -> DailyReport:
         alignment_samples_1h,
         len(paper_rows),
         latest_markets,
+        readiness_max_drawdown_pct,
     )
 
     return DailyReport(
@@ -165,6 +166,7 @@ def _readiness(
     alignment_samples_1h: int,
     paper_runs: int,
     latest_markets: int,
+    readiness_max_drawdown_pct: float,
 ) -> tuple[str, str]:
     if not live_pipeline_healthy:
         return "not_ready", f"实时模拟链路不健康（{live_pipeline_reason}），禁止进入实盘判断"
@@ -178,8 +180,8 @@ def _readiness(
         return "not_ready", "alignment 样本不足，分层统计仍不稳"
     if replay_pnl <= 0:
         return "not_ready", "扣除成本后的离线回放仍未盈利"
-    if replay_max_drawdown > 0.08:
-        return "not_ready", "最大回撤超过当前保守阈值"
+    if replay_max_drawdown > readiness_max_drawdown_pct:
+        return "not_ready", f"最大回撤超过当前观察阈值 {readiness_max_drawdown_pct:.1%}"
     return "candidate", "满足最低研究门槛，但仍需小资金实盘前检查"
 
 
