@@ -17,6 +17,9 @@ class DailyReport:
     latest_maker: int
     latest_skip: int
     replay_pnl: float
+    paper_account_pnl: float
+    paper_account_open_positions: int
+    paper_account_closed_positions: int
     replay_max_drawdown: float
     replay_trade_count: int
     replay_win_rate: float
@@ -32,7 +35,13 @@ class DailyReport:
     reason: str
 
 
-def build_daily_report(output_dir: str, readiness_max_drawdown_pct: float = 0.08) -> DailyReport:
+def build_daily_report(
+    output_dir: str,
+    readiness_max_drawdown_pct: float = 0.08,
+    paper_account_pnl: float = 0.0,
+    paper_account_open_positions: int = 0,
+    paper_account_closed_positions: int = 0,
+) -> DailyReport:
     directory = Path(output_dir)
     paper_rows = _read_csv(directory / "paper_report.csv")
     portfolio_rows = _read_csv(directory / "portfolio_mtm_summary.csv")
@@ -84,6 +93,9 @@ def build_daily_report(output_dir: str, readiness_max_drawdown_pct: float = 0.08
         latest_maker=int(_float(latest_paper.get("maker_count"))),
         latest_skip=int(_float(latest_paper.get("skip_count"))),
         replay_pnl=replay_pnl,
+        paper_account_pnl=paper_account_pnl,
+        paper_account_open_positions=paper_account_open_positions,
+        paper_account_closed_positions=paper_account_closed_positions,
         replay_max_drawdown=replay_max_drawdown,
         replay_trade_count=replay_trade_count,
         replay_win_rate=replay_win_rate,
@@ -115,6 +127,9 @@ def write_daily_report_csv(report: DailyReport, output_dir: str) -> Path:
                 "latest_maker",
                 "latest_skip",
                 "replay_pnl",
+                "paper_account_pnl",
+                "paper_account_open_positions",
+                "paper_account_closed_positions",
                 "replay_max_drawdown",
                 "replay_trade_count",
                 "replay_win_rate",
@@ -139,6 +154,9 @@ def write_daily_report_csv(report: DailyReport, output_dir: str) -> Path:
                 report.latest_maker,
                 report.latest_skip,
                 report.replay_pnl,
+                report.paper_account_pnl,
+                report.paper_account_open_positions,
+                report.paper_account_closed_positions,
                 report.replay_max_drawdown,
                 report.replay_trade_count,
                 report.replay_win_rate,

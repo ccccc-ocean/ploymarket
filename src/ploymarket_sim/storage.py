@@ -53,6 +53,13 @@ class PaperPositionState:
     partial_take_profit_count: int
 
 
+@dataclass(frozen=True)
+class PaperAccountSummary:
+    realized_pnl: float
+    open_position_count: int
+    closed_position_count: int
+
+
 class Storage:
     def __init__(self, enabled: bool, sqlite_path: str):
         self.enabled = enabled
@@ -639,6 +646,30 @@ class Storage:
             )
             for row in rows
         ]
+
+    def load_paper_account_summary(self) -> PaperAccountSummary:
+        if not self.enabled or not Path(self.sqlite_path).exists():
+            return PaperAccountSummary(0.0, 0, 0)
+        self.init()
+        with self._connect() as connection:
+            closed_pnl, closed_count = connection.execute(
+                """
+                SELECT COALESCE(SUM(realized_pnl), 0), COUNT(*)
+                FROM paper_position_history
+                """
+            ).fetchone()
+            open_pnl, open_count = connection.execute(
+                """
+                SELECT COALESCE(SUM(realized_pnl), 0), COUNT(*)
+                FROM paper_positions
+                WHERE status = 'open'
+                """
+            ).fetchone()
+        return PaperAccountSummary(
+            realized_pnl=float(closed_pnl) + float(open_pnl),
+            open_position_count=int(open_count),
+            closed_position_count=int(closed_count),
+        )
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.sqlite_path)

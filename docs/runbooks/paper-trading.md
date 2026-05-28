@@ -403,6 +403,11 @@ env PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/ploymarket_pycache python3 -m ployma
 data/daily_report.csv
 ```
 
+日报中的 PnL 口径：
+
+- `replay_pnl`：离线回放/历史样本 PnL，用于评估策略在已抓取市场上的回放表现，可能包含当前日期之前已经到期的市场。
+- `paper_account_pnl`：模拟盘账户账本已实现 PnL，来自 SQLite 仓位状态；包含已关闭仓位和开仓仓位中已经部分止盈落袋的收益，不包含未平仓浮盈浮亏。
+
 当前 readiness 规则偏保守：
 
 - paper-run 样本至少需要多轮连续观察。

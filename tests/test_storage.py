@@ -151,6 +151,26 @@ class StorageTests(unittest.TestCase):
             history = storage.load_closed_paper_position_history()
             self.assertEqual(len(history), 2)
             self.assertAlmostEqual(sum(position.realized_pnl for position in history), 0.5)
+            storage.save_open_paper_position(
+                PaperPositionState(
+                    market_id="m2",
+                    side="YES",
+                    entry_price=0.4,
+                    shares=10,
+                    notional=4,
+                    opened_at=901,
+                    status="open",
+                    closed_at=None,
+                    realized_pnl=0.75,
+                    cooldown_until=0,
+                    peak_price=0.5,
+                    partial_take_profit_count=1,
+                )
+            )
+            account = storage.load_paper_account_summary()
+            self.assertAlmostEqual(account.realized_pnl, 1.25)
+            self.assertEqual(account.open_position_count, 1)
+            self.assertEqual(account.closed_position_count, 2)
 
     def test_disabled_storage_reports_zero_counts(self) -> None:
         storage = Storage(False, "unused.sqlite")
@@ -159,3 +179,7 @@ class StorageTests(unittest.TestCase):
 
         self.assertFalse(stats.enabled)
         self.assertEqual(stats.market_count, 0)
+        account = storage.load_paper_account_summary()
+        self.assertEqual(account.realized_pnl, 0.0)
+        self.assertEqual(account.open_position_count, 0)
+        self.assertEqual(account.closed_position_count, 0)

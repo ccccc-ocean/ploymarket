@@ -998,11 +998,21 @@ def _run_strike_report(config) -> None:
 
 
 def _run_daily_report(config) -> None:
-    report = build_daily_report(config.backtest.output_dir, config.risk.readiness_max_drawdown_pct)
+    storage = storage_from_config(config)
+    paper_account = storage.load_paper_account_summary()
+    report = build_daily_report(
+        config.backtest.output_dir,
+        config.risk.readiness_max_drawdown_pct,
+        paper_account.realized_pnl,
+        paper_account.open_position_count,
+        paper_account.closed_position_count,
+    )
     path = write_daily_report_csv(report, config.backtest.output_dir)
     print(
         f"daily_report | readiness={report.readiness} | paper_runs={report.paper_runs} | "
-        f"trades={report.replay_trade_count} | pnl={report.replay_pnl:.2f} | "
+        f"trades={report.replay_trade_count} | replay_pnl={report.replay_pnl:.2f} | "
+        f"paper_account_pnl={report.paper_account_pnl:.2f} | "
+        f"paper_positions=open:{report.paper_account_open_positions}/closed:{report.paper_account_closed_positions} | "
         f"max_drawdown={report.replay_max_drawdown:.1%} | "
         f"live_health={report.live_pipeline_healthy}/{report.live_pipeline_reason} | "
         f"spread_buy_both={report.spread_buy_both_count} | best_buy_edge={report.spread_best_buy_edge:.4f} | "

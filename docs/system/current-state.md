@@ -194,6 +194,8 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 
 - 汇总 paper report、离线回放、alignment、edge report。
 - 输出 `data/daily_report.csv`。
+- `replay_pnl` 表示离线回放/历史样本 PnL，会包含当前日期之前已经到期的回放市场。
+- `paper_account_pnl` 表示模拟盘账户账本里的已实现 PnL，来自 SQLite 的已关闭仓位和开仓仓位中已部分止盈落袋的收益；不包含未平仓浮盈浮亏。
 - 给出 `not_ready` / `candidate` 状态和原因。
 - 实时模拟链的健康状态缺失、失败或超时未成功时，强制维持 `not_ready`。
 

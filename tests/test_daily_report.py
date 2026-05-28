@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from time import time
 
-from ploymarket_sim.daily_report import build_daily_report
+from ploymarket_sim.daily_report import build_daily_report, write_daily_report_csv
 from ploymarket_sim.pipeline_health import mark_finished, mark_started
 
 
@@ -37,6 +37,48 @@ class DailyReportTests(unittest.TestCase):
 
             self.assertEqual(report.readiness, "not_ready")
             self.assertEqual(report.replay_trade_count, 12)
+            self.assertEqual(report.paper_account_pnl, 0.0)
+
+    def test_writes_replay_and_paper_account_pnl_separately(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            self._write_healthy_live_state(directory)
+            self._write_csv(
+                Path(directory) / "paper_report.csv",
+                ["run_timestamp", "market_count", "taker_count", "maker_count", "skip_count"],
+                [[index, 35, 0, 0, 35] for index in range(14)],
+            )
+            self._write_csv(
+                Path(directory) / "portfolio_mtm_summary.csv",
+                ["realized_pnl", "max_drawdown"],
+                [[100.0, 0.02]],
+            )
+            self._write_csv(
+                Path(directory) / "backtest_summary_by_type.csv",
+                ["market_type", "trade_count", "win_rate"],
+                [["all", 100, 0.66]],
+            )
+            self._write_csv(
+                Path(directory) / "alignment_summary.csv",
+                ["horizon_hours", "sample_count"],
+                [[1, 20000]],
+            )
+
+            report = build_daily_report(
+                directory,
+                paper_account_pnl=1.25,
+                paper_account_open_positions=2,
+                paper_account_closed_positions=3,
+            )
+            path = write_daily_report_csv(report, directory)
+            with path.open("r", newline="", encoding="utf-8") as file:
+                rows = list(csv.DictReader(file))
+
+            self.assertEqual(report.replay_pnl, 100.0)
+            self.assertEqual(report.paper_account_pnl, 1.25)
+            self.assertEqual(rows[0]["replay_pnl"], "100.0")
+            self.assertEqual(rows[0]["paper_account_pnl"], "1.25")
+            self.assertEqual(rows[0]["paper_account_open_positions"], "2")
+            self.assertEqual(rows[0]["paper_account_closed_positions"], "3")
 
     def test_latest_empty_paper_run_blocks_readiness(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
