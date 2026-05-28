@@ -114,6 +114,7 @@ def main() -> None:
     sweep_parser = subparsers.add_parser("strategy-sweep", help="try conservative 5-minute strategy parameter candidates")
     sweep_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
     sweep_parser.add_argument("--limit", type=int, default=10)
+    sweep_parser.add_argument("--candidate-limit", type=int, default=None)
     spread_parser = subparsers.add_parser("spread-scan", help="scan live YES/NO order books for complete-set spread edges")
     spread_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
     reversal_parser = subparsers.add_parser("reversal-backtest", help="compare BUY_YES, BUY_NO, reversal, and stop-loss variants")
@@ -178,7 +179,7 @@ def main() -> None:
     elif args.command == "edge-report":
         _run_edge_report(config, args.min_samples)
     elif args.command == "strategy-sweep":
-        _run_strategy_sweep(config, args.market_type, args.limit)
+        _run_strategy_sweep(config, args.market_type, args.limit, args.candidate_limit)
     elif args.command == "spread-scan":
         _run_spread_scan(config, args.market_type)
     elif args.command == "reversal-backtest":
@@ -895,17 +896,19 @@ def _run_edge_report(config, min_samples: int) -> None:
     print(f"edge_report_csv={path}")
 
 
-def _run_strategy_sweep(config, market_type: str, limit: int) -> None:
+def _run_strategy_sweep(config, market_type: str, limit: int, candidate_limit: int | None) -> None:
     storage = storage_from_config(config)
     markets = storage.load_markets()
     btc_candles = load_btc_candles_csv(Path(config.backtest.output_dir) / "btc_price_candles.csv")
     if limit <= 0:
         raise SystemExit("--limit must be > 0")
+    if candidate_limit is not None and candidate_limit <= 0:
+        raise SystemExit("--candidate-limit must be > 0")
     if not markets:
         raise SystemExit("No local markets found. Run discover or backtest first.")
     if not btc_candles:
         raise SystemExit("No BTC candles found. Run btc-price first.")
-    results = run_strategy_sweep(config, storage, markets, btc_candles, market_type, limit)
+    results = run_strategy_sweep(config, storage, markets, btc_candles, market_type, limit, candidate_limit)
     path = write_strategy_sweep_csv(results, config.backtest.output_dir)
     print_strategy_sweep_summary(results, path)
 

@@ -27,7 +27,7 @@ run backtest --market-type all
 run reversal-backtest --market-type price_range_daily
 run alignment-report --market-type all
 run edge-report --min-samples 30
-run strategy-sweep --market-type all --limit 10
+run strategy-sweep --market-type all --limit 10 --candidate-limit "${PLOYMARKET_STRATEGY_SWEEP_CANDIDATE_LIMIT:-2}"
 run market-type-report
 run strike-report
 run data-quality

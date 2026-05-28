@@ -9,7 +9,7 @@ from .btc_price import BtcCandle
 from .classifier import is_market_type
 from .clob import PricePoint
 from .config import AppConfig
-from .portfolio import build_mark_to_market_curve, summarize_portfolio
+from .portfolio import build_portfolio_curve, summarize_portfolio
 from .polymarket import Market
 from .storage import Storage
 from .summary import aggregate_summaries, summarize_all, summarize_market
@@ -64,6 +64,7 @@ def run_strategy_sweep(
     btc_candles: list[BtcCandle],
     market_type: str,
     limit: int,
+    candidate_limit: int | None = None,
 ) -> list[SweepResult]:
     selected_markets = [market for market in markets if is_market_type(market, market_type)]
     histories_by_market = {
@@ -72,6 +73,8 @@ def run_strategy_sweep(
         if market.yes_token_id
     }
     candidates = default_candidates()
+    if candidate_limit is not None:
+        candidates = candidates[:candidate_limit]
     rows = [_evaluate_candidate(config, candidate, selected_markets, histories_by_market, btc_candles) for candidate in candidates]
     rows = sorted(rows, key=lambda row: (-row.score, -row.realized_pnl, row.max_drawdown, -row.trade_count))
     ranked = [replace(row, rank=index + 1) for index, row in enumerate(rows)]
@@ -163,7 +166,6 @@ def _evaluate_candidate(
     )
     results = []
     summaries = []
-    used_histories = {}
     for market in markets:
         history = histories_by_market.get(market.id, [])
         if len(history) <= candidate.long_window:
@@ -171,10 +173,9 @@ def _evaluate_candidate(
         result = backtest_market(market, history, candidate_config, btc_candles)
         results.append(result)
         summaries.append(summarize_market(market, result))
-        used_histories[market.id] = history
     aggregate = summarize_all(summaries) if summaries else _empty_aggregate()
-    mtm_summary = summarize_portfolio(build_mark_to_market_curve(results, used_histories, candidate_config), candidate_config)
-    score = _score(aggregate.realized_pnl, mtm_summary.max_drawdown, aggregate.trade_count)
+    portfolio_summary = summarize_portfolio(build_portfolio_curve(results, candidate_config), candidate_config)
+    score = _score(aggregate.realized_pnl, portfolio_summary.max_drawdown, aggregate.trade_count)
     return SweepResult(
         rank=0,
         short_window=candidate.short_window,
@@ -189,8 +190,8 @@ def _evaluate_candidate(
         realized_pnl=aggregate.realized_pnl,
         total_fees=aggregate.total_fees,
         total_slippage=aggregate.total_slippage,
-        max_drawdown=mtm_summary.max_drawdown,
-        event_count=mtm_summary.event_count,
+        max_drawdown=portfolio_summary.max_drawdown,
+        event_count=portfolio_summary.event_count,
         score=score,
     )
 
