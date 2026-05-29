@@ -124,6 +124,9 @@ strike_distance_pct = (strike - current_btc_price) / current_btc_price
 - 对 `price_target` / `price_target_daily`，目标 strike 与 BTC 现货距离默认不能超过 `2.5%`；更远的 `reach/hit/dip/drop` 目标只观察，不吃单。
 - 对 `price_target`，允许在 YES 动量转弱且净 edge 足够时评估 `BUY_NO`，但必须同时满足现货距离、趋势和赔率过滤。
 - 对 `price_target`，`BUY_YES` 当前价格默认不能高于 `0.65`，`BUY_NO` 当前 NO 价格默认不能高于 `0.75`；否则即使方向正确，赔率也可能不足以覆盖一次反转亏损。
+- 对 `price_range_daily`，`BUY_YES` 当前 YES 价格默认不能高于 `0.88`，`BUY_NO` 当前 NO 价格默认不能高于 `0.75`；避免类似 `above 74k` 中高价追 NO 后被中途波动止损。
+- 对 `price_range_daily`，如果 BTC 在 `2%` 安全带内正接近 strike，则不逆势买另一边；例如 BTC 低于 above strike 但 15 分钟快速上行时，暂停 `BUY_NO`。
+- 对 `price_target` / `price_target_daily`，如果 BTC 15 分钟走势正在远离目标方向，则暂停 `BUY_YES`；例如 `dip to 72.5k` 但 BTC 正上行远离 72.5k，不再让止损替入场质量兜底。
 - 对 `above` 市场，不能在 `far_above_spot + NO_PRESSURE` 时买 YES。
 - 对 `under/below` 市场，不能在 `far_below_spot + NO_PRESSURE` 时买 YES。
 - `near_spot + YES_PRESSURE` 可以进入候选，但仍要通过净 edge、价差和风控。
@@ -143,6 +146,7 @@ strike_distance_pct = (strike - current_btc_price) / current_btc_price
 - `price_target` 止损后的同方向冷却更长，当前默认 `21600` 秒，避免在同一个 weekly target 上连续补刀式亏损。
 - 同一市场触发止盈后只进入短冷却；止盈是兑现利润，冷却结束后仍允许重新评估开仓。
 - 止盈后重新入场必须满足更高 edge 门槛，避免“卖出落袋后马上追进”导致手续费和滑点变多。
+- 同类型、同方向市场在观察窗口内连续出现亏损后，暂停该类型/方向的新开仓；这是跨 market_id 的熔断，不再只依赖单市场冷却。
 - 浮盈达到分批止盈阈值时，先卖出部分仓位，剩余仓位继续用移动止盈保护。
 - `above` 市场买 `NO` 时，如果 BTC 已接近或站上 strike，暂停逆突破方向；`below/under` 市场买 `NO` 时规则反向处理。
 - 实时 `TAKER` 候选必须继续经过执行压力观察：如果模拟发单延迟后的 ask 恶化已经吞掉净 edge，未来实盘层必须拒绝追单。

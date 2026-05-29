@@ -2,7 +2,14 @@ import unittest
 
 from ploymarket_sim.btc_price import BtcCandle
 from ploymarket_sim.btc_price import merge_btc_candles
-from ploymarket_sim.market_rules import blocks_btc_strike_entry, describe_strike_risk, extract_usd_strike, infer_strike_direction
+from ploymarket_sim.market_rules import (
+    blocks_btc_strike_entry,
+    blocks_price_range_entry,
+    blocks_price_target_entry,
+    describe_strike_risk,
+    extract_usd_strike,
+    infer_strike_direction,
+)
 from ploymarket_sim.polymarket import Market
 
 
@@ -50,6 +57,54 @@ class MarketRulesTests(unittest.TestCase):
 
         self.assertTrue(blocked)
         self.assertIn("缺少 BTC 现货确认", reason)
+
+    def test_blocks_expensive_buy_no_in_daily_range_market(self) -> None:
+        market = Market("m1", "Will the price of Bitcoin be above $74,000 on May 29?", "btc-above", None, 1000, 1000, True, ["Yes", "No"], [0.24, 0.76], ["yes", "no"], False, None, None)
+
+        blocked, reason = blocks_price_range_entry(
+            market,
+            "BUY_NO",
+            900,
+            [BtcCandle(0, 72700, 72800, 72750, 72700), BtcCandle(900, 72750, 72900, 72800, 72850)],
+            yes_price=0.24,
+            buy_no_max_price=0.75,
+        )
+
+        self.assertTrue(blocked)
+        self.assertIn("BUY_NO 价格过高", reason)
+
+    def test_blocks_daily_buy_no_when_btc_moves_toward_above_strike(self) -> None:
+        market = Market("m1", "Will the price of Bitcoin be above $74,000 on May 29?", "btc-above", None, 1000, 1000, True, ["Yes", "No"], [0.3, 0.7], ["yes", "no"], False, None, None)
+
+        blocked, reason = blocks_price_range_entry(
+            market,
+            "BUY_NO",
+            900,
+            [BtcCandle(0, 72700, 72800, 72750, 72700), BtcCandle(900, 72900, 73100, 73000, 73000)],
+            yes_price=0.3,
+            buy_no_max_price=0.75,
+            safety_band_pct=0.02,
+            moving_away_return_pct=0.001,
+        )
+
+        self.assertTrue(blocked)
+        self.assertIn("正接近 above strike", reason)
+
+    def test_blocks_dip_target_buy_yes_when_btc_moves_away(self) -> None:
+        market = Market("m1", "Will Bitcoin dip to $72,500 in May?", "btc-dip", None, 1000, 1000, True, ["Yes", "No"], [0.6, 0.4], ["yes", "no"], False, None, None)
+
+        blocked, reason = blocks_price_target_entry(
+            market,
+            "BUY_YES",
+            900,
+            [BtcCandle(0, 73300, 73400, 73350, 73350), BtcCandle(900, 73500, 73750, 73600, 73700)],
+            max_distance_pct=0.025,
+            yes_price=0.6,
+            moving_away_return_pct=0.001,
+        )
+
+        self.assertTrue(blocked)
+        self.assertIn("正远离 below/dip target", reason)
 
 
 if __name__ == "__main__":

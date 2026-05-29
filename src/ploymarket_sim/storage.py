@@ -671,6 +671,25 @@ class Storage:
             closed_position_count=int(closed_count),
         )
 
+    def count_recent_paper_losses(self, market_type: str, side: str, since_timestamp: int) -> int:
+        if not self.enabled or not Path(self.sqlite_path).exists():
+            return 0
+        self.init()
+        with self._connect() as connection:
+            count = connection.execute(
+                """
+                SELECT COUNT(*)
+                FROM paper_position_history h
+                JOIN markets m ON m.market_id = h.market_id
+                WHERE m.market_type = ?
+                  AND h.side = ?
+                  AND h.closed_at >= ?
+                  AND h.realized_pnl < 0
+                """,
+                (market_type, side, since_timestamp),
+            ).fetchone()[0]
+        return int(count)
+
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.sqlite_path)
 

@@ -13,7 +13,7 @@ from .orders import OrderEvent, canceled_events, lifecycle_events, make_order_id
 from .polymarket import Market
 from .risk import Portfolio, Position, approve_entry, should_exit
 from .signals import build_signal
-from .market_rules import blocks_btc_strike_entry, blocks_price_target_entry, latest_btc_candle_at_or_before
+from .market_rules import blocks_btc_strike_entry, blocks_price_range_entry, blocks_price_target_entry, latest_btc_candle_at_or_before
 from .strategy_profiles import is_tradeable_market, strategy_config_for_market
 
 
@@ -200,6 +200,20 @@ def backtest_market(
         if strike_blocked:
             trades.append(Trade(current.timestamp, market.id, "REJECTED", current.price, 0.0, 0.0, 0.0, 0.0, signal.net_edge, strike_reason))
             continue
+        range_blocked, range_reason = blocks_price_range_entry(
+            market,
+            signal.action,
+            current.timestamp,
+            btc_candles or [],
+            current.price,
+            config.risk.range_buy_yes_max_price,
+            config.risk.range_buy_no_max_price,
+            config.risk.range_market_safety_band_pct,
+            config.risk.btc_moving_away_return_pct,
+        )
+        if range_blocked:
+            trades.append(Trade(current.timestamp, market.id, "REJECTED", current.price, 0.0, 0.0, 0.0, 0.0, signal.net_edge, range_reason))
+            continue
         target_blocked, target_reason = blocks_price_target_entry(
             market,
             signal.action,
@@ -209,6 +223,7 @@ def backtest_market(
             current.price,
             config.risk.target_buy_yes_max_price,
             config.risk.target_buy_no_max_price,
+            config.risk.btc_moving_away_return_pct,
         )
         if target_blocked:
             trades.append(Trade(current.timestamp, market.id, "REJECTED", current.price, 0.0, 0.0, 0.0, 0.0, signal.net_edge, target_reason))

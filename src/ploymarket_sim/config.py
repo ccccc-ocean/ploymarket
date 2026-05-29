@@ -127,6 +127,12 @@ class RiskConfig:
     target_stop_cooldown_seconds: int = 21600
     target_buy_yes_max_price: float = 0.65
     target_buy_no_max_price: float = 0.75
+    range_buy_yes_max_price: float = 0.88
+    range_buy_no_max_price: float = 0.75
+    range_market_safety_band_pct: float = 0.02
+    btc_moving_away_return_pct: float = 0.001
+    strategy_loss_pause_count: int = 2
+    strategy_loss_pause_window_seconds: int = 21600
     readiness_max_drawdown_pct: float = 0.08
 
 

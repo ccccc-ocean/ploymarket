@@ -31,7 +31,7 @@ from .execution_stress import (
 from .flow_scan import print_flow_scan_summary, scan_market_flows, write_flow_scan_csv
 from .http import HttpError
 from .kalshi import discover_kalshi_btc_markets
-from .market_rules import blocks_btc_strike_entry, blocks_price_target_entry
+from .market_rules import blocks_btc_strike_entry, blocks_price_range_entry, blocks_price_target_entry
 from .market_type_report import build_market_type_report, print_market_type_report, write_market_type_report_csv
 from .portfolio import build_mark_to_market_curve, build_portfolio_curve, summarize_portfolio
 from .paper import build_paper_signal_row, summarize_paper_rows
@@ -408,6 +408,19 @@ def _run_paper_scan(config, market_type: str) -> None:
             )
             if blocked:
                 signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, reason)
+            blocked, reason = blocks_price_range_entry(
+                market,
+                signal.action,
+                history[-1].timestamp,
+                btc_candles,
+                history[-1].price,
+                config.risk.range_buy_yes_max_price,
+                config.risk.range_buy_no_max_price,
+                config.risk.range_market_safety_band_pct,
+                config.risk.btc_moving_away_return_pct,
+            )
+            if blocked:
+                signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, reason)
             blocked, reason = blocks_price_target_entry(
                 market,
                 signal.action,
@@ -417,10 +430,14 @@ def _run_paper_scan(config, market_type: str) -> None:
                 history[-1].price,
                 config.risk.target_buy_yes_max_price,
                 config.risk.target_buy_no_max_price,
+                config.risk.btc_moving_away_return_pct,
             )
             if blocked:
                 signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, reason)
             blocked, reason = blocks_directional_entry(market, signal, btc_candles, history[-1].timestamp)
+            if blocked:
+                signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, reason)
+            blocked, reason = _strategy_loss_pause_blocks_entry(config, storage, market, signal.action, history[-1].timestamp)
             if blocked:
                 signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, reason)
         signal, execution_plan = _live_paper_entry_plan(config, market, signal, market_config, history[-1].price)
@@ -683,6 +700,24 @@ def _paper_reentry_edge_too_weak(config, storage, market, expected_net_edge: flo
         return False
     required_edge = min_edge * config.risk.paper_reentry_edge_multiplier
     return expected_net_edge < required_edge
+
+
+def _strategy_loss_pause_blocks_entry(config, storage, market, action: str, timestamp: int) -> tuple[bool, str]:
+    if action not in {"BUY_YES", "BUY_NO"}:
+        return False, ""
+    max_losses = max(0, int(config.risk.strategy_loss_pause_count))
+    if max_losses <= 0:
+        return False, ""
+    side = "NO" if action == "BUY_NO" else "YES"
+    market_type = classify_market(market).market_type
+    since_timestamp = timestamp - max(0, int(config.risk.strategy_loss_pause_window_seconds))
+    losses = storage.count_recent_paper_losses(market_type, side, since_timestamp)
+    if losses >= max_losses:
+        return (
+            True,
+            f"同类市场连续止损/亏损暂停: market_type={market_type}, side={side}, losses={losses}, window={config.risk.strategy_loss_pause_window_seconds}s",
+        )
+    return False, ""
 
 
 def _paper_close_value(position: PaperPositionState, current_price: float, market, config) -> float:

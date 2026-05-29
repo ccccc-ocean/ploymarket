@@ -13,6 +13,7 @@ from ploymarket_sim.cli import _market_discovery_is_healthy
 from ploymarket_sim.cli import _paper_run_data_degraded
 from ploymarket_sim.cli import _paper_markets_including_open_positions
 from ploymarket_sim.cli import _realtime_market_discovery_is_healthy
+from ploymarket_sim.cli import _strategy_loss_pause_blocks_entry
 from ploymarket_sim.clob import TokenQuote
 from ploymarket_sim.http import HttpError
 from ploymarket_sim.config import (
@@ -362,6 +363,35 @@ class PaperPositionTests(unittest.TestCase):
 
             self.assertTrue(_paper_reentry_edge_too_weak(config, storage, market(), 0.002, 0.0015))
             self.assertFalse(_paper_reentry_edge_too_weak(config, storage, market(), 0.003, 0.0015))
+
+    def test_strategy_loss_pause_blocks_same_market_type_and_side(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = app_config(str(Path(directory) / "paper.sqlite"))
+            storage = Storage(True, config.storage.sqlite_path)
+            storage.save_markets([market(), Market("m2", market().question, "btc-above-2", None, 1000, 100, True, ["Yes", "No"], [0.3, 0.7], ["yes2", "no2"], False, None, None)])
+            for market_id in ["m1", "m2"]:
+                storage.save_open_paper_position(
+                    PaperPositionState(
+                        market_id=market_id,
+                        side="NO",
+                        entry_price=0.7,
+                        shares=10.0,
+                        notional=7.0,
+                        opened_at=100,
+                        status="open",
+                        closed_at=None,
+                        realized_pnl=0.0,
+                        cooldown_until=0,
+                        peak_price=0.7,
+                        partial_take_profit_count=0,
+                    )
+                )
+                storage.close_paper_position(market_id, 200, -1.0, 300)
+
+            blocked, reason = _strategy_loss_pause_blocks_entry(config, storage, market(), "BUY_NO", 400)
+
+            self.assertTrue(blocked)
+            self.assertIn("同类市场连续止损", reason)
 
 
 if __name__ == "__main__":

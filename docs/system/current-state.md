@@ -314,6 +314,9 @@ Maker 参数位于 `config/default.toml` 的 `[execution]` 区块。当前默认
 - `partial_take_profit_pct` / `partial_take_profit_fraction`: 浮盈达到阈值后先卖出一部分，剩余仓位继续跟踪。当前为 `16%` 先卖 `35%`，减少过早切掉赢家。
 - `paper_full_take_profit_pct`: 模拟盘保护性全量止盈比例，当前为 `32%`，与回测趋势止盈分开配置。
 - `trailing_stop_activation_pct` / `trailing_stop_drawdown_pct`: 浮盈达到启动阈值后，如果从峰值回吐过多，则保护性退出剩余仓位。当前为浮盈 `18%` 后允许从峰值回吐 `7%`。
+- `range_buy_yes_max_price` / `range_buy_no_max_price`: `price_range_daily` 入场价格上限，当前分别为 `0.88` / `0.75`，用于避免高价追单。
+- `range_market_safety_band_pct` / `btc_moving_away_return_pct`: strike 安全带与 15 分钟方向过滤；BTC 在安全带内朝 strike 快速移动时，不逆势开另一边。
+- `strategy_loss_pause_count` / `strategy_loss_pause_window_seconds`: 同类型同方向连续亏损熔断；当前为 `6` 小时内亏损达到 `2` 笔后暂停该类型/方向新开仓。
 - `paper_reentry_edge_multiplier`: 止盈后同市场重新入场需要更高 edge，避免频繁止盈/再开仓把利润交给手续费。
 - `max_spread`: 最大允许价差。
 - `min_price` / `max_price`: 不交易过于极端的价格。
