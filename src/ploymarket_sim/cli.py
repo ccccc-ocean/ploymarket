@@ -31,7 +31,7 @@ from .execution_stress import (
 from .flow_scan import print_flow_scan_summary, scan_market_flows, write_flow_scan_csv
 from .http import HttpError
 from .kalshi import discover_kalshi_btc_markets
-from .market_rules import blocks_btc_strike_entry, blocks_price_range_entry, blocks_price_target_entry
+from .market_rules import blocks_btc_strike_entry, blocks_price_range_entry, blocks_price_target_entry, infer_strike_direction
 from .market_type_report import build_market_type_report, print_market_type_report, write_market_type_report_csv
 from .portfolio import build_mark_to_market_curve, build_portfolio_curve, summarize_portfolio
 from .paper import build_paper_signal_row, summarize_paper_rows
@@ -576,8 +576,15 @@ def _live_paper_entry_plan(config, market, signal, market_config, reference_yes_
     reference_side_price = reference_yes_price if signal.action == "BUY_YES" else max(0.0, 1.0 - reference_yes_price)
     adverse_repricing = max(0.0, quote.ask - reference_side_price)
     repriced_edge = signal.net_edge - adverse_repricing
-    if repriced_edge < market_config.signal.min_edge:
-        hold = Signal("HOLD", 0.0, signal.edge, repriced_edge, f"实时 ask 重定价后净 edge 不足，跳过模拟开仓: ask={quote.ask:.3f}")
+    required_edge = market_config.signal.min_edge * max(1.0, config.risk.live_reprice_edge_multiplier)
+    if repriced_edge < required_edge:
+        hold = Signal(
+            "HOLD",
+            0.0,
+            signal.edge,
+            repriced_edge,
+            f"实时 ask 重定价后净 edge 不足，跳过模拟开仓: ask={quote.ask:.3f}, required={required_edge:.4f}",
+        )
         return hold, plan_execution(market, hold, market_config.signal, market_config.backtest, market_config.execution, reference_yes_price)
     repriced_signal = Signal(signal.action, signal.confidence, signal.edge, repriced_edge, f"{signal.reason}; 实时 ask 已确认")
     return (
@@ -710,12 +717,16 @@ def _strategy_loss_pause_blocks_entry(config, storage, market, action: str, time
         return False, ""
     side = "NO" if action == "BUY_NO" else "YES"
     market_type = classify_market(market).market_type
+    direction = infer_strike_direction(market.question)
     since_timestamp = timestamp - max(0, int(config.risk.strategy_loss_pause_window_seconds))
-    losses = storage.count_recent_paper_losses(market_type, side, since_timestamp)
+    if direction != "unknown":
+        losses = storage.count_recent_paper_losses_by_direction(market_type, direction, side, since_timestamp)
+    else:
+        losses = storage.count_recent_paper_losses(market_type, side, since_timestamp)
     if losses >= max_losses:
         return (
             True,
-            f"同类市场连续止损/亏损暂停: market_type={market_type}, side={side}, losses={losses}, window={config.risk.strategy_loss_pause_window_seconds}s",
+            f"同类方向连续止损/亏损暂停: market_type={market_type}, direction={direction}, side={side}, losses={losses}, window={config.risk.strategy_loss_pause_window_seconds}s",
         )
     return False, ""
 

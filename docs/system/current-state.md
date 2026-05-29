@@ -1,6 +1,6 @@
 # 当前系统状态
 
-最后更新：2026-05-20
+最后更新：2026-05-29
 
 ## 项目定位
 
@@ -187,6 +187,22 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discov
 - BTC 过去 1 小时收益 `<= -0.25%`
 
 命中时，不允许做多 YES。该过滤器来自 `edge-report` 的坏条件分层，用于先排除明显差的交易环境。
+
+### 入场质量过滤
+
+代码位置：
+
+- [src/ploymarket_sim/market_rules.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/market_rules.py)
+- [src/ploymarket_sim/strategy_profiles.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/strategy_profiles.py)
+- [src/ploymarket_sim/cli.py](/Users/pizza_yang/code/ploymarket/src/ploymarket_sim/cli.py)
+
+当前模拟盘在开仓前会额外执行：
+
+- `price_target` 使用更高门槛，当前 5 分钟策略约为 `short=6`、`long=24`、`min_momentum=0.01`、`min_edge=0.01`。
+- `price_target BUY_YES` 如果 15 分钟或 1 小时 BTC 走势正在远离目标方向，会暂停入场，避免 `dip/reach` 类市场在反向行情里连续止损。
+- `price_range_daily BUY_NO above` 如果 BTC 在更近安全带内且 1 小时正在接近 strike，会暂停逆突破方向。
+- 实时订单簿 ask 重定价后，净 edge 必须至少达到 `min_edge * live_reprice_edge_multiplier`；默认倍数为 `2.0`。
+- 连续亏损暂停按 `market_type + strike direction + side` 统计，减少不同方向策略互相误伤，同时能更快暂停同类亏损模式。
 
 ### 每日复盘报告
 

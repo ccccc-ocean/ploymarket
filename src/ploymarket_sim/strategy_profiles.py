@@ -37,8 +37,8 @@ def strategy_config_for_market(config: AppConfig, market: Market) -> AppConfig:
                 config.signal,
                 short_window=6,
                 long_window=24,
-                min_momentum=0.0075,
-                min_edge=0.005,
+                min_momentum=0.01,
+                min_edge=0.01,
             ),
         )
     return config

@@ -7,6 +7,7 @@ from time import time
 
 from .classifier import classify_market
 from .clob import PricePoint
+from .market_rules import infer_strike_direction
 from .paper import PaperSignalRow
 from .polymarket import Market
 
@@ -689,6 +690,27 @@ class Storage:
                 (market_type, side, since_timestamp),
             ).fetchone()[0]
         return int(count)
+
+    def count_recent_paper_losses_by_direction(
+        self, market_type: str, direction: str, side: str, since_timestamp: int
+    ) -> int:
+        if not self.enabled or not Path(self.sqlite_path).exists():
+            return 0
+        self.init()
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT m.question
+                FROM paper_position_history h
+                JOIN markets m ON m.market_id = h.market_id
+                WHERE m.market_type = ?
+                  AND h.side = ?
+                  AND h.closed_at >= ?
+                  AND h.realized_pnl < 0
+                """,
+                (market_type, side, since_timestamp),
+            ).fetchall()
+        return sum(1 for (question,) in rows if infer_strike_direction(str(question)) == direction)
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.sqlite_path)

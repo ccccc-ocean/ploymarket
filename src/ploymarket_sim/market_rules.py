@@ -70,8 +70,9 @@ def blocks_price_range_entry(
                 return True, f"price_range_daily BUY_NO 价格过高，避免高价追 NO: no={no_price:.3f}, max={buy_no_max_price:.3f}"
 
     recent_return = _return_since(btc_candles, timestamp, 15 * 60, candle.close)
+    hourly_return = _return_since(btc_candles, timestamp, 60 * 60, candle.close)
     if recent_return is None:
-        return False, ""
+        recent_return = 0.0
 
     distance_pct = (strike - candle.close) / candle.close
     near_band = abs(distance_pct) <= safety_band_pct
@@ -80,6 +81,16 @@ def blocks_price_range_entry(
             return (
                 True,
                 f"BTC 正接近 above strike，暂停 BUY_NO: BTC={candle.close:.2f}, strike={strike:.2f}, distance={distance_pct:.2%}, 15m={recent_return:.2%}",
+            )
+        if (
+            action == "BUY_NO"
+            and 0 < distance_pct <= safety_band_pct / 2
+            and hourly_return is not None
+            and hourly_return >= moving_away_return_pct
+        ):
+            return (
+                True,
+                f"BTC 1h 正接近 above strike，暂停 BUY_NO: BTC={candle.close:.2f}, strike={strike:.2f}, distance={distance_pct:.2%}, 1h={hourly_return:.2%}",
             )
         if action == "BUY_YES" and distance_pct > 0 and recent_return <= -moving_away_return_pct:
             return (
@@ -156,6 +167,7 @@ def blocks_price_target_entry(
             f"price_target 接近/跌破 below strike，暂停 BUY_NO: BTC={candle.close:.2f}, strike={strike:.2f}, distance={distance_pct:.2%}, max={max_distance_pct:.2%}",
         )
     recent_return = _return_since(btc_candles, timestamp, 15 * 60, candle.close)
+    hourly_return = _return_since(btc_candles, timestamp, 60 * 60, candle.close)
     if recent_return is not None:
         if direction == "above" and action == "BUY_YES" and recent_return <= -moving_away_return_pct:
             return (
@@ -166,6 +178,17 @@ def blocks_price_target_entry(
             return (
                 True,
                 f"price_target BTC 正远离 below/dip target，暂停 BUY_YES: BTC={candle.close:.2f}, strike={strike:.2f}, 15m={recent_return:.2%}",
+            )
+    if hourly_return is not None:
+        if direction == "above" and action == "BUY_YES" and hourly_return <= -moving_away_return_pct:
+            return (
+                True,
+                f"price_target BTC 1h 正远离 above target，暂停 BUY_YES: BTC={candle.close:.2f}, strike={strike:.2f}, 1h={hourly_return:.2%}",
+            )
+        if direction == "below" and action == "BUY_YES" and hourly_return >= moving_away_return_pct:
+            return (
+                True,
+                f"price_target BTC 1h 正远离 below/dip target，暂停 BUY_YES: BTC={candle.close:.2f}, strike={strike:.2f}, 1h={hourly_return:.2%}",
             )
     return False, ""
 

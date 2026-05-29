@@ -123,6 +123,7 @@ class RiskConfig:
     trailing_stop_drawdown_pct: float = 0.06
     paper_full_take_profit_pct: float = 0.25
     paper_reentry_edge_multiplier: float = 2.0
+    live_reprice_edge_multiplier: float = 2.0
     target_market_max_distance_pct: float = 0.025
     target_stop_cooldown_seconds: int = 21600
     target_buy_yes_max_price: float = 0.65

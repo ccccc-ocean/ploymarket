@@ -364,7 +364,7 @@ class PaperPositionTests(unittest.TestCase):
             self.assertTrue(_paper_reentry_edge_too_weak(config, storage, market(), 0.002, 0.0015))
             self.assertFalse(_paper_reentry_edge_too_weak(config, storage, market(), 0.003, 0.0015))
 
-    def test_strategy_loss_pause_blocks_same_market_type_and_side(self) -> None:
+    def test_strategy_loss_pause_blocks_same_market_type_direction_and_side(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             config = app_config(str(Path(directory) / "paper.sqlite"))
             storage = Storage(True, config.storage.sqlite_path)
@@ -391,7 +391,36 @@ class PaperPositionTests(unittest.TestCase):
             blocked, reason = _strategy_loss_pause_blocks_entry(config, storage, market(), "BUY_NO", 400)
 
             self.assertTrue(blocked)
-            self.assertIn("同类市场连续止损", reason)
+            self.assertIn("同类方向连续止损", reason)
+
+    def test_strategy_loss_pause_does_not_block_different_direction(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = app_config(str(Path(directory) / "paper.sqlite"))
+            storage = Storage(True, config.storage.sqlite_path)
+            below_market = Market("below-1", "Will Bitcoin dip to $72,000 in May?", "btc-dip-72000", None, 1000, 100, True, ["Yes", "No"], [0.3, 0.7], ["yes3", "no3"], False, None, None)
+            storage.save_markets([market(), Market("m2", market().question, "btc-above-2", None, 1000, 100, True, ["Yes", "No"], [0.3, 0.7], ["yes2", "no2"], False, None, None), below_market])
+            for market_id in ["m1", "m2"]:
+                storage.save_open_paper_position(
+                    PaperPositionState(
+                        market_id=market_id,
+                        side="NO",
+                        entry_price=0.7,
+                        shares=10.0,
+                        notional=7.0,
+                        opened_at=100,
+                        status="open",
+                        closed_at=None,
+                        realized_pnl=0.0,
+                        cooldown_until=0,
+                        peak_price=0.7,
+                        partial_take_profit_count=0,
+                    )
+                )
+                storage.close_paper_position(market_id, 200, -1.0, 300)
+
+            blocked, _reason = _strategy_loss_pause_blocks_entry(config, storage, below_market, "BUY_NO", 400)
+
+            self.assertFalse(blocked)
 
 
 if __name__ == "__main__":

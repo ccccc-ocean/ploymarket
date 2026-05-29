@@ -106,6 +106,47 @@ class MarketRulesTests(unittest.TestCase):
         self.assertTrue(blocked)
         self.assertIn("正远离 below/dip target", reason)
 
+    def test_blocks_dip_target_buy_yes_when_hourly_btc_moves_away(self) -> None:
+        market = Market("m1", "Will Bitcoin dip to $72,500 in May?", "btc-dip", None, 1000, 1000, True, ["Yes", "No"], [0.6, 0.4], ["yes", "no"], False, None, None)
+
+        blocked, reason = blocks_price_target_entry(
+            market,
+            "BUY_YES",
+            3600,
+            [
+                BtcCandle(0, 72700, 72800, 72750, 72750),
+                BtcCandle(2700, 73020, 73100, 73050, 73050),
+                BtcCandle(3600, 73050, 73150, 73100, 73100),
+            ],
+            max_distance_pct=0.025,
+            yes_price=0.6,
+            moving_away_return_pct=0.001,
+        )
+
+        self.assertTrue(blocked)
+        self.assertIn("1h 正远离 below/dip target", reason)
+
+    def test_blocks_range_buy_no_when_hourly_btc_moves_toward_near_above_strike(self) -> None:
+        market = Market("m1", "Will the price of Bitcoin be above $74,000 on May 29?", "btc-above", None, 1000, 1000, True, ["Yes", "No"], [0.4, 0.6], ["yes", "no"], False, None, None)
+
+        blocked, reason = blocks_price_range_entry(
+            market,
+            "BUY_NO",
+            3600,
+            [
+                BtcCandle(0, 73200, 73300, 73250, 73250),
+                BtcCandle(2700, 73550, 73620, 73600, 73600),
+                BtcCandle(3600, 73600, 73700, 73650, 73650),
+            ],
+            yes_price=0.4,
+            buy_no_max_price=0.75,
+            safety_band_pct=0.02,
+            moving_away_return_pct=0.001,
+        )
+
+        self.assertTrue(blocked)
+        self.assertIn("1h 正接近 above strike", reason)
+
 
 if __name__ == "__main__":
     unittest.main()

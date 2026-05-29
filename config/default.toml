@@ -95,6 +95,7 @@ trailing_stop_activation_pct = 0.18
 trailing_stop_drawdown_pct = 0.07
 paper_full_take_profit_pct = 0.32
 paper_reentry_edge_multiplier = 2.0
+live_reprice_edge_multiplier = 2.0
 target_market_max_distance_pct = 0.025
 target_stop_cooldown_seconds = 21600
 target_buy_yes_max_price = 0.65
