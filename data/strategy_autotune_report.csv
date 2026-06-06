@@ -1,0 +1,2 @@
+priority,scope,action,status,reason,evidence
+80,probe_slots,maintain_current_probe_budget,slots_available,探索槽位和敞口仍可用，当前不需要为了开仓数调整预算。,"open_positions=0,probe_slots=5,open_exposure=0.00,probe_max_exposure=30.00,zero_taker_streak=4,probe_zero_run_threshold=1"

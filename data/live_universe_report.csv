@@ -1,0 +1,10 @@
+market_type,live_count,sample_status,recent_taker_count,positive_edge_skip_count,universe_status
+above_below_expiry,30,sample_starved,0,1,sample_starved_with_live_markets
+touch_above,29,no_edge,0,0,live_available
+touch_below,16,no_edge,0,0,live_available
+company_treasury,2,sample_starved,0,7,sample_starved_with_live_markets
+indirect_event,1,sample_starved,0,5,sample_starved_with_live_markets
+up_down_short_term,1,,0,0,live_available
+range_bucket,0,,0,0,no_live_markets
+expiry_target,0,,0,0,no_live_markets
+unknown,0,,0,0,no_live_markets

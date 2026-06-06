@@ -1,0 +1,5 @@
+market_type,side,market_count,entry_count,exit_count,win_count,loss_count,win_rate,realized_pnl,total_fees,total_slippage,average_entry_edge,worst_trade_pnl,status,top_loss_reason
+above_below_expiry,NO,9,16,16,8,8,0.5,16.153480675766893,17.765582962980012,1.0,0.046584114583333315,-7.0655345902485145,side_candidate,触发止损 (8)
+touch_above,NO,1,2,2,1,1,0.5,1.8266143659419072,1.6405927218365948,0.125,0.022379166666666686,-6.354008835669447,collect_more_samples,触发止损 (1)
+up_down_short_term,NO,1,1,1,0,1,0.0,-7.51347708993282,1.5473802262362115,0.0625,0.03634999999999995,-7.51347708993282,collect_more_samples,触发止损 (1)
+up_down_short_term,YES,1,1,1,1,0,1.0,7.946705907211836,0.44742098194112023,0.0625,0.003816666666666673,7.946705907211836,collect_more_samples,

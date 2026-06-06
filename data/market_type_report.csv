@@ -1,0 +1,6 @@
+market_type,market_count,traded_market_count,trade_count,win_rate,pnl,total_fees,total_slippage,max_drawdown,ending_equity
+price_target,48,3,10,0.4,0.212816407157554,7.931615592657376,0.3125,0.011583093852079741,1000.2128164071576
+price_target_daily,71,0,0,0.0,0.0,0,0,0.0,1000.0
+price_range_daily,78,21,100,0.68,66.41936113717087,39.864710262288526,3.125,0.04181984731849684,1066.4193611371707
+company_treasury,6,0,0,0.0,0.0,0,0,0.0,1000.0
+indirect_event,13,0,0,0.0,0.0,0,0,0.0,1000.0

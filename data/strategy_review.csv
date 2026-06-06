@@ -1,0 +1,8 @@
+market_type,status,recommended_action,reason,taker_count,probe_taker_count,positive_edge_skip_count,max_expected_edge,top_blocker
+price_range_daily,normal,maintain,当前没有明显样本饥饿或正 edge 被大量过滤的迹象。,2,0,5,0.043041388888888935,price_too_high_or_payout_too_low:3/3
+above_below_expiry,normal,maintain,当前没有明显样本饥饿或正 edge 被大量过滤的迹象。,0,0,1,0.05421805555555555,missing_context:1/11
+company_treasury,observe_only,keep_observing,非 BTC 价格结构，暂不进入主模拟盘，避免偏离当前 BTC 策略目标。top_blocker=observe_only_type:0/19,0,0,0,-0.011699999999999999,observe_only_type:0/19
+indirect_event,observe_only,keep_observing,非 BTC 价格结构，暂不进入主模拟盘，避免偏离当前 BTC 策略目标。top_blocker=observe_only_type:0/4,0,0,0,-0.0241,observe_only_type:0/4
+price_target,normal,maintain,当前没有明显样本饥饿或正 edge 被大量过滤的迹象。,0,0,0,-0.03141666666666666,edge_too_low:0/81
+touch_above,normal,maintain,当前没有明显样本饥饿或正 edge 被大量过滤的迹象。,0,0,0,-0.031708333333333324,edge_too_low:0/20
+touch_below,normal,maintain,当前没有明显样本饥饿或正 edge 被大量过滤的迹象。,0,0,0,-0.07566083333333334,edge_too_low:0/15

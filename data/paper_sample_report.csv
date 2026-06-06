@@ -1,0 +1,9 @@
+market_type,recent_runs,unique_market_count,row_count,taker_count,buy_yes_taker_count,buy_no_taker_count,probe_taker_count,skip_count,positive_edge_skip_count,taker_rate,probe_taker_rate,max_expected_edge,average_taker_edge,top_probe_families,sample_status
+price_range_daily,20,34,149,3,2,1,0,146,13,0.020134228187919462,0.0,0.04363888888888878,0.035192129629629594,,main_strategy
+above_below_expiry,20,14,14,0,0,0,0,14,1,0.0,0.0,0.05421805555555555,0.0,,sample_starved
+company_treasury,20,6,31,0,0,0,0,31,0,0.0,0.0,-0.011699999999999999,0.0,,no_edge
+indirect_event,20,2,10,0,0,0,0,10,0,0.0,0.0,-0.0241,0.0,,no_edge
+price_target,20,34,213,0,0,0,0,213,0,0.0,0.0,-0.03141666666666666,0.0,,no_edge
+touch_above,20,20,20,0,0,0,0,20,0,0.0,0.0,-0.031708333333333324,0.0,,no_edge
+touch_below,20,15,15,0,0,0,0,15,0,0.0,0.0,-0.07566083333333334,0.0,,no_edge
+price_target_daily,20,13,25,0,0,0,0,25,0,0.0,0.0,-0.07746500000000002,0.0,,no_edge

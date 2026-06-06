@@ -1,0 +1,6 @@
+run_timestamp,market_id,market_type,question,yes_price,taker_fee_rate,action,confidence,gross_edge,net_edge,reason,execution_mode,execution_side,limit_price,expected_net_edge,execution_reason
+1779539669,540844,price_target,Will bitcoin hit $1m before GTA VI?,0.4915,0.05,HOLD,0.0,0.0,-0.032924999999999996,净优势不足，等待更清晰的定价偏差,SKIP,,,-0.032924999999999996,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779539669,2109881,indirect_event,Will Anthropic flip BTC by December 31?,0.62,0.04,HOLD,0.0,0.0,-0.0227,当前市场类型暂不交易，只记录观察,SKIP,,,-0.0227,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779539669,2290309,company_treasury,MicroStrategy announces >1000 BTC purchase May 19-25?,0.08,0.07,HOLD,0.0,0.0,-0.07190000000000002,当前市场类型暂不交易，只记录观察,SKIP,,,-0.07190000000000002,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779539669,1553608,company_treasury,"Will MicroStrategy announce holding 1M+ BTC by December 31, 2026?-bV81",0.495,0.07,HOLD,0.0,0.0,-0.042850000000000006,当前市场类型暂不交易，只记录观察,SKIP,,,-0.042850000000000006,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779539669,1068384,indirect_event,"Will El Salvador hold $1b+ of BTC by December 31, 2026?",0.45,0.07,HOLD,0.0,0.003124999999999989,-0.04252500000000001,当前市场类型暂不交易，只记录观察,SKIP,,,-0.04252500000000001,Taker 净优势不足，Maker 条件也未达到，继续观察

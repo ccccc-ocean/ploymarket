@@ -1,0 +1,12 @@
+market_type,observed_rows,hold_count,avoid_count,buy_yes_count,buy_no_count,positive_edge_count,strong_edge_count,best_net_edge,avg_positive_net_edge,replay_trade_count,replay_pnl,replay_max_drawdown,status,top_reason
+above_below_expiry,0,0,0,0,0,0,0,0.0,0.0,32,16.153480675766893,0.0,main_active,
+company_treasury,875,871,4,0,0,7,2,0.026986666666666638,0.009641428571428546,0,0.0,0.0,observe_optimize,当前市场类型暂不交易，只记录观察 (865)
+expiry_target,0,0,0,0,0,0,0,0.0,0.0,0,0.0,0.0,collect_more_samples,
+indirect_event,432,432,0,0,0,5,1,0.016299999999999922,0.009560499999999991,0,0.0,0.0,observe_optimize,当前市场类型暂不交易，只记录观察 (428)
+price_range_daily,4100,3806,240,17,37,418,338,0.32695694444444445,0.04919838882243488,0,0.0,0.0,observe_optimize,YES 价格太接近 0，容易被噪音扫损 (1471)
+price_target,6694,6552,119,23,0,30,25,0.09460833333333334,0.02874927777777779,0,0.0,0.0,observe_optimize,净优势不足，等待更清晰的定价偏差 (3121)
+price_target_daily,3113,3113,0,0,0,4,4,0.125695,0.045428750000000004,0,0.0,0.0,observe_optimize,当前市场类型暂不交易，只记录观察 (3055)
+range_bucket,0,0,0,0,0,0,0,0.0,0.0,0,0.0,0.0,collect_more_samples,
+touch_above,0,0,0,0,0,0,0,0.0,0.0,4,1.8266143659419072,0.0,main_active,
+touch_below,0,0,0,0,0,0,0,0.0,0.0,0,0.0,0.0,collect_more_samples,
+up_down_short_term,0,0,0,0,0,0,0,0.0,0.0,4,0.43322881727901574,0.0,main_active,

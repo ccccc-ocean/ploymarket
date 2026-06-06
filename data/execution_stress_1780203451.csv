@@ -1,0 +1,1 @@
+run_timestamp,market_id,question,side,scenario,reference_price,stressed_price,expected_net_edge,stressed_net_edge,fill_fraction,filled_notional,unfilled_notional,outcome,control_action,reason

@@ -1,0 +1,4 @@
+run_timestamp,market_id,market_type,question,yes_price,taker_fee_rate,action,confidence,gross_edge,net_edge,reason,execution_mode,execution_side,limit_price,expected_net_edge,execution_reason
+1779550917,540844,price_target,Will bitcoin hit $1m before GTA VI?,0.4915,0.05,HOLD,0.0,0.0,-0.032924999999999996,净优势不足，等待更清晰的定价偏差,SKIP,,,-0.032924999999999996,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779550917,2109881,indirect_event,Will Anthropic flip BTC by December 31?,0.615,0.04,HOLD,0.0,-0.00187499999999996,-0.02477499999999996,当前市场类型暂不交易，只记录观察,SKIP,,,-0.02477499999999996,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779550917,1068384,indirect_event,"Will El Salvador hold $1b+ of BTC by December 31, 2026?",0.45,0.07,HOLD,0.0,0.0012500000000000289,-0.04439999999999997,当前市场类型暂不交易，只记录观察,SKIP,,,-0.04439999999999997,Taker 净优势不足，Maker 条件也未达到，继续观察

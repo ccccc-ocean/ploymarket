@@ -1,0 +1,36 @@
+run_timestamp,market_id,market_type,question,yes_price,taker_fee_rate,action,confidence,gross_edge,net_edge,reason,execution_mode,execution_side,limit_price,expected_net_edge,execution_reason
+1779210113,573655,price_target,"Will Bitcoin hit $150k by June 30, 2026?",0.0135,0.07,HOLD,0.0,-2.60416666666664e-05,-0.013047104166666667,YES 价格太接近 0，容易被噪音扫损,SKIP,,,-0.013047104166666667,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2132768,price_target,"Will Bitcoin reach $150,000 in May?",0.0025,0.07,HOLD,0.0,0.0,-0.0126745625,YES 价格太接近 0，容易被噪音扫损,SKIP,,,-0.0126745625,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2132769,price_target,"Will Bitcoin reach $120,000 in May?",0.0015,0.07,HOLD,0.0,-3.4722222222222012e-06,-0.012608314722222224,YES 价格太接近 0，容易被噪音扫损,SKIP,,,-0.012608314722222224,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2132775,price_target,"Will Bitcoin reach $90,000 in May?",0.0265,0.07,HOLD,0.0,-0.004227430555555554,-0.018533273055555556,YES 价格太接近 0，容易被噪音扫损,SKIP,,,-0.018533273055555556,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2132776,price_target,"Will Bitcoin reach $85,000 in May?",0.095,0.07,HOLD,0.0,-0.007604166666666662,-0.026122416666666662,净优势不足，等待更清晰的定价偏差,SKIP,,,-0.026122416666666662,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2132780,price_target,"Will Bitcoin dip to $65,000 in May?",0.055,0.07,HOLD,0.0,0.0010572916666666682,-0.015112090833333335,YES 价格太接近 0，容易被噪音扫损,SKIP,,,-0.015112090833333335,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2132779,price_target,"Will Bitcoin dip to $70,000 in May?",0.195,0.07,HOLD,0.0,0.0004340277777777901,-0.02347422222222221,净优势不足，等待更清晰的定价偏差,SKIP,,,-0.02347422222222221,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2132774,price_target,"Will Bitcoin reach $95,000 in May?",0.0095,0.07,HOLD,0.0,-0.00010763888888888802,-0.01326632138888889,YES 价格太接近 0，容易被噪音扫损,SKIP,,,-0.01326632138888889,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2132778,price_target,"Will Bitcoin dip to $75,000 in May?",0.675,0.07,HOLD,0.0,0.024982638888888853,-0.002873611111111146,净优势不足，等待更清晰的定价偏差,SKIP,,,-0.002873611111111146,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2132781,price_target,"Will Bitcoin dip to $60,000 in May?",0.0165,0.07,HOLD,0.0,-0.0022552083333333313,-0.015891150833333333,YES 价格太接近 0，容易被噪音扫损,SKIP,,,-0.015891150833333333,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2132773,price_target,"Will Bitcoin reach $100,000 in May?",0.0045,0.07,HOLD,0.0,-0.0005729166666666669,-0.013455799166666668,YES 价格太接近 0，容易被噪音扫损,SKIP,,,-0.013455799166666668,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2159397,price_target,"Will Bitcoin reach $86,000 May 4-10?",0.0015,0.07,HOLD,0.0,0.0,0.0,价格历史不足，先观察,SKIP,,,0.0,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2132772,price_target,"Will Bitcoin reach $105,000 in May?",0.0035,0.07,HOLD,0.0,-0.0005833333333333333,-0.013327475833333333,YES 价格太接近 0，容易被噪音扫损,SKIP,,,-0.013327475833333333,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2159398,price_target,"Will Bitcoin reach $84,000 May 4-10?",0.0165,0.07,HOLD,0.0,0.0,0.0,价格历史不足，先观察,SKIP,,,0.0,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2132771,price_target,"Will Bitcoin reach $110,000 in May?",0.0025,0.07,HOLD,0.0,-0.0006250000000000001,-0.0132995625,YES 价格太接近 0，容易被噪音扫损,SKIP,,,-0.0132995625,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2132784,price_target,"Will Bitcoin dip to $45,000 in May?",0.0035,0.07,HOLD,0.0,-0.0003888888888888887,-0.013133031388888888,YES 价格太接近 0，容易被噪音扫损,SKIP,,,-0.013133031388888888,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2159396,price_target,"Will Bitcoin reach $88,000 May 4-10?",0.001,0.07,HOLD,0.0,0.0,0.0,价格历史不足，先观察,SKIP,,,0.0,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2132770,price_target,"Will Bitcoin reach $115,000 in May?",0.0025,0.07,HOLD,0.0,-0.0004756944444444444,-0.013150256944444445,YES 价格太接近 0，容易被噪音扫损,SKIP,,,-0.013150256944444445,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2159400,price_target,"Will Bitcoin dip to $78,000 May 4-10?",0.0115,0.07,HOLD,0.0,0.0,0.0,价格历史不足，先观察,SKIP,,,0.0,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2132786,price_target,"Will Bitcoin dip to $35,000 in May?",0.0015,0.07,HOLD,0.0,0.0,-0.012604842500000001,YES 价格太接近 0，容易被噪音扫损,SKIP,,,-0.012604842500000001,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2132785,price_target,"Will Bitcoin dip to $40,000 in May?",0.0015,0.07,HOLD,0.0,-0.0005538194444444447,-0.013158661944444447,YES 价格太接近 0，容易被噪音扫损,SKIP,,,-0.013158661944444447,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2159401,price_target,"Will Bitcoin dip to $76,000 May 4-10?",0.0045,0.07,HOLD,0.0,0.0,0.0,价格历史不足，先观察,SKIP,,,0.0,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2159404,price_target,"Will Bitcoin dip to $70,000 May 4-10?",0.001,0.07,HOLD,0.0,0.0,0.0,价格历史不足，先观察,SKIP,,,0.0,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2132787,price_target,"Will Bitcoin dip to $30,000 in May?",0.0005,0.07,HOLD,0.0,0.0,-0.0125349825,YES 价格太接近 0，容易被噪音扫损,SKIP,,,-0.0125349825,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2132782,price_target,"Will Bitcoin dip to $55,000 in May?",0.0095,0.07,HOLD,0.0,-0.0004618055555555556,-0.013620488055555557,YES 价格太接近 0，容易被噪音扫损,SKIP,,,-0.013620488055555557,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2159394,price_target,"Will Bitcoin reach $92,000 May 4-10?",0.0005,0.07,HOLD,0.0,0.0,0.0,价格历史不足，先观察,SKIP,,,0.0,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2159395,price_target,"Will Bitcoin reach $90,000 May 4-10?",0.0005,0.07,HOLD,0.0,0.0,0.0,价格历史不足，先观察,SKIP,,,0.0,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2159402,price_target,"Will Bitcoin dip to $74,000 May 4-10?",0.003,0.07,HOLD,0.0,0.0,0.0,价格历史不足，先观察,SKIP,,,0.0,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2132783,price_target,"Will Bitcoin dip to $50,000 in May?",0.006,0.07,HOLD,0.0,-0.0003385416666666667,-0.013256021666666666,YES 价格太接近 0，容易被噪音扫损,SKIP,,,-0.013256021666666666,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2159403,price_target,"Will Bitcoin dip to $72,000 May 4-10?",0.001,0.07,HOLD,0.0,0.0,0.0,价格历史不足，先观察,SKIP,,,0.0,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,540844,price_target,Will bitcoin hit $1m before GTA VI?,0.484,0.05,HOLD,0.0,-0.0022187499999999916,-0.027205949999999993,净优势不足，等待更清晰的定价偏差,SKIP,,,-0.027205949999999993,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2159405,price_target,"Will Bitcoin dip to $68,000 May 4-10?",0.0005,0.07,HOLD,0.0,0.0,0.0,价格历史不足，先观察,SKIP,,,0.0,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2159393,price_target,"Will Bitcoin reach $94,000 May 4-10?",0.0005,0.07,HOLD,0.0,0.0,0.0,价格历史不足，先观察,SKIP,,,0.0,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,573656,price_target,"Will Bitcoin hit $150k by December 31, 2026?",0.095,0.07,HOLD,0.0,-0.0065972222222222265,-0.023351472222222225,YES 价格太接近 0，容易被噪音扫损,SKIP,,,-0.023351472222222225,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779210113,2159406,price_target,"Will Bitcoin dip to $66,000 May 4-10?",0.0005,0.07,HOLD,0.0,0.0,0.0,价格历史不足，先观察,SKIP,,,0.0,Taker 净优势不足，Maker 条件也未达到，继续观察

@@ -1,0 +1,1 @@
+market_id,market_type,question,side,entry_price,current_price,current_price_source,shares,notional,realized_pnl,unrealized_pnl,estimated_total_pnl,pnl_pct,opened_at,age_seconds,end_date,seconds_to_expiry,expiry_status,probe_family,partial_take_profit_count

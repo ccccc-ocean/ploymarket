@@ -1,0 +1,4 @@
+run_timestamp,market_id,market_type,question,yes_price,taker_fee_rate,action,confidence,gross_edge,net_edge,reason,execution_mode,execution_side,limit_price,expected_net_edge,execution_reason
+1779605138,1553608,company_treasury,"Will MicroStrategy announce holding 1M+ BTC by December 31, 2026?-bV81",0.47,0.07,HOLD,0.0,0.0,-0.04460000000000001,当前市场类型暂不交易，只记录观察,SKIP,,,-0.04460000000000001,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779605138,2109881,indirect_event,Will Anthropic flip BTC by December 31?,0.56,0.04,HOLD,0.0,0.0,-0.025099999999999997,当前市场类型暂不交易，只记录观察,SKIP,,,-0.025099999999999997,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779605138,2290309,company_treasury,MicroStrategy announces >1000 BTC purchase May 19-25?,0.1,0.07,HOLD,0.0,0.002291666666666664,-0.06820833333333336,当前市场类型暂不交易，只记录观察,SKIP,,,-0.06820833333333336,Taker 净优势不足，Maker 条件也未达到，继续观察

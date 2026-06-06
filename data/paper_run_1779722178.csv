@@ -1,0 +1,3 @@
+run_timestamp,market_id,market_type,question,yes_price,taker_fee_rate,action,confidence,gross_edge,net_edge,reason,execution_mode,execution_side,limit_price,expected_net_edge,execution_reason
+1779722178,1553608,company_treasury,"Will MicroStrategy announce holding 1M+ BTC by December 31, 2026?-bV81",0.485,0.07,HOLD,0.0,0.0008333333333333526,-0.04271666666666665,当前市场类型暂不交易，只记录观察,SKIP,,,-0.04271666666666665,Taker 净优势不足，Maker 条件也未达到，继续观察
+1779722178,2351348,company_treasury,MicroStrategy announces >1000 BTC purchase May 26-June 1?,0.59,0.07,HOLD,0.0,-0.0016666666666667052,-0.03786666666666671,当前市场类型暂不交易，只记录观察,SKIP,,,-0.03786666666666671,Taker 净优势不足，Maker 条件也未达到，继续观察

@@ -1,2 +1,2 @@
-generated_at,paper_runs,latest_markets,latest_taker,latest_maker,latest_skip,replay_pnl,replay_max_drawdown,replay_trade_count,replay_win_rate,alignment_samples_1h,edge_bucket_count,readiness,reason
-1779191316,6,35,0,0,35,17.736617052027327,0.011769258555839055,12,0.6666666666666666,4410,39,not_ready,paper-run 样本不足，至少需要连续多日/多轮观察
+generated_at,paper_runs,latest_markets,latest_taker,latest_maker,latest_skip,replay_pnl,paper_account_pnl,paper_account_open_positions,paper_account_closed_positions,replay_max_drawdown,replay_trade_count,replay_win_rate,alignment_samples_1h,edge_bucket_count,spread_buy_both_count,spread_sell_both_count,spread_best_buy_edge,spread_best_sell_edge,live_pipeline_healthy,live_pipeline_reason,readiness,reason
+1779977194,625,2,0,0,2,59.67174083394593,15.995759294733718,3,3,0.06341143891884933,108,0.6296296296296297,164081,75,0,0,-0.003712149999999914,-0.0037071499999999924,False,missing_state,not_ready,实时模拟链路不健康（missing_state），禁止进入实盘判断

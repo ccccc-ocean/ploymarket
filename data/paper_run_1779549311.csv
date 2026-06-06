@@ -1,0 +1,2 @@
+run_timestamp,market_id,market_type,question,yes_price,taker_fee_rate,action,confidence,gross_edge,net_edge,reason,execution_mode,execution_side,limit_price,expected_net_edge,execution_reason
+1779549311,540844,price_target,Will bitcoin hit $1m before GTA VI?,0.4915,0.05,HOLD,0.0,0.0,-0.032924999999999996,净优势不足，等待更清晰的定价偏差,SKIP,,,-0.032924999999999996,Taker 净优势不足，Maker 条件也未达到，继续观察
