@@ -49,9 +49,9 @@ PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml replay
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-run
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-loop --iterations 3 --interval-seconds 300
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-report
-PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml spread-scan --market-type price_target
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml spread-scan --market-type all
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml flow-scan --market-type all
-PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml reversal-backtest --market-type price_range_daily
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml reversal-backtest --market-type above_below_expiry
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml explain-risk
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml cache-info
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml storage-info
@@ -111,11 +111,11 @@ VPS 默认每 5 分钟运行一次实时模拟扫描，每小时执行一次深�
 可以用 `--market-type` 只观察某一类市场：
 
 ```bash
-PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discover --market-type price_target
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml discover --market-type above_below_expiry
 PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml signals --market-type company_treasury
-PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml backtest --market-type price_target
-PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml replay-backtest --market-type price_target
-PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-run --market-type price_target
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml backtest --market-type range_bucket
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml replay-backtest --market-type all
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml paper-run --market-type all
 ```
 
 当前仓库还没有安装成包，所以命令里先显式加 `PYTHONPATH=src`。
@@ -166,7 +166,7 @@ SQLite 文件不会提交到 GitHub，用于本地长期研究样本积累。
 离线回放只使用 SQLite 本地数据，不依赖实时 API：
 
 ```bash
-PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml replay-backtest --market-type price_target
+PYTHONPATH=src python3 -m ploymarket_sim.cli --config config/default.toml replay-backtest --market-type all
 ```
 
 ## 外部 BTC 价格
@@ -198,7 +198,7 @@ data/alignment_summary.csv
 
 `edge-report` 会进一步按可提前知道的条件分层，例如 YES 价格区间和过去 1 小时 BTC 动量。注意：它不会用未来 BTC 收益做分组，避免引入未来函数。
 
-当前默认启用了 BTC 行情过滤：旧的 BTC 下跌过滤只用于阻止弱势行情里追 `BUY_YES`；新的 `btc_regime` 会按 15m/1h/3h BTC 收益和 1h 区间，把短周期 `price_range_daily` 的方向单分成 `uptrend`、`downtrend`、`range_bound` 等环境后再决定是否放行。
+当前默认启用了 BTC 行情过滤：旧的 BTC 下跌过滤只用于阻止弱势行情里追 `BUY_YES`；新的 `btc_regime` 会按 15m/1h/3h BTC 收益和 1h 区间，把短周期 `above_below_expiry`、`up_down_short_term`、`range_bucket` 的方向单分成 `uptrend`、`downtrend`、`range_bound` 等环境后再决定是否放行。
 
 `daily-report` 会汇总当前模拟盘、回放、对齐和 edge 报告，并给出 `not_ready` / `candidate` 状态。
 

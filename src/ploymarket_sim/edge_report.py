@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import csv
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .alignment import AlignmentRow
@@ -21,57 +21,90 @@ class EdgeBucket:
 
 
 def load_alignment_rows_csv(path: str | Path) -> list[AlignmentRow]:
+    return list(iter_alignment_rows_csv(path))
+
+
+def iter_alignment_rows_csv(path: str | Path):
     csv_path = Path(path)
     if not csv_path.exists():
-        return []
+        return
     with csv_path.open("r", newline="", encoding="utf-8") as file:
-        rows = []
         for row in csv.DictReader(file):
             try:
-                rows.append(
-                    AlignmentRow(
-                        market_id=str(row["market_id"]),
-                        question=str(row.get("question", "")),
-                        timestamp=int(float(row["timestamp"])),
-                        horizon_hours=int(float(row["horizon_hours"])),
-                        yes_price=float(row["yes_price"]),
-                        future_yes_price=float(row["future_yes_price"]),
-                        yes_change=float(row["yes_change"]),
-                        btc_close=float(row["btc_close"]),
-                        future_btc_close=float(row["future_btc_close"]),
-                        btc_return=float(row["btc_return"]),
-                        btc_past_1h_return=float(row.get("btc_past_1h_return", 0.0)),
-                        btc_past_3h_return=float(row.get("btc_past_3h_return", 0.0)),
-                    )
+                yield AlignmentRow(
+                    market_id=str(row["market_id"]),
+                    question=str(row.get("question", "")),
+                    timestamp=int(float(row["timestamp"])),
+                    horizon_hours=int(float(row["horizon_hours"])),
+                    yes_price=float(row["yes_price"]),
+                    future_yes_price=float(row["future_yes_price"]),
+                    yes_change=float(row["yes_change"]),
+                    btc_close=float(row["btc_close"]),
+                    future_btc_close=float(row["future_btc_close"]),
+                    btc_return=float(row["btc_return"]),
+                    btc_past_1h_return=float(row.get("btc_past_1h_return", 0.0)),
+                    btc_past_3h_return=float(row.get("btc_past_3h_return", 0.0)),
                 )
             except (KeyError, TypeError, ValueError):
                 continue
-    return rows
+
+
+@dataclass
+class _BucketAccumulator:
+    count: int = 0
+    yes_up_count: int = 0
+    sum_yes_change: float = 0.0
+    sum_btc_past_1h_return: float = 0.0
+    sum_btc_future_return: float = 0.0
+    yes_changes: list[float] = field(default_factory=list)
+
+    def add(self, row: AlignmentRow) -> None:
+        self.count += 1
+        self.yes_up_count += 1 if row.yes_change > 0 else 0
+        self.sum_yes_change += row.yes_change
+        self.sum_btc_past_1h_return += row.btc_past_1h_return
+        self.sum_btc_future_return += row.btc_return
+        self.yes_changes.append(row.yes_change)
 
 
 def build_edge_buckets(rows: list[AlignmentRow], min_samples: int = 30) -> list[EdgeBucket]:
-    grouped: dict[tuple[int, str, str], list[AlignmentRow]] = {}
+    grouped: dict[tuple[int, str, str], _BucketAccumulator] = {}
     for row in rows:
         key = (row.horizon_hours, yes_price_bucket(row.yes_price), btc_return_bucket(row.btc_past_1h_return))
-        grouped.setdefault(key, []).append(row)
+        grouped.setdefault(key, _BucketAccumulator()).add(row)
 
+    return _build_edge_buckets_from_accumulators(grouped, min_samples=min_samples)
+
+
+def build_edge_buckets_from_csv(path: str | Path, min_samples: int = 30) -> list[EdgeBucket]:
+    grouped: dict[tuple[int, str, str], _BucketAccumulator] = {}
+    for row in iter_alignment_rows_csv(path):
+        key = (row.horizon_hours, yes_price_bucket(row.yes_price), btc_return_bucket(row.btc_past_1h_return))
+        grouped.setdefault(key, _BucketAccumulator()).add(row)
+    return _build_edge_buckets_from_accumulators(grouped, min_samples=min_samples)
+
+
+def _build_edge_buckets_from_accumulators(
+    grouped: dict[tuple[int, str, str], _BucketAccumulator],
+    min_samples: int,
+) -> list[EdgeBucket]:
     buckets = []
-    for (horizon, yes_bucket, btc_past_1h_bucket), bucket_rows in grouped.items():
-        if len(bucket_rows) < min_samples:
+    for (horizon, yes_bucket, btc_past_1h_bucket), bucket in grouped.items():
+        if bucket.count < min_samples:
             continue
-        yes_changes = sorted(row.yes_change for row in bucket_rows)
+        yes_changes = sorted(bucket.yes_changes)
         median = _median(yes_changes)
         buckets.append(
             EdgeBucket(
                 horizon_hours=horizon,
                 yes_price_bucket=yes_bucket,
                 btc_past_1h_bucket=btc_past_1h_bucket,
-                sample_count=len(bucket_rows),
-                average_yes_change=sum(yes_changes) / len(yes_changes),
+                sample_count=bucket.count,
+                average_yes_change=bucket.sum_yes_change / bucket.count,
                 median_yes_change=median,
-                yes_up_rate=len([value for value in yes_changes if value > 0]) / len(yes_changes),
-                average_btc_past_1h_return=sum(row.btc_past_1h_return for row in bucket_rows) / len(bucket_rows),
-                average_btc_future_return=sum(row.btc_return for row in bucket_rows) / len(bucket_rows),
+                yes_up_rate=bucket.yes_up_count / bucket.count,
+                average_btc_past_1h_return=bucket.sum_btc_past_1h_return / bucket.count,
+                average_btc_future_return=bucket.sum_btc_future_return / bucket.count,
             )
         )
     return sorted(buckets, key=lambda item: (item.horizon_hours, item.yes_price_bucket, item.btc_past_1h_bucket))

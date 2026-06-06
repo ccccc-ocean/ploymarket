@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 from .btc_regime import blocks_directional_entry
 from .btc_price import BtcCandle
-from .classifier import classify_market
+from .classifier import classify_market, is_target_like_market_type
 from .clob import PricePoint
 from .config import AppConfig
 from .costs import fee_amount, taker_fee_rate
@@ -165,7 +165,7 @@ def backtest_market(
                 if "止损" in reason:
                     cooldown_seconds = (
                         config.risk.target_stop_cooldown_seconds
-                        if market_type in {"price_target", "price_target_daily"}
+                        if is_target_like_market_type(market_type)
                         else config.risk.paper_reentry_cooldown_seconds
                     )
                     market_cooldown_until = current.timestamp + cooldown_seconds

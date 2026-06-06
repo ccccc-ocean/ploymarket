@@ -88,7 +88,7 @@ class MarketRulesTests(unittest.TestCase):
         )
 
         self.assertTrue(blocked)
-        self.assertIn("正接近 above strike", reason)
+        self.assertIn("未明显远离 above strike", reason)
 
     def test_blocks_dip_target_buy_yes_when_btc_moves_away(self) -> None:
         market = Market("m1", "Will Bitcoin dip to $72,500 in May?", "btc-dip", None, 1000, 1000, True, ["Yes", "No"], [0.6, 0.4], ["yes", "no"], False, None, None)
@@ -145,7 +145,7 @@ class MarketRulesTests(unittest.TestCase):
         )
 
         self.assertTrue(blocked)
-        self.assertIn("1h 正接近 above strike", reason)
+        self.assertIn("未明显远离 above strike", reason)
 
 
 if __name__ == "__main__":

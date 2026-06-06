@@ -26,9 +26,9 @@ class StrikeReportTests(unittest.TestCase):
                         "question",
                     ]
                 )
-                writer.writerow(["m1", "price_range_daily", 1, 2, 1, 0, 2.5, 0.2, 0.1, "Will Bitcoin be above $76,000?"])
-                writer.writerow(["m2", "price_range_daily", 1, 2, 0, 1, -3.0, 0.3, 0.1, "Will Bitcoin be above $76,000?"])
-                writer.writerow(["m3", "price_target", 1, 2, 1, 0, 9.0, 0.1, 0.1, "Will Bitcoin hit $76,000?"])
+                writer.writerow(["m1", "above_below_expiry", 1, 2, 1, 0, 2.5, 0.2, 0.1, "Will Bitcoin be above $76,000?"])
+                writer.writerow(["m2", "above_below_expiry", 1, 2, 0, 1, -3.0, 0.3, 0.1, "Will Bitcoin be above $76,000?"])
+                writer.writerow(["m3", "touch_above", 1, 2, 1, 0, 9.0, 0.1, 0.1, "Will Bitcoin hit $76,000?"])
 
             rows = build_strike_report(path)
 

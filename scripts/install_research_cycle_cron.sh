@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 PROJECT_DIR="$(pwd)"
-LIVE_SCHEDULE="${1:-*/5 * * * *}"
+LIVE_SCHEDULE="${1:-*/2 * * * *}"
 RESEARCH_SCHEDULE="${2:-17 * * * *}"
 CONFIG_PATH="${3:-config/vps.local.toml}"
 BEGIN_MARKER="# BEGIN ploymarket-research-cycle"

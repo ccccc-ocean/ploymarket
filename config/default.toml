@@ -16,15 +16,6 @@ sqlite_path = "data/ploymarket.sqlite"
 fresh_market_ttl_seconds = 900
 fresh_history_ttl_seconds = 180
 
-[kalshi]
-base_url = "https://external-api.kalshi.com/trade-api/v2"
-request_timeout_seconds = 12
-limit = 10
-max_pages = 2
-status = "open"
-min_volume_24h = 0.0
-series_tickers = ["KXBTC", "KXBTCD", "KXBTC15M", "KXBTCMAX150"]
-
 [btc_price]
 provider = "coinbase_public"
 base_url = "https://api.coinbase.com"
@@ -89,11 +80,11 @@ min_price = 0.03
 max_price = 0.97
 paper_reentry_cooldown_seconds = 3600
 paper_take_profit_reentry_cooldown_seconds = 900
-partial_take_profit_pct = 0.16
+partial_take_profit_pct = 0.10
 partial_take_profit_fraction = 0.35
-trailing_stop_activation_pct = 0.18
-trailing_stop_drawdown_pct = 0.07
-paper_full_take_profit_pct = 0.32
+trailing_stop_activation_pct = 0.10
+trailing_stop_drawdown_pct = 0.04
+paper_full_take_profit_pct = 0.24
 paper_reentry_edge_multiplier = 2.0
 live_reprice_edge_multiplier = 2.0
 target_market_max_distance_pct = 0.025
@@ -107,9 +98,17 @@ btc_moving_away_return_pct = 0.001
 strategy_loss_pause_count = 2
 strategy_loss_pause_window_seconds = 21600
 readiness_max_drawdown_pct = 0.10
+paper_probe_enabled = true
+paper_probe_zero_run_threshold = 0
+paper_probe_trade_size_usdc = 3.0
+paper_probe_min_edge = 0.001
+paper_probe_max_open_positions = 5
+paper_probe_hard_max_open_positions = 10
+paper_probe_max_total_exposure_usdc = 30.0
+paper_probe_max_new_positions_per_run = 3
 
 [backtest]
-trade_size_usdc = 25.0
+trade_size_usdc = 3.0
 taker_fee_rate = 0.02
 slippage_bps = 25
 output_dir = "data"

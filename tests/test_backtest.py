@@ -21,7 +21,7 @@ class BacktestTests(unittest.TestCase):
             risk=RiskConfig(10.0, 50.0, 50.0, 50.0, 1, 10.0, 1.0, 0.9, 0.9, 1.0, 0.01, 0.99),
             backtest=BacktestConfig(10.0, 0.02, 25, "data"),
         )
-        market = Market("m1", "Will BTC hit $100,000?", "btc-hit-100k", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
+        market = Market("m1", "Bitcoin Up or Down on May 22?", "btc-up-down", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
         history = [PricePoint(i, 0.40) for i in range(4)] + [PricePoint(4 + i, 0.60) for i in range(4)]
         btc_candles = [BtcCandle(i, 98500.0, 99000.0, 98500.0, 98500.0) for i in range(len(history))]
 
@@ -127,9 +127,9 @@ class BacktestTests(unittest.TestCase):
         result = backtest_market(market, history, config, btc_candles)
 
         self.assertFalse(any(trade.action == "BUY_YES" for trade in result.trades))
-        self.assertTrue(any("距离过远" in trade.reason for trade in result.trades))
+        self.assertEqual(result.trades, [])
 
-    def test_near_price_target_dip_can_trade_before_reversal(self) -> None:
+    def test_near_price_target_dip_buy_yes_is_observe_only(self) -> None:
         config = AppConfig(
             api=ApiConfig("", "", 1),
             cache=CacheConfig(False, ".cache/http", 60, False),
@@ -148,9 +148,9 @@ class BacktestTests(unittest.TestCase):
 
         result = backtest_market(market, history, config, btc_candles)
 
-        self.assertTrue(any(trade.action == "BUY_YES" for trade in result.trades))
+        self.assertFalse(any(trade.action == "BUY_YES" for trade in result.trades))
 
-    def test_price_target_stop_loss_sets_reentry_cooldown(self) -> None:
+    def test_price_target_buy_yes_no_longer_opens_stop_loss_path(self) -> None:
         config = AppConfig(
             api=ApiConfig("", "", 1),
             cache=CacheConfig(False, ".cache/http", 60, False),
@@ -170,8 +170,7 @@ class BacktestTests(unittest.TestCase):
 
         result = backtest_market(market, history, config, btc_candles)
 
-        self.assertTrue(any(trade.action == "SELL_YES" and "止损" in trade.reason for trade in result.trades))
-        self.assertTrue(any(trade.action == "REJECTED" and "冷却中" in trade.reason for trade in result.trades))
+        self.assertFalse(any(trade.action == "SELL_YES" for trade in result.trades))
 
     def test_price_range_stop_loss_sets_market_reentry_cooldown(self) -> None:
         config = AppConfig(
@@ -187,13 +186,14 @@ class BacktestTests(unittest.TestCase):
             backtest=BacktestConfig(10.0, 0.0, 0, "data"),
         )
         market = Market("m1", "Will Bitcoin be above $100 on May 22?", "btc-above-100", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
-        prices = [0.50, 0.50, 0.52, 0.58, 0.60, 0.48, 0.50, 0.54, 0.60, 0.66]
+        prices = [0.60, 0.60, 0.58, 0.50, 0.45, 0.60, 0.58, 0.50, 0.45, 0.40]
         history = [PricePoint(i * 300, price) for i, price in enumerate(prices)]
-        btc_candles = [BtcCandle(i * 300, 100.1, 100.1, 100.1, 100.1) for i in range(len(prices))]
+        btc_closes = [100.0, 99.8, 99.7, 99.5, 99.3, 99.2, 99.1, 99.0, 98.9, 98.8]
+        btc_candles = [BtcCandle(i * 300, close, close + 0.1, close - 0.1, close) for i, close in enumerate(btc_closes)]
 
         result = backtest_market(market, history, config, btc_candles)
 
-        self.assertTrue(any(trade.action == "SELL_YES" and "止损" in trade.reason for trade in result.trades))
+        self.assertTrue(any(trade.action == "SELL_NO" and "止损" in trade.reason for trade in result.trades))
         self.assertTrue(any(trade.action == "REJECTED" and "冷却中" in trade.reason for trade in result.trades))
 
     def test_far_price_target_reach_can_buy_no(self) -> None:
@@ -259,7 +259,7 @@ class BacktestTests(unittest.TestCase):
         result = backtest_market(market, history, config, btc_candles)
 
         self.assertFalse(any(trade.action == "BUY_NO" for trade in result.trades))
-        self.assertTrue(any("BUY_NO 价格过高" in trade.reason for trade in result.trades))
+        self.assertEqual(result.trades, [])
 
     def test_price_target_buy_yes_rejects_poor_reward_price(self) -> None:
         config = AppConfig(
@@ -281,4 +281,4 @@ class BacktestTests(unittest.TestCase):
         result = backtest_market(market, history, config, btc_candles)
 
         self.assertFalse(any(trade.action == "BUY_YES" for trade in result.trades))
-        self.assertTrue(any("BUY_YES 价格过高" in trade.reason for trade in result.trades))
+        self.assertEqual(result.trades, [])

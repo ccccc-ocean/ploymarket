@@ -1,22 +1,26 @@
 from __future__ import annotations
 
 import argparse
+import csv
+import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
+from statistics import mean
 from time import sleep, time
 
 from .alignment import build_alignment_rows, summarize_alignment
 from .backtest import backtest_market
+from .blocked_edge_report import build_blocked_edge_report, print_blocked_edge_report, write_blocked_edge_report_csv
 from .btc_regime import blocks_directional_entry
 from .btc_price import get_btc_candles, load_btc_candles_csv, merge_btc_candles
 from .cache import CachePolicy, JsonCache
-from .classifier import MARKET_TYPES, classify_market, is_market_type
+from .classifier import MARKET_TYPES, classify_market, is_market_type, is_target_like_market_type
 from .clob import get_price_history, get_token_quote
 from .config import load_config
-from .costs import fee_amount, taker_fee_rate
-from .cross_platform import match_btc_markets, print_cross_platform_summary, write_cross_platform_matches_csv
+from .costs import estimate_entry_cost, fee_amount, taker_fee_rate
 from .daily_report import build_daily_report, write_daily_report_csv
-from .edge_report import build_edge_buckets, load_alignment_rows_csv
+from .edge_report import build_edge_buckets_from_csv
 from .execution import plan_execution
 from .execution_stress import (
     build_execution_stress_rows,
@@ -29,13 +33,18 @@ from .execution_stress import (
     write_shadow_order_events_csv,
 )
 from .flow_scan import print_flow_scan_summary, scan_market_flows, write_flow_scan_csv
+from .filter_reason_report import build_filter_reason_report, print_filter_reason_report, write_filter_reason_report_csv
 from .http import HttpError
-from .kalshi import discover_kalshi_btc_markets
-from .market_rules import blocks_btc_strike_entry, blocks_price_range_entry, blocks_price_target_entry, infer_strike_direction
+from .live_universe_report import build_live_universe_report, print_live_universe_report, write_live_universe_report_csv
+from .market_rules import blocks_btc_strike_entry, blocks_price_range_entry, blocks_price_target_entry, extract_usd_strike, infer_strike_direction, latest_btc_candle_at_or_before
 from .market_type_report import build_market_type_report, print_market_type_report, write_market_type_report_csv
+from .observation_report import build_observation_report, print_observation_report, write_observation_report_csv
+from .open_position_report import build_open_position_report, print_open_position_report, write_open_position_report_csv
 from .portfolio import build_mark_to_market_curve, build_portfolio_curve, summarize_portfolio
 from .paper import build_paper_signal_row, summarize_paper_rows
 from .paper_report import load_paper_run_summaries
+from .paper_sample_report import build_paper_sample_report, print_paper_sample_report, write_paper_sample_report_csv
+from .probe_performance_report import build_probe_performance_report, print_probe_performance_report, probe_family_from_reason, write_probe_performance_report_csv
 from .polymarket import discover_btc_markets, get_market_by_id
 from .reporting import (
     print_aggregate_summary,
@@ -72,12 +81,21 @@ from .reversal_backtest import (
     write_reversal_trades_csv,
 )
 from .signals import Signal, build_signal
+from .side_diagnostics import build_side_diagnostics, print_side_diagnostics, write_side_diagnostics_csv
 from .spread_scan import print_spread_scan_summary, scan_spreads, write_spread_scan_csv
 from .storage import PaperPositionState, storage_from_config
+from .strategy_autotune_report import (
+    AutotuneContext,
+    build_strategy_autotune_report,
+    print_strategy_autotune_report,
+    write_strategy_autotune_report_csv,
+)
+from .strategy_review import build_strategy_review, print_strategy_review, write_strategy_review_csv
 from .strategy_profiles import is_tradeable_market, strategy_config_for_market
 from .strategy_sweep import print_strategy_sweep_summary, run_strategy_sweep, write_strategy_sweep_csv
 from .strike_report import build_strike_report, print_strike_report, write_strike_report_csv
 from .summary import aggregate_summaries, summarize_all, summarize_market
+from .touch_below_path_report import build_touch_below_path_report, print_touch_below_path_report, write_touch_below_path_report_csv
 
 
 DEFAULT_CONFIG = "config/default.toml"
@@ -95,11 +113,11 @@ def main() -> None:
     backtest_parser = subparsers.add_parser("backtest", help="run a simple historical paper-trading backtest")
     backtest_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
     replay_parser = subparsers.add_parser("replay-backtest", help="run a backtest using only local SQLite data")
-    replay_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
+    replay_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
     paper_parser = subparsers.add_parser("paper-run", help="run one paper-trading signal scan")
-    paper_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
+    paper_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
     paper_loop_parser = subparsers.add_parser("paper-loop", help="run repeated paper-trading signal scans")
-    paper_loop_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
+    paper_loop_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
     paper_loop_parser.add_argument("--interval-seconds", type=int, default=300)
     paper_loop_parser.add_argument("--iterations", type=int, default=1, help="0 means run until interrupted")
     subparsers.add_parser("paper-report", help="summarize saved paper-run outputs")
@@ -108,26 +126,45 @@ def main() -> None:
     subparsers.add_parser("data-quality", help="summarize local SQLite market/history coverage")
     subparsers.add_parser("btc-price", help="fetch external BTC spot candles")
     alignment_parser = subparsers.add_parser("alignment-report", help="align local Polymarket YES history with BTC candles")
-    alignment_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
+    alignment_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
+    alignment_parser.add_argument("--max-points-per-market", type=int, default=None)
     edge_parser = subparsers.add_parser("edge-report", help="bucket alignment rows to inspect conditional edge")
     edge_parser.add_argument("--min-samples", type=int, default=30)
     sweep_parser = subparsers.add_parser("strategy-sweep", help="try conservative 5-minute strategy parameter candidates")
-    sweep_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
+    sweep_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
     sweep_parser.add_argument("--limit", type=int, default=10)
     sweep_parser.add_argument("--candidate-limit", type=int, default=None)
+    sweep_parser.add_argument("--max-points-per-market", type=int, default=None)
     spread_parser = subparsers.add_parser("spread-scan", help="scan live YES/NO order books for complete-set spread edges")
-    spread_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_target")
+    spread_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
     reversal_parser = subparsers.add_parser("reversal-backtest", help="compare BUY_YES, BUY_NO, reversal, and stop-loss variants")
-    reversal_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_range_daily")
+    reversal_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="above_below_expiry")
     flow_parser = subparsers.add_parser("flow-scan", help="scan recent Polymarket trade flow and large-wallet pressure")
     flow_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="all")
     flow_parser.add_argument("--limit", type=int, default=250)
     flow_parser.add_argument("--large-trade-usdc", type=float, default=500.0)
     subparsers.add_parser("market-type-report", help="compare local backtest results by BTC market type")
+    observation_parser = subparsers.add_parser("observation-report", help="score observed market types for possible promotion")
+    observation_parser.add_argument("--recent-runs", type=int, default=288)
+    sample_parser = subparsers.add_parser("paper-sample-report", help="summarize recent paper-run sample density and probe activity")
+    sample_parser.add_argument("--recent-runs", type=int, default=288)
+    live_universe_parser = subparsers.add_parser("live-universe-report", help="compare live BTC market coverage with recent paper samples")
+    live_universe_parser.add_argument("--recent-runs", type=int, default=288)
+    review_parser = subparsers.add_parser("strategy-review", help="review whether paper trading is sample-starved or over-filtered")
+    review_parser.add_argument("--recent-runs", type=int, default=288)
+    filter_parser = subparsers.add_parser("filter-reason-report", help="summarize why recent paper-run candidates were skipped")
+    filter_parser.add_argument("--recent-runs", type=int, default=288)
+    blocked_edge_parser = subparsers.add_parser("blocked-edge-report", help="summarize positive-edge skips by market and later taker status")
+    blocked_edge_parser.add_argument("--recent-runs", type=int, default=288)
+    touch_below_path_parser = subparsers.add_parser("touch-below-path-report", help="classify touch_below path state for safer sample expansion")
+    touch_below_path_parser.add_argument("--recent-runs", type=int, default=288)
+    subparsers.add_parser("probe-performance-report", help="summarize realized PnL by paper probe family")
+    autotune_parser = subparsers.add_parser("strategy-autotune-report", help="turn strategy/probe diagnostics into prioritized next actions")
+    autotune_parser.add_argument("--recent-runs", type=int, default=288)
+    open_position_parser = subparsers.add_parser("open-position-report", help="summarize current open paper positions")
+    open_position_parser.add_argument("--live-quotes", action="store_true", help="fetch live CLOB bids for current-side PnL")
+    subparsers.add_parser("side-diagnostics", help="break replay PnL down by market type and YES/NO side")
     subparsers.add_parser("strike-report", help="summarize BTC daily range backtest results by strike")
-    subparsers.add_parser("kalshi-discover", help="find active BTC-related Kalshi markets")
-    cross_parser = subparsers.add_parser("cross-platform-report", help="match Polymarket and Kalshi BTC markets")
-    cross_parser.add_argument("--market-type", choices=["all"] + MARKET_TYPES, default="price_range_daily")
     subparsers.add_parser("daily-report", help="summarize paper, replay, alignment, and edge outputs")
     subparsers.add_parser("explain-risk", help="explain the current risk limits")
 
@@ -175,11 +212,11 @@ def main() -> None:
     elif args.command == "btc-price":
         _run_btc_price(config)
     elif args.command == "alignment-report":
-        _run_alignment_report(config, args.market_type)
+        _run_alignment_report(config, args.market_type, args.max_points_per_market)
     elif args.command == "edge-report":
         _run_edge_report(config, args.min_samples)
     elif args.command == "strategy-sweep":
-        _run_strategy_sweep(config, args.market_type, args.limit, args.candidate_limit)
+        _run_strategy_sweep(config, args.market_type, args.limit, args.candidate_limit, args.max_points_per_market)
     elif args.command == "spread-scan":
         _run_spread_scan(config, args.market_type)
     elif args.command == "reversal-backtest":
@@ -188,12 +225,30 @@ def main() -> None:
         _run_flow_scan(config, args.market_type, args.limit, args.large_trade_usdc)
     elif args.command == "market-type-report":
         _run_market_type_report(config)
+    elif args.command == "observation-report":
+        _run_observation_report(config, args.recent_runs)
+    elif args.command == "paper-sample-report":
+        _run_paper_sample_report(config, args.recent_runs)
+    elif args.command == "live-universe-report":
+        _run_live_universe_report(config, args.recent_runs)
+    elif args.command == "strategy-review":
+        _run_strategy_review(config, args.recent_runs)
+    elif args.command == "filter-reason-report":
+        _run_filter_reason_report(config, args.recent_runs)
+    elif args.command == "blocked-edge-report":
+        _run_blocked_edge_report(config, args.recent_runs)
+    elif args.command == "touch-below-path-report":
+        _run_touch_below_path_report(config, args.recent_runs)
+    elif args.command == "probe-performance-report":
+        _run_probe_performance_report(config)
+    elif args.command == "strategy-autotune-report":
+        _run_strategy_autotune_report(config, args.recent_runs)
+    elif args.command == "open-position-report":
+        _run_open_position_report(config, args.live_quotes)
+    elif args.command == "side-diagnostics":
+        _run_side_diagnostics(config)
     elif args.command == "strike-report":
         _run_strike_report(config)
-    elif args.command == "kalshi-discover":
-        _run_kalshi_discover(config)
-    elif args.command == "cross-platform-report":
-        _run_cross_platform_report(config, args.market_type)
     elif args.command == "daily-report":
         _run_daily_report(config)
 
@@ -384,13 +439,18 @@ def _run_paper_scan(config, market_type: str) -> None:
     btc_candles = _fresh_paper_btc_candles(config, btc_candles, run_timestamp)
     rows = []
     stress_candidates = []
+    probe_candidates = []
+    probe_slots = _paper_probe_available_slots(config, storage)
+    disabled_probe_families = _underperforming_probe_families(config, storage)
     for market in markets:
         history = _safe_history(config, market, storage, prefer_local=False, use_cache=False, allow_local_fallback=False)
         if not history:
             continue
         storage.save_price_history(market.yes_token_id or "", history)
         market_config = strategy_config_for_market(config, market)
-        state_signal = _paper_position_signal_with_live_quote(config, storage, market, history[-1].price, run_timestamp)
+        state_signal = _paper_position_signal_with_live_quote(
+            config, storage, market, history[-1].price, run_timestamp, disabled_probe_families
+        )
         if state_signal is not None:
             execution_plan = plan_execution(market, state_signal, market_config.signal, market_config.backtest, market_config.execution, history[-1].price)
             rows.append(build_paper_signal_row(market, state_signal, config.backtest.taker_fee_rate, run_timestamp, execution_plan))
@@ -450,6 +510,12 @@ def _run_paper_scan(config, market_type: str) -> None:
         ):
             signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, "止盈后重新入场 edge 不够强，避免频繁止盈/再开仓消耗手续费")
             execution_plan = plan_execution(market, signal, market_config.signal, market_config.backtest, market_config.execution, history[-1].price)
+        if execution_plan.mode == "SKIP" and probe_slots > 0:
+            probe_signal = _paper_probe_signal(config, market, history, market_config, signal, btc_candles, disabled_probe_families)
+            if probe_signal is not None:
+                probe_signal, probe_plan = _live_paper_entry_plan(config, market, probe_signal, market_config, history[-1].price)
+                if probe_plan.mode == "TAKER":
+                    probe_candidates.append((probe_plan.expected_net_edge, len(rows), market, probe_signal, probe_plan))
         if execution_plan.mode == "TAKER":
             stress_candidate = build_paper_signal_row(
                 market, signal, config.backtest.taker_fee_rate, run_timestamp, execution_plan
@@ -458,6 +524,18 @@ def _run_paper_scan(config, market_type: str) -> None:
         if execution_plan.mode == "TAKER":
             _save_paper_position(config, storage, market, execution_plan, run_timestamp)
         rows.append(build_paper_signal_row(market, signal, config.backtest.taker_fee_rate, run_timestamp, execution_plan))
+    if probe_candidates and probe_slots > 0:
+        max_new_probes = max(1, int(config.risk.paper_probe_max_new_positions_per_run))
+        remaining_new_probes = max(0, max_new_probes - len(stress_candidates))
+        if remaining_new_probes <= 0:
+            remaining_new_probes = 1 if not stress_candidates else 0
+        for _, row_index, market, probe_signal, probe_plan in sorted(probe_candidates, key=lambda item: item[0], reverse=True)[
+            : min(probe_slots, remaining_new_probes)
+        ]:
+            _save_paper_position(config, storage, market, probe_plan, run_timestamp, _paper_probe_trade_size_usdc(config, probe_signal))
+            probe_row = build_paper_signal_row(market, probe_signal, config.backtest.taker_fee_rate, run_timestamp, probe_plan)
+            rows[row_index] = probe_row
+            stress_candidates.append(probe_row)
     storage.save_paper_snapshots(rows)
     path = write_paper_signal_rows_csv(rows, config.backtest.output_dir, run_timestamp)
     summary = summarize_paper_rows(rows)
@@ -532,10 +610,21 @@ def _fresh_paper_btc_candles(config, candles, run_timestamp: int):
     return candles
 
 
-def _paper_position_signal_with_live_quote(config, storage, market, yes_price: float, run_timestamp: int) -> Signal | None:
+def _paper_position_signal_with_live_quote(
+    config,
+    storage,
+    market,
+    yes_price: float,
+    run_timestamp: int,
+    disabled_probe_families: set[str] | None = None,
+) -> Signal | None:
     position = storage.load_paper_position(market.id)
     if position is None or position.status != "open":
         return _paper_position_state_signal(config, storage, market, yes_price, run_timestamp)
+    if _paper_market_end_date_has_passed(market, run_timestamp):
+        settlement_signal = _paper_settlement_signal(config, storage, market, position, run_timestamp)
+        if settlement_signal is not None:
+            return settlement_signal
     token_id = market.yes_token_id if position.side == "YES" else market.no_token_id
     if not token_id:
         return Signal("HOLD", 0.0, 0.0, 0.0, "已有模拟持仓，但缺少对应 token，无法用实时 bid 退出")
@@ -551,7 +640,1225 @@ def _paper_position_signal_with_live_quote(config, storage, market, yes_price: f
         if settlement_signal is not None:
             return settlement_signal
         return Signal("HOLD", 0.0, 0.0, 0.0, "已有模拟持仓，但订单簿缺少实时 bid，暂停退出判断")
+    disabled_probe_families = disabled_probe_families or set()
+    probe_family = _paper_probe_family_for_position(config, position)
+    if probe_family in disabled_probe_families:
+        realized_pnl = _paper_close_value(position, quote.bid, market, config)
+        storage.close_paper_position(market.id, run_timestamp, realized_pnl, run_timestamp + config.risk.paper_reentry_cooldown_seconds)
+        return Signal(
+            "HOLD",
+            0.0,
+            0.0,
+            0.0,
+            f"模拟探索仓家族已停用，按实时 bid risk-off 退出; family={probe_family}; bid={quote.bid:.3f}; realized_pnl={realized_pnl:.2f}",
+        )
     return _paper_position_state_signal(config, storage, market, yes_price, run_timestamp, quote.bid)
+
+
+def _paper_probe_available_slots(config, storage) -> int:
+    if not config.risk.paper_probe_enabled:
+        return 0
+    zero_run_threshold = max(0, int(config.risk.paper_probe_zero_run_threshold))
+    if zero_run_threshold > 0 and _recent_zero_taker_runs(config.backtest.output_dir) < zero_run_threshold:
+        return 0
+    soft_max_open = max(0, int(config.risk.paper_probe_max_open_positions))
+    hard_max_open = max(soft_max_open, int(config.risk.paper_probe_hard_max_open_positions))
+    open_count = len(_paper_open_probe_positions(config, storage))
+    if open_count < soft_max_open:
+        return soft_max_open - open_count
+    if open_count >= hard_max_open:
+        return 0
+    open_exposure = _paper_open_probe_exposure_usdc(config, storage)
+    next_trade_size = max(0.0, float(config.risk.paper_probe_trade_size_usdc))
+    max_probe_exposure = max(0.0, float(config.risk.paper_probe_max_total_exposure_usdc))
+    if max_probe_exposure <= 0 or open_exposure + next_trade_size > max_probe_exposure:
+        return 0
+    return hard_max_open - open_count
+
+
+def _paper_open_probe_positions(config, storage) -> list[PaperPositionState]:
+    probe_keys = _paper_probe_entry_keys(config.backtest.output_dir)
+    positions = []
+    for market_id in storage.load_open_paper_market_ids():
+        position = storage.load_paper_position(market_id)
+        if position is not None and position.status == "open" and (position.market_id, position.opened_at) in probe_keys:
+            positions.append(position)
+    return positions
+
+
+def _paper_probe_entry_keys(output_dir: str) -> set[tuple[str, int]]:
+    keys: set[tuple[str, int]] = set()
+    for path in sorted(Path(output_dir).glob("paper_run_*.csv")):
+        with path.open("r", newline="", encoding="utf-8") as file:
+            for row in csv.DictReader(file):
+                if row.get("execution_mode") != "TAKER":
+                    continue
+                reason = row.get("reason", "")
+                if "探索仓" not in reason and "挑战仓" not in reason:
+                    continue
+                keys.add((row.get("market_id", ""), int(float(row.get("run_timestamp") or 0))))
+    return keys
+
+
+def _paper_probe_entry_families(output_dir: str) -> dict[tuple[str, int], str]:
+    families: dict[tuple[str, int], str] = {}
+    for path in sorted(Path(output_dir).glob("paper_run_*.csv")):
+        with path.open("r", newline="", encoding="utf-8") as file:
+            for row in csv.DictReader(file):
+                if row.get("execution_mode") != "TAKER":
+                    continue
+                reason = row.get("reason", "")
+                if "探索仓" not in reason and "挑战仓" not in reason:
+                    continue
+                key = (row.get("market_id", ""), int(float(row.get("run_timestamp") or 0)))
+                families[key] = probe_family_from_reason(reason)
+    return families
+
+
+def _paper_probe_family_for_position(config, position: PaperPositionState) -> str | None:
+    return _paper_probe_entry_families(config.backtest.output_dir).get((position.market_id, position.opened_at))
+
+
+def _paper_open_probe_exposure_usdc(config, storage) -> float:
+    return sum(max(0.0, position.notional) for position in _paper_open_probe_positions(config, storage))
+
+
+def _paper_open_exposure_usdc(storage) -> float:
+    exposure = 0.0
+    for market_id in storage.load_open_paper_market_ids():
+        position = storage.load_paper_position(market_id)
+        if position is not None and position.status == "open":
+            exposure += max(0.0, position.notional)
+    return exposure
+
+
+def _paper_probe_trade_size_usdc(config, probe_signal: Signal) -> float:
+    if probe_signal.reason.startswith("微型探索仓:"):
+        return min(1.0, max(0.0, float(config.risk.paper_probe_trade_size_usdc)))
+    return max(0.0, float(config.risk.paper_probe_trade_size_usdc))
+
+
+def _recent_zero_taker_runs(output_dir: str) -> int:
+    path = Path(output_dir) / "paper_report.csv"
+    if not path.exists():
+        return 0
+    with path.open("r", newline="", encoding="utf-8") as file:
+        rows = list(csv.DictReader(file))
+    streak = 0
+    for row in reversed(rows):
+        if int(float(row.get("taker_count") or 0)) > 0:
+            break
+        streak += 1
+    return streak
+
+
+def _paper_probe_signal(config, market, history, market_config, current_signal: Signal, btc_candles, disabled_probe_families: set[str] | None = None) -> Signal | None:
+    if _paper_probe_blocked_by_hard_risk(current_signal.reason):
+        return None
+    disabled_probe_families = disabled_probe_families or set()
+    market_type = classify_market(market).market_type
+    if market_type == "range_bucket":
+        center_probe = _paper_range_bucket_center_probe_signal(
+            config, market, history, market_config, current_signal, btc_candles, disabled_probe_families
+        )
+        if center_probe is not None:
+            return center_probe
+        return _paper_range_bucket_probe_signal(
+            config, market, history, market_config, current_signal, btc_candles, disabled_probe_families
+        )
+    if market_type == "touch_below":
+        no_probe = _paper_touch_below_no_probe_signal(
+            config, market, history, market_config, current_signal, btc_candles, disabled_probe_families
+        )
+        if no_probe is not None:
+            return no_probe
+        certainty_no_probe = _paper_touch_below_certainty_no_probe_signal(
+            config, market, history, market_config, current_signal, btc_candles, disabled_probe_families
+        )
+        if certainty_no_probe is not None:
+            return certainty_no_probe
+        distance_no_probe = _paper_touch_below_distance_no_probe_signal(
+            config, market, history, market_config, current_signal, btc_candles, disabled_probe_families
+        )
+        if distance_no_probe is not None:
+            return distance_no_probe
+        momentum_yes_probe = _paper_touch_below_momentum_yes_probe_signal(
+            config, market, history, market_config, current_signal, btc_candles, disabled_probe_families
+        )
+        if momentum_yes_probe is not None:
+            return momentum_yes_probe
+        discount_probe = _paper_touch_below_discount_probe_signal(
+            config, market, history, market_config, current_signal, btc_candles, disabled_probe_families
+        )
+        if discount_probe is not None:
+            return discount_probe
+        if "touch_below_yes" in disabled_probe_families:
+            return None
+        return _paper_touch_below_probe_signal(config, market, history, market_config, current_signal, btc_candles)
+    if market_type != "above_below_expiry":
+        return None
+    if current_signal.reason.startswith("当前市场类型暂不交易"):
+        return None
+    if len(history) < market_config.signal.long_window:
+        return None
+    if "阻止 BUY_NO" in current_signal.reason and current_signal.net_edge >= max(config.risk.paper_probe_min_edge, 0.01):
+        challenge_disabled = "regime_filter_challenge" in disabled_probe_families
+        challenge_reversal_blocked = _above_below_no_reversal_risk_blocks_probe(
+            config, market, history[-1].timestamp, btc_candles
+        )
+        current_yes = history[-1].price
+        no_price = max(0.0, 1.0 - current_yes)
+        if (
+            not challenge_disabled
+            and not challenge_reversal_blocked
+            and config.risk.min_price < no_price < config.risk.range_buy_no_max_price
+        ):
+            return Signal(
+                "BUY_NO",
+                min(0.30, current_signal.net_edge / 0.08),
+                current_signal.edge,
+                current_signal.net_edge,
+                f"过滤器挑战仓: 小仓位验证被 BTC regime 拦截的 above_below_expiry/NO; 原因={current_signal.reason}",
+            )
+    near_strike_no_signal = _paper_near_strike_above_below_no_probe_signal(
+        config, market, history, current_signal, btc_candles, disabled_probe_families
+    )
+    if near_strike_no_signal is not None:
+        return near_strike_no_signal
+    certainty_signal = _paper_above_below_certainty_no_probe_signal(
+        config, market, history, current_signal, btc_candles, disabled_probe_families
+    )
+    if certainty_signal is not None:
+        return certainty_signal
+    ultra_certainty_no_signal = _paper_above_below_ultra_certainty_no_probe_signal(
+        config, market, history, current_signal, btc_candles, disabled_probe_families
+    )
+    if ultra_certainty_no_signal is not None:
+        return ultra_certainty_no_signal
+    crossed_reversal_no_signal = _paper_above_below_crossed_reversal_no_probe_signal(
+        config, market, history, current_signal, btc_candles, disabled_probe_families
+    )
+    if crossed_reversal_no_signal is not None:
+        return crossed_reversal_no_signal
+    certainty_yes_signal = _paper_above_below_certainty_yes_probe_signal(
+        config, market, history, current_signal, btc_candles, disabled_probe_families
+    )
+    if certainty_yes_signal is not None:
+        return certainty_yes_signal
+    ultra_certainty_yes_signal = _paper_above_below_ultra_certainty_yes_probe_signal(
+        config, market, history, current_signal, btc_candles, disabled_probe_families
+    )
+    if ultra_certainty_yes_signal is not None:
+        return ultra_certainty_yes_signal
+    expensive_no_signal = _paper_expensive_edge_above_below_no_probe_signal(
+        config, market, history, current_signal, btc_candles, disabled_probe_families
+    )
+    if expensive_no_signal is not None:
+        return expensive_no_signal
+    recovery_no_signal = _paper_above_below_recovery_no_probe_signal(
+        config, market, history, current_signal, btc_candles, disabled_probe_families
+    )
+    if recovery_no_signal is not None:
+        return recovery_no_signal
+    current = history[-1]
+    if "暂不允许 BUY_YES" in current_signal.reason and current_signal.net_edge >= config.risk.paper_probe_min_edge:
+        if "above_below_yes" in disabled_probe_families:
+            return None
+        if current.price <= config.risk.min_price or current.price >= config.risk.range_buy_yes_max_price:
+            return None
+        if _above_below_yes_reversal_risk_blocks_probe(config, market, current.timestamp, btc_candles):
+            return None
+        strike_blocked, _ = blocks_btc_strike_entry(market, current.timestamp, btc_candles, "BUY_YES")
+        range_blocked, _ = blocks_price_range_entry(
+            market,
+            "BUY_YES",
+            current.timestamp,
+            btc_candles,
+            current.price,
+            config.risk.range_buy_yes_max_price,
+            config.risk.range_buy_no_max_price,
+            config.risk.range_market_safety_band_pct,
+            config.risk.btc_moving_away_return_pct,
+        )
+        regime_blocked, _ = blocks_directional_entry(market, Signal("BUY_YES", current_signal.confidence, current_signal.edge, current_signal.net_edge, current_signal.reason), btc_candles, current.timestamp)
+        if strike_blocked or range_blocked or regime_blocked:
+            return None
+        return Signal(
+            "BUY_YES",
+            min(0.35, current_signal.net_edge / max(config.risk.paper_probe_min_edge * 5, 0.0001)),
+            current_signal.edge,
+            current_signal.net_edge,
+            f"探索仓: 连续零成交后，仅用小仓位验证 above_below_expiry/YES; 原因={current_signal.reason}",
+        )
+    if infer_strike_direction(market.question) != "above":
+        return None
+    if "above_below_no" in disabled_probe_families:
+        return None
+    prices = [point.price for point in history]
+    current_yes = prices[-1]
+    no_price = max(0.0, 1.0 - current_yes)
+    if no_price <= config.risk.min_price or no_price >= config.risk.range_buy_no_max_price:
+        return None
+    short_avg = mean(prices[-market_config.signal.short_window :])
+    long_avg = mean(prices[-market_config.signal.long_window :])
+    no_momentum = long_avg - short_avg
+    costs = estimate_entry_cost(
+        no_price,
+        market.effective_taker_fee_rate(market_config.backtest.taker_fee_rate),
+        market_config.backtest.slippage_bps,
+        market_config.signal.safety_margin,
+    )
+    no_net_edge = no_momentum - costs.total_rate
+    if no_net_edge < config.risk.paper_probe_min_edge:
+        return None
+    range_blocked, _ = blocks_price_range_entry(
+        market,
+        "BUY_NO",
+        history[-1].timestamp,
+        btc_candles,
+        history[-1].price,
+        config.risk.range_buy_yes_max_price,
+        config.risk.range_buy_no_max_price,
+        config.risk.range_market_safety_band_pct,
+        config.risk.btc_moving_away_return_pct,
+    )
+    regime_blocked, _ = blocks_directional_entry(market, Signal("BUY_NO", 0.0, no_momentum, no_net_edge, current_signal.reason), btc_candles, history[-1].timestamp)
+    if range_blocked or regime_blocked:
+        return None
+    return Signal(
+        "BUY_NO",
+        min(0.35, no_net_edge / max(config.risk.paper_probe_min_edge * 5, 0.0001)),
+        no_momentum,
+        no_net_edge,
+        f"探索仓: 连续零成交后，仅用小仓位验证 above_below_expiry/NO; 原因={current_signal.reason}",
+    )
+
+
+def _paper_probe_blocked_by_hard_risk(reason: str) -> bool:
+    return "同类方向连续止损" in reason or "亏损暂停" in reason or "触发止损" in reason
+
+
+def _is_paper_probe_reason(reason: str) -> bool:
+    return "探索仓" in reason or "挑战仓" in reason
+
+
+def _underperforming_probe_families(config, storage) -> set[str]:
+    closed_positions = storage.load_closed_paper_position_history()
+    rows = build_probe_performance_report(
+        config.backtest.output_dir,
+        closed_positions,
+        storage.load_open_paper_market_ids(),
+    )
+    disabled = set()
+    for row in rows:
+        if row.closed_count >= 20 and row.average_realized_pnl < 0:
+            disabled.add(row.probe_family)
+        elif row.closed_count >= 3 and row.average_realized_pnl < -0.05:
+            disabled.add(row.probe_family)
+        elif row.closed_count >= 2 and row.average_realized_pnl < -0.25:
+            disabled.add(row.probe_family)
+        elif row.closed_count >= 1 and row.average_realized_pnl <= -0.5:
+            disabled.add(row.probe_family)
+        elif row.closed_count >= 1 and row.realized_pnl <= -1.0:
+            disabled.add(row.probe_family)
+    entry_families = _paper_probe_entry_families(config.backtest.output_dir)
+    for position in closed_positions:
+        family = entry_families.get((position.market_id, position.opened_at))
+        if family is not None and position.realized_pnl <= -0.5:
+            disabled.add(family)
+    return disabled
+
+
+def _paper_range_bucket_probe_signal(
+    config,
+    market,
+    history,
+    market_config,
+    current_signal: Signal,
+    btc_candles,
+    disabled_probe_families: set[str] | None = None,
+) -> Signal | None:
+    if disabled_probe_families and "range_bucket_yes" in disabled_probe_families:
+        return None
+    bounds = _extract_range_bounds(market.question)
+    candle = latest_btc_candle_at_or_before(btc_candles, history[-1].timestamp)
+    if bounds is None or candle is None or candle.close <= 0:
+        return None
+    lower, upper = bounds
+    if not lower < candle.close < upper:
+        return None
+    width = upper - lower
+    if width <= 0:
+        return None
+    boundary_distance_pct = min(candle.close - lower, upper - candle.close) / candle.close
+    min_boundary_distance_pct = max(config.risk.range_market_safety_band_pct / 3, 0.003)
+    if boundary_distance_pct < min_boundary_distance_pct:
+        return None
+    high_certainty_price_cap = 0.985 if current_signal.net_edge >= 0.05 else min(config.risk.range_buy_yes_max_price, 0.85)
+    if history[-1].price <= config.risk.min_price or history[-1].price >= high_certainty_price_cap:
+        return None
+    if current_signal.net_edge < max(config.risk.paper_probe_min_edge, 0.01):
+        return None
+    return Signal(
+        "BUY_YES",
+        min(0.35, current_signal.net_edge / 0.05),
+        current_signal.edge,
+        current_signal.net_edge,
+        (
+            "探索仓: 连续零成交后，小仓位验证 range_bucket/YES; "
+            f"BTC={candle.close:.2f}, range=[{lower:.0f},{upper:.0f}], boundary_distance={boundary_distance_pct:.2%}; "
+            f"原因={current_signal.reason}"
+        ),
+    )
+
+
+def _paper_range_bucket_center_probe_signal(
+    config,
+    market,
+    history,
+    market_config,
+    current_signal: Signal,
+    btc_candles,
+    disabled_probe_families: set[str] | None = None,
+) -> Signal | None:
+    if disabled_probe_families and "range_bucket_center_yes" in disabled_probe_families:
+        return None
+    if not current_signal.reason.startswith("当前市场类型暂不交易"):
+        return None
+    bounds = _extract_range_bounds(market.question)
+    current = history[-1]
+    candle = latest_btc_candle_at_or_before(btc_candles, current.timestamp)
+    if bounds is None or candle is None or candle.close <= 0:
+        return None
+    lower, upper = bounds
+    if not lower < candle.close < upper:
+        return None
+    width = upper - lower
+    if width <= 0:
+        return None
+    boundary_distance_pct = min(candle.close - lower, upper - candle.close) / candle.close
+    center = (lower + upper) / 2
+    center_offset_ratio = abs(candle.close - center) / (width / 2)
+    if boundary_distance_pct < max(config.risk.range_market_safety_band_pct / 2, 0.006):
+        return None
+    if center_offset_ratio > 0.35:
+        return None
+    return_1h = _btc_return_since(btc_candles, current.timestamp, 60 * 60, candle.close)
+    if return_1h is not None and abs(return_1h) > 0.006:
+        return None
+    if current_signal.net_edge < max(0.05, config.risk.paper_probe_min_edge * 25):
+        return None
+    if current.price <= config.risk.min_price or current.price >= 0.98:
+        return None
+    return Signal(
+        "BUY_YES",
+        min(0.18, current_signal.net_edge / 0.35),
+        current_signal.edge,
+        current_signal.net_edge,
+        (
+            "微型探索仓: 1USDC 验证区间中心 range_bucket/YES v1; "
+            f"yes={current.price:.3f}, BTC={candle.close:.2f}, range=[{lower:.0f},{upper:.0f}], "
+            f"boundary_distance={boundary_distance_pct:.2%}, center_offset={center_offset_ratio:.2f}, "
+            f"1h={_fmt_pct(return_1h)}; 原因={current_signal.reason}"
+        ),
+    )
+
+
+def _paper_near_strike_above_below_no_probe_signal(
+    config,
+    market,
+    history,
+    current_signal: Signal,
+    btc_candles,
+    disabled_probe_families: set[str] | None = None,
+) -> Signal | None:
+    if disabled_probe_families and "near_strike_above_below_no" in disabled_probe_families:
+        return None
+    if not (
+        current_signal.reason.startswith("BTC 正接近 above strike")
+        or current_signal.reason.startswith("BTC 1h 正接近 above strike")
+        or current_signal.reason.startswith("BTC 未明显远离 above strike")
+        or current_signal.reason.startswith("BTC 1h 未明显远离 above strike")
+    ):
+        return None
+    if infer_strike_direction(market.question) != "above":
+        return None
+    if current_signal.net_edge < max(0.08, config.risk.paper_probe_min_edge * 20):
+        return None
+    current = history[-1]
+    yes_price = current.price
+    no_price = max(0.0, 1.0 - yes_price)
+    if no_price <= config.risk.min_price or no_price > min(config.risk.range_buy_no_max_price, 0.75):
+        return None
+    strike = extract_usd_strike(market.question)
+    candle = latest_btc_candle_at_or_before(btc_candles, current.timestamp)
+    if strike is None or candle is None or candle.close <= 0:
+        return None
+    distance_pct = (strike - candle.close) / candle.close
+    min_distance_pct = max(0.004, config.risk.range_market_safety_band_pct / 4)
+    if distance_pct < min_distance_pct or distance_pct > config.risk.range_market_safety_band_pct:
+        return None
+    return_15m = _btc_return_since(btc_candles, current.timestamp, 15 * 60, candle.close)
+    return_1h = _btc_return_since(btc_candles, current.timestamp, 60 * 60, candle.close)
+    moving_away_from_strike = (return_15m is not None and return_15m <= -0.001) or (
+        return_1h is not None and return_1h <= -0.002
+    )
+    if not moving_away_from_strike:
+        return None
+    return Signal(
+        "BUY_NO",
+        min(0.20, current_signal.net_edge / 0.30),
+        current_signal.edge,
+        current_signal.net_edge,
+        (
+            "探索仓: 小仓位验证 near-strike 安全带 above_below_expiry/NO; "
+            f"no={no_price:.3f}, BTC={candle.close:.2f}, strike={strike:.2f}, "
+            f"distance={distance_pct:.2%}, 15m={_fmt_pct(return_15m)}, 1h={_fmt_pct(return_1h)}; "
+            f"原因={current_signal.reason}"
+        ),
+    )
+
+
+def _above_below_no_reversal_risk_blocks_probe(config, market, timestamp: int, btc_candles) -> bool:
+    if infer_strike_direction(market.question) != "above":
+        return False
+    strike = extract_usd_strike(market.question)
+    candle = latest_btc_candle_at_or_before(btc_candles, timestamp)
+    if strike is None or candle is None or candle.close <= 0:
+        return True
+    distance_pct = (strike - candle.close) / candle.close
+    if distance_pct <= 0:
+        return True
+    safety_band = max(config.risk.range_market_safety_band_pct, 0.01)
+    if distance_pct > safety_band:
+        return False
+    return_15m = _btc_return_since(btc_candles, timestamp, 15 * 60, candle.close)
+    return_1h = _btc_return_since(btc_candles, timestamp, 60 * 60, candle.close)
+    moving_away_threshold = max(config.risk.btc_moving_away_return_pct, 0.001)
+    moving_away_from_strike = (return_15m is not None and return_15m <= -moving_away_threshold) or (
+        return_1h is not None and return_1h <= -2 * moving_away_threshold
+    )
+    return not moving_away_from_strike
+
+
+def _above_below_yes_reversal_risk_blocks_probe(config, market, timestamp: int, btc_candles) -> bool:
+    if infer_strike_direction(market.question) != "above":
+        return False
+    strike = extract_usd_strike(market.question)
+    candle = latest_btc_candle_at_or_before(btc_candles, timestamp)
+    if strike is None or candle is None or candle.close <= 0:
+        return True
+    distance_pct = (candle.close - strike) / candle.close
+    min_distance_pct = max(0.012, config.risk.range_market_safety_band_pct / 2)
+    if distance_pct < min_distance_pct:
+        return True
+    return_15m = _btc_return_since(btc_candles, timestamp, 15 * 60, candle.close)
+    return_1h = _btc_return_since(btc_candles, timestamp, 60 * 60, candle.close)
+    return (return_15m is not None and return_15m <= -0.003) or (
+        return_1h is not None and return_1h <= -0.006
+    )
+
+
+def _paper_above_below_certainty_no_probe_signal(
+    config,
+    market,
+    history,
+    current_signal: Signal,
+    btc_candles,
+    disabled_probe_families: set[str] | None = None,
+) -> Signal | None:
+    if disabled_probe_families and "certainty_above_below_no" in disabled_probe_families:
+        return None
+    if not current_signal.reason.startswith("NO 价格太接近 1"):
+        return None
+    if current_signal.net_edge < max(config.risk.paper_probe_min_edge, 0.05):
+        return None
+    if infer_strike_direction(market.question) != "above":
+        return None
+    strike = extract_usd_strike(market.question)
+    candle = latest_btc_candle_at_or_before(btc_candles, history[-1].timestamp)
+    if strike is None or candle is None or candle.close <= 0:
+        return None
+    distance_pct = (strike - candle.close) / candle.close
+    min_distance_pct = max(0.005, config.risk.range_market_safety_band_pct / 4)
+    if distance_pct < min_distance_pct:
+        return None
+    yes_price = history[-1].price
+    no_price = max(0.0, 1.0 - yes_price)
+    if no_price <= config.risk.range_buy_no_max_price or no_price > 0.985:
+        return None
+    return Signal(
+        "BUY_NO",
+        min(0.20, current_signal.net_edge / 0.20),
+        current_signal.edge,
+        current_signal.net_edge,
+        (
+            "探索仓: 小仓位验证高确定性 above_below_expiry/NO; "
+            f"BTC={candle.close:.2f}, strike={strike:.2f}, distance={distance_pct:.2%}; "
+            f"原因={current_signal.reason}"
+        ),
+    )
+
+
+def _paper_above_below_ultra_certainty_no_probe_signal(
+    config,
+    market,
+    history,
+    current_signal: Signal,
+    btc_candles,
+    disabled_probe_families: set[str] | None = None,
+) -> Signal | None:
+    if disabled_probe_families and "ultra_certainty_above_below_no" in disabled_probe_families:
+        return None
+    if not current_signal.reason.startswith("NO 价格太接近 1"):
+        return None
+    if current_signal.net_edge < max(0.01, config.risk.paper_probe_min_edge * 8):
+        return None
+    if infer_strike_direction(market.question) != "above":
+        return None
+    current = history[-1]
+    yes_price = current.price
+    no_price = max(0.0, 1.0 - yes_price)
+    if no_price <= 0.94 or no_price > 0.999:
+        return None
+    strike = extract_usd_strike(market.question)
+    candle = latest_btc_candle_at_or_before(btc_candles, current.timestamp)
+    if strike is None or candle is None or candle.close <= 0:
+        return None
+    distance_pct = (strike - candle.close) / candle.close
+    if distance_pct < max(0.02, config.risk.range_market_safety_band_pct) or distance_pct > 0.12:
+        return None
+    return_15m = _btc_return_since(btc_candles, current.timestamp, 15 * 60, candle.close)
+    return_1h = _btc_return_since(btc_candles, current.timestamp, 60 * 60, candle.close)
+    moving_toward_strike = (return_15m is not None and return_15m >= 0.0075) or (
+        return_1h is not None and return_1h >= 0.012
+    )
+    if moving_toward_strike:
+        return None
+    return Signal(
+        "BUY_NO",
+        min(0.08, current_signal.net_edge / 0.25),
+        current_signal.edge,
+        current_signal.net_edge,
+        (
+            "微型探索仓: 1USDC 验证超高确定性 above_below_expiry/NO v1; "
+            f"no={no_price:.3f}, BTC={candle.close:.2f}, strike={strike:.2f}, "
+            f"distance={distance_pct:.2%}, 15m={_fmt_pct(return_15m)}, 1h={_fmt_pct(return_1h)}; "
+            f"原因={current_signal.reason}"
+        ),
+    )
+
+
+def _paper_above_below_crossed_reversal_no_probe_signal(
+    config,
+    market,
+    history,
+    current_signal: Signal,
+    btc_candles,
+    disabled_probe_families: set[str] | None = None,
+) -> Signal | None:
+    if disabled_probe_families and "crossed_above_reversal_no" in disabled_probe_families:
+        return None
+    if current_signal.action != "BUY_NO" and "阻止 BUY_NO" not in current_signal.reason:
+        return None
+    if infer_strike_direction(market.question) != "above":
+        return None
+    if current_signal.net_edge < max(0.04, config.risk.paper_probe_min_edge * 20):
+        return None
+    current = history[-1]
+    yes_price = current.price
+    no_price = max(0.0, 1.0 - yes_price)
+    if no_price < 0.20 or no_price > 0.70:
+        return None
+    strike = extract_usd_strike(market.question)
+    candle = latest_btc_candle_at_or_before(btc_candles, current.timestamp)
+    if strike is None or candle is None or candle.close <= 0:
+        return None
+    crossed_distance_pct = (candle.close - strike) / candle.close
+    if crossed_distance_pct <= 0 or crossed_distance_pct > 0.025:
+        return None
+    return_15m = _btc_return_since(btc_candles, current.timestamp, 15 * 60, candle.close)
+    return_1h = _btc_return_since(btc_candles, current.timestamp, 60 * 60, candle.close)
+    if return_1h is None or return_1h > -0.002:
+        return None
+    if return_15m is not None and return_15m > 0.006:
+        return None
+    return Signal(
+        "BUY_NO",
+        min(0.10, current_signal.net_edge / 0.35),
+        current_signal.edge,
+        current_signal.net_edge,
+        (
+            "微型探索仓: 1USDC 验证 crossed-above 回落 above_below_expiry/NO v1; "
+            f"no={no_price:.3f}, BTC={candle.close:.2f}, strike={strike:.2f}, "
+            f"crossed={crossed_distance_pct:.2%}, 15m={_fmt_pct(return_15m)}, 1h={_fmt_pct(return_1h)}; "
+            f"原因={current_signal.reason}"
+        ),
+    )
+
+
+def _paper_above_below_certainty_yes_probe_signal(
+    config,
+    market,
+    history,
+    current_signal: Signal,
+    btc_candles,
+    disabled_probe_families: set[str] | None = None,
+) -> Signal | None:
+    if disabled_probe_families and "certainty_above_below_yes" in disabled_probe_families:
+        return None
+    if not current_signal.reason.startswith("above_below_expiry 暂不允许 BUY_YES"):
+        return None
+    if infer_strike_direction(market.question) != "above":
+        return None
+    if current_signal.net_edge < max(0.03, config.risk.paper_probe_min_edge * 20):
+        return None
+    current = history[-1]
+    yes_price = current.price
+    if yes_price <= 0.70 or yes_price > 0.925:
+        return None
+    strike = extract_usd_strike(market.question)
+    candle = latest_btc_candle_at_or_before(btc_candles, current.timestamp)
+    if strike is None or candle is None or candle.close <= 0:
+        return None
+    distance_pct = (candle.close - strike) / candle.close
+    min_distance_pct = max(0.012, config.risk.range_market_safety_band_pct / 2)
+    if distance_pct < min_distance_pct or distance_pct > 0.12:
+        return None
+    return_15m = _btc_return_since(btc_candles, current.timestamp, 15 * 60, candle.close)
+    return_1h = _btc_return_since(btc_candles, current.timestamp, 60 * 60, candle.close)
+    moving_toward_strike = (return_15m is not None and return_15m <= -0.003) or (
+        return_1h is not None and return_1h <= -0.006
+    )
+    if moving_toward_strike:
+        return None
+    return Signal(
+        "BUY_YES",
+        min(0.18, current_signal.net_edge / 0.30),
+        current_signal.edge,
+        current_signal.net_edge,
+        (
+            "探索仓: 小仓位验证高确定性 above_below_expiry/YES v1; "
+            f"yes={yes_price:.3f}, BTC={candle.close:.2f}, strike={strike:.2f}, "
+            f"distance={distance_pct:.2%}, 15m={_fmt_pct(return_15m)}, 1h={_fmt_pct(return_1h)}; "
+            f"原因={current_signal.reason}"
+        ),
+    )
+
+
+def _paper_above_below_ultra_certainty_yes_probe_signal(
+    config,
+    market,
+    history,
+    current_signal: Signal,
+    btc_candles,
+    disabled_probe_families: set[str] | None = None,
+) -> Signal | None:
+    if disabled_probe_families and "ultra_certainty_above_below_yes" in disabled_probe_families:
+        return None
+    if not current_signal.reason.startswith("above_below_expiry 暂不允许 BUY_YES"):
+        return None
+    if infer_strike_direction(market.question) != "above":
+        return None
+    if current_signal.net_edge < max(0.015, config.risk.paper_probe_min_edge * 10):
+        return None
+    current = history[-1]
+    yes_price = current.price
+    if yes_price <= 0.90 or yes_price > 0.965:
+        return None
+    strike = extract_usd_strike(market.question)
+    candle = latest_btc_candle_at_or_before(btc_candles, current.timestamp)
+    if strike is None or candle is None or candle.close <= 0:
+        return None
+    distance_pct = (candle.close - strike) / candle.close
+    if distance_pct < max(0.035, config.risk.range_market_safety_band_pct * 1.75) or distance_pct > 0.15:
+        return None
+    return_15m = _btc_return_since(btc_candles, current.timestamp, 15 * 60, candle.close)
+    return_1h = _btc_return_since(btc_candles, current.timestamp, 60 * 60, candle.close)
+    moving_toward_strike = (return_15m is not None and return_15m <= -0.0075) or (
+        return_1h is not None and return_1h <= -0.012
+    )
+    if moving_toward_strike:
+        return None
+    return Signal(
+        "BUY_YES",
+        min(0.10, current_signal.net_edge / 0.30),
+        current_signal.edge,
+        current_signal.net_edge,
+        (
+            "微型探索仓: 1USDC 验证超高确定性 above_below_expiry/YES v1; "
+            f"yes={yes_price:.3f}, BTC={candle.close:.2f}, strike={strike:.2f}, "
+            f"distance={distance_pct:.2%}, 15m={_fmt_pct(return_15m)}, 1h={_fmt_pct(return_1h)}; "
+            f"原因={current_signal.reason}"
+        ),
+    )
+
+
+def _paper_above_below_recovery_no_probe_signal(
+    config,
+    market,
+    history,
+    current_signal: Signal,
+    btc_candles,
+    disabled_probe_families: set[str] | None = None,
+) -> Signal | None:
+    if disabled_probe_families and "recovery_above_below_no" in disabled_probe_families:
+        return None
+    if not current_signal.reason.startswith("range-like BUY_NO 价格过高"):
+        return None
+    if infer_strike_direction(market.question) != "above":
+        return None
+    if current_signal.net_edge < max(0.08, config.risk.paper_probe_min_edge * 50):
+        return None
+    current = history[-1]
+    yes_price = current.price
+    no_price = max(0.0, 1.0 - yes_price)
+    if no_price <= config.risk.range_buy_no_max_price or no_price > 0.925:
+        return None
+    strike = extract_usd_strike(market.question)
+    candle = latest_btc_candle_at_or_before(btc_candles, current.timestamp)
+    if strike is None or candle is None or candle.close <= 0:
+        return None
+    distance_pct = (strike - candle.close) / candle.close
+    min_distance_pct = max(0.012, config.risk.range_market_safety_band_pct / 2)
+    if distance_pct < min_distance_pct or distance_pct > 0.08:
+        return None
+    return_15m = _btc_return_since(btc_candles, current.timestamp, 15 * 60, candle.close)
+    return_1h = _btc_return_since(btc_candles, current.timestamp, 60 * 60, candle.close)
+    if return_15m is None or return_1h is None:
+        return None
+    moving_toward_strike = return_15m >= 0.002 or return_1h >= 0.005
+    if moving_toward_strike:
+        return None
+    regime_blocked, _ = blocks_directional_entry(
+        market,
+        Signal("BUY_NO", current_signal.confidence, current_signal.edge, current_signal.net_edge, current_signal.reason),
+        btc_candles,
+        current.timestamp,
+    )
+    if regime_blocked:
+        return None
+    return Signal(
+        "BUY_NO",
+        min(0.14, current_signal.net_edge / 0.40),
+        current_signal.edge,
+        current_signal.net_edge,
+        (
+            "探索仓: 样本恢复 above_below_expiry/NO v1; "
+            f"no={no_price:.3f}, BTC={candle.close:.2f}, strike={strike:.2f}, "
+            f"distance={distance_pct:.2%}, 15m={_fmt_pct(return_15m)}, 1h={_fmt_pct(return_1h)}; "
+            f"原因={current_signal.reason}"
+        ),
+    )
+
+
+def _paper_expensive_edge_above_below_no_probe_signal(
+    config,
+    market,
+    history,
+    current_signal: Signal,
+    btc_candles,
+    disabled_probe_families: set[str] | None = None,
+) -> Signal | None:
+    if disabled_probe_families and "expensive_edge_above_below_no" in disabled_probe_families:
+        return None
+    if not current_signal.reason.startswith("range-like BUY_NO 价格过高"):
+        return None
+    if infer_strike_direction(market.question) != "above":
+        return None
+    current = history[-1]
+    yes_price = current.price
+    no_price = max(0.0, 1.0 - yes_price)
+    max_probe_no_price = min(0.92, config.risk.max_price)
+    if no_price <= config.risk.range_buy_no_max_price or no_price > max_probe_no_price:
+        return None
+    if current_signal.net_edge < max(0.05, config.risk.paper_probe_min_edge * 10):
+        return None
+    strike = extract_usd_strike(market.question)
+    candle = latest_btc_candle_at_or_before(btc_candles, current.timestamp)
+    if strike is None or candle is None or candle.close <= 0:
+        return None
+    distance_pct = (strike - candle.close) / candle.close
+    min_distance_pct = max(0.004, config.risk.range_market_safety_band_pct / 4)
+    if distance_pct < min_distance_pct:
+        return None
+    return_15m = _btc_return_since(btc_candles, current.timestamp, 15 * 60, candle.close)
+    return_1h = _btc_return_since(btc_candles, current.timestamp, 60 * 60, candle.close)
+    moving_toward_strike = (return_15m is not None and return_15m >= 0.002) or (
+        return_1h is not None and return_1h >= 0.005
+    )
+    if moving_toward_strike:
+        return None
+    regime_blocked, _ = blocks_directional_entry(
+        market,
+        Signal("BUY_NO", current_signal.confidence, current_signal.edge, current_signal.net_edge, current_signal.reason),
+        btc_candles,
+        current.timestamp,
+    )
+    if regime_blocked:
+        return None
+    return Signal(
+        "BUY_NO",
+        min(0.25, current_signal.net_edge / 0.20),
+        current_signal.edge,
+        current_signal.net_edge,
+        (
+            "探索仓: 小仓位验证高价正edge above_below_expiry/NO; "
+            f"no={no_price:.3f}, BTC={candle.close:.2f}, strike={strike:.2f}, distance={distance_pct:.2%}; "
+            f"原因={current_signal.reason}"
+        ),
+    )
+
+
+def _paper_touch_below_probe_signal(config, market, history, market_config, current_signal: Signal, btc_candles) -> Signal | None:
+    if "暂不允许 BUY_YES" not in current_signal.reason:
+        return None
+    current = history[-1]
+    high_certainty = current_signal.net_edge >= 0.05
+    price_cap = 0.85 if high_certainty else config.risk.target_buy_yes_max_price
+    if current.price <= config.risk.min_price or current.price >= price_cap:
+        return None
+    if current_signal.net_edge < max(config.risk.paper_probe_min_edge, market_config.signal.min_edge):
+        return None
+    target_blocked, _ = blocks_price_target_entry(
+        market,
+        "BUY_YES",
+        current.timestamp,
+        btc_candles,
+        config.risk.target_market_max_distance_pct,
+        current.price,
+        price_cap,
+        config.risk.target_buy_no_max_price,
+        config.risk.btc_moving_away_return_pct,
+    )
+    regime_blocked, _ = blocks_directional_entry(
+        market,
+        Signal("BUY_YES", current_signal.confidence, current_signal.edge, current_signal.net_edge, current_signal.reason),
+        btc_candles,
+        current.timestamp,
+    )
+    if target_blocked or regime_blocked:
+        return None
+    return Signal(
+        "BUY_YES",
+        min(0.30, current_signal.net_edge / 0.08),
+        current_signal.edge,
+        current_signal.net_edge,
+        (
+            "探索仓: 连续零成交后，小仓位验证 touch_below/YES; "
+            f"price_cap={price_cap:.3f}, high_certainty={high_certainty}; 原因={current_signal.reason}"
+        ),
+    )
+
+
+def _paper_touch_below_no_probe_signal(
+    config,
+    market,
+    history,
+    market_config,
+    current_signal: Signal,
+    btc_candles,
+    disabled_probe_families: set[str] | None = None,
+) -> Signal | None:
+    if disabled_probe_families and "touch_below_no" in disabled_probe_families:
+        return None
+    if "touch_below 暂不允许 BUY_NO" not in current_signal.reason:
+        return None
+    if infer_strike_direction(market.question) != "below":
+        return None
+    current = history[-1]
+    yes_price = current.price
+    no_price = max(0.0, 1.0 - yes_price)
+    if current_signal.net_edge < max(0.06, config.risk.paper_probe_min_edge * 30):
+        return None
+    if no_price <= config.risk.range_buy_no_max_price or no_price > 0.94:
+        return None
+    strike = extract_usd_strike(market.question)
+    candle = latest_btc_candle_at_or_before(btc_candles, current.timestamp)
+    if strike is None or candle is None or candle.close <= 0:
+        return None
+    distance_pct = (candle.close - strike) / candle.close
+    if distance_pct <= 0.008 or distance_pct > 0.045:
+        return None
+    return_15m = _btc_return_since(btc_candles, current.timestamp, 15 * 60, candle.close)
+    return_1h = _btc_return_since(btc_candles, current.timestamp, 60 * 60, candle.close)
+    moving_toward_dip = (return_15m is not None and return_15m <= -0.003) or (
+        return_1h is not None and return_1h <= -0.006
+    )
+    if moving_toward_dip:
+        return None
+    regime_blocked, _ = blocks_directional_entry(
+        market,
+        Signal("BUY_NO", current_signal.confidence, current_signal.edge, current_signal.net_edge, current_signal.reason),
+        btc_candles,
+        current.timestamp,
+    )
+    if regime_blocked:
+        return None
+    return Signal(
+        "BUY_NO",
+        min(0.20, current_signal.net_edge / 0.20),
+        current_signal.edge,
+        current_signal.net_edge,
+        (
+            "探索仓: 小仓位验证 touch_below/NO v1; "
+            f"no={no_price:.3f}, BTC={candle.close:.2f}, target={strike:.2f}, "
+            f"distance={distance_pct:.2%}, 15m={_fmt_pct(return_15m)}, 1h={_fmt_pct(return_1h)}; "
+            f"原因={current_signal.reason}"
+        ),
+    )
+
+
+def _paper_touch_below_certainty_no_probe_signal(
+    config,
+    market,
+    history,
+    market_config,
+    current_signal: Signal,
+    btc_candles,
+    disabled_probe_families: set[str] | None = None,
+) -> Signal | None:
+    if disabled_probe_families and "touch_below_certainty_no" in disabled_probe_families:
+        return None
+    if "touch_below 暂不允许 BUY_NO" not in current_signal.reason:
+        return None
+    if infer_strike_direction(market.question) != "below":
+        return None
+    current = history[-1]
+    yes_price = current.price
+    no_price = max(0.0, 1.0 - yes_price)
+    if current_signal.net_edge < max(0.025, config.risk.paper_probe_min_edge * 20):
+        return None
+    if no_price <= 0.94 or no_price > 0.985:
+        return None
+    strike = extract_usd_strike(market.question)
+    candle = latest_btc_candle_at_or_before(btc_candles, current.timestamp)
+    if strike is None or candle is None or candle.close <= 0:
+        return None
+    distance_pct = (candle.close - strike) / candle.close
+    if distance_pct <= 0.015 or distance_pct > 0.055:
+        return None
+    return_15m = _btc_return_since(btc_candles, current.timestamp, 15 * 60, candle.close)
+    return_1h = _btc_return_since(btc_candles, current.timestamp, 60 * 60, candle.close)
+    moving_toward_dip = (return_15m is not None and return_15m <= -0.004) or (
+        return_1h is not None and return_1h <= -0.003
+    )
+    if moving_toward_dip:
+        return None
+    regime_blocked, _ = blocks_directional_entry(
+        market,
+        Signal("BUY_NO", current_signal.confidence, current_signal.edge, current_signal.net_edge, current_signal.reason),
+        btc_candles,
+        current.timestamp,
+    )
+    if regime_blocked:
+        return None
+    return Signal(
+        "BUY_NO",
+        min(0.16, current_signal.net_edge / 0.25),
+        current_signal.edge,
+        current_signal.net_edge,
+        (
+            "探索仓: 小仓位验证高确定性 touch_below/NO v2; "
+            f"no={no_price:.3f}, BTC={candle.close:.2f}, target={strike:.2f}, "
+            f"distance={distance_pct:.2%}, 15m={_fmt_pct(return_15m)}, 1h={_fmt_pct(return_1h)}; "
+            f"原因={current_signal.reason}"
+        ),
+    )
+
+
+def _paper_touch_below_distance_no_probe_signal(
+    config,
+    market,
+    history,
+    market_config,
+    current_signal: Signal,
+    btc_candles,
+    disabled_probe_families: set[str] | None = None,
+) -> Signal | None:
+    if disabled_probe_families and "touch_below_distance_no" in disabled_probe_families:
+        return None
+    positive_edge_skip = current_signal.reason.startswith("净优势不足") or "touch_below 暂不允许 BUY_NO" in current_signal.reason
+    if not positive_edge_skip:
+        return None
+    if infer_strike_direction(market.question) != "below":
+        return None
+    current = history[-1]
+    yes_price = current.price
+    no_price = max(0.0, 1.0 - yes_price)
+    if current_signal.net_edge < max(0.035, config.risk.paper_probe_min_edge * 20):
+        return None
+    if no_price < 0.25 or no_price > 0.72:
+        return None
+    strike = extract_usd_strike(market.question)
+    candle = latest_btc_candle_at_or_before(btc_candles, current.timestamp)
+    if strike is None or candle is None or candle.close <= 0:
+        return None
+    distance_pct = (candle.close - strike) / candle.close
+    if distance_pct < 0.055 or distance_pct > 0.28:
+        return None
+    return_15m = _btc_return_since(btc_candles, current.timestamp, 15 * 60, candle.close)
+    return_1h = _btc_return_since(btc_candles, current.timestamp, 60 * 60, candle.close)
+    moving_toward_dip = (return_15m is not None and return_15m <= -0.0025) or (
+        return_1h is not None and return_1h <= -0.006
+    )
+    if moving_toward_dip:
+        return None
+    regime_blocked, _ = blocks_directional_entry(
+        market,
+        Signal("BUY_NO", current_signal.confidence, current_signal.edge, current_signal.net_edge, current_signal.reason),
+        btc_candles,
+        current.timestamp,
+    )
+    if regime_blocked:
+        return None
+    return Signal(
+        "BUY_NO",
+        min(0.12, current_signal.net_edge / 0.30),
+        current_signal.edge,
+        current_signal.net_edge,
+        (
+            "微型探索仓: 1USDC 验证距离安全 touch_below/NO v1; "
+            f"no={no_price:.3f}, BTC={candle.close:.2f}, target={strike:.2f}, "
+            f"distance={distance_pct:.2%}, 15m={_fmt_pct(return_15m)}, 1h={_fmt_pct(return_1h)}; "
+            f"原因={current_signal.reason}"
+        ),
+    )
+
+
+def _paper_touch_below_momentum_yes_probe_signal(
+    config,
+    market,
+    history,
+    market_config,
+    current_signal: Signal,
+    btc_candles,
+    disabled_probe_families: set[str] | None = None,
+) -> Signal | None:
+    if disabled_probe_families and "touch_below_momentum_yes" in disabled_probe_families:
+        return None
+    if "touch_below 暂不允许 BUY_YES" not in current_signal.reason:
+        return None
+    if infer_strike_direction(market.question) != "below":
+        return None
+    current = history[-1]
+    if current_signal.net_edge < max(0.08, config.risk.paper_probe_min_edge * 40):
+        return None
+    if current.price <= 0.18 or current.price >= 0.72:
+        return None
+    strike = extract_usd_strike(market.question)
+    candle = latest_btc_candle_at_or_before(btc_candles, current.timestamp)
+    if strike is None or candle is None or candle.close <= 0:
+        return None
+    distance_pct = (candle.close - strike) / candle.close
+    if distance_pct <= 0.004 or distance_pct > 0.035:
+        return None
+    return_15m = _btc_return_since(btc_candles, current.timestamp, 15 * 60, candle.close)
+    return_1h = _btc_return_since(btc_candles, current.timestamp, 60 * 60, candle.close)
+    moving_toward_target = (return_15m is not None and return_15m <= -0.0015) or (
+        return_1h is not None and return_1h <= -0.003
+    )
+    if not moving_toward_target:
+        return None
+    regime_blocked, _ = blocks_directional_entry(
+        market,
+        Signal("BUY_YES", current_signal.confidence, current_signal.edge, current_signal.net_edge, current_signal.reason),
+        btc_candles,
+        current.timestamp,
+    )
+    if regime_blocked:
+        return None
+    return Signal(
+        "BUY_YES",
+        min(0.20, current_signal.net_edge / 0.25),
+        current_signal.edge,
+        current_signal.net_edge,
+        (
+            "探索仓: 小仓位验证 touch_below/YES momentum v1; "
+            f"yes={current.price:.3f}, BTC={candle.close:.2f}, target={strike:.2f}, "
+            f"distance={distance_pct:.2%}, 15m={_fmt_pct(return_15m)}, 1h={_fmt_pct(return_1h)}; "
+            f"原因={current_signal.reason}"
+        ),
+    )
+
+
+def _paper_touch_below_discount_probe_signal(
+    config,
+    market,
+    history,
+    market_config,
+    current_signal: Signal,
+    btc_candles,
+    disabled_probe_families: set[str] | None = None,
+) -> Signal | None:
+    if disabled_probe_families and "touch_below_discount_yes" in disabled_probe_families:
+        return None
+    if not current_signal.reason.startswith("净优势不足"):
+        return None
+    if infer_strike_direction(market.question) != "below":
+        return None
+    current = history[-1]
+    if current_signal.net_edge < max(0.035, config.risk.paper_probe_min_edge * 15):
+        return None
+    if current.price <= 0.25 or current.price >= 0.78:
+        return None
+    strike = extract_usd_strike(market.question)
+    candle = latest_btc_candle_at_or_before(btc_candles, current.timestamp)
+    if strike is None or candle is None or candle.close <= 0:
+        return None
+    distance_pct = (candle.close - strike) / candle.close
+    if distance_pct <= 0.005 or distance_pct > 0.045:
+        return None
+    return_15m = _btc_return_since(btc_candles, current.timestamp, 15 * 60, candle.close)
+    return_1h = _btc_return_since(btc_candles, current.timestamp, 60 * 60, candle.close)
+    moving_toward_target = (return_15m is not None and return_15m <= -0.001) or (
+        return_1h is not None and return_1h <= -0.002
+    )
+    if not moving_toward_target:
+        return None
+    regime_blocked, _ = blocks_directional_entry(
+        market,
+        Signal("BUY_YES", current_signal.confidence, current_signal.edge, current_signal.net_edge, current_signal.reason),
+        btc_candles,
+        current.timestamp,
+    )
+    if regime_blocked:
+        return None
+    return Signal(
+        "BUY_YES",
+        min(0.25, current_signal.net_edge / 0.12),
+        current_signal.edge,
+        current_signal.net_edge,
+        (
+            "探索仓: 小仓位验证折扣 touch_below/YES v2; "
+            f"yes={current.price:.3f}, BTC={candle.close:.2f}, target={strike:.2f}, "
+            f"distance={distance_pct:.2%}, 15m={_fmt_pct(return_15m)}, 1h={_fmt_pct(return_1h)}; "
+            f"原因={current_signal.reason}"
+        ),
+    )
+
+
+def _btc_return_since(candles, timestamp: int, lookback_seconds: int, current_close: float) -> float | None:
+    previous = latest_btc_candle_at_or_before(candles, timestamp - lookback_seconds)
+    if previous is None or previous.close == 0:
+        return None
+    return (current_close - previous.close) / previous.close
+
+
+def _fmt_pct(value: float | None) -> str:
+    return "n/a" if value is None else f"{value:.2%}"
+
+def _extract_range_bounds(question: str) -> tuple[float, float] | None:
+    values = []
+    for value, suffix in re.findall(r"\$\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+(?:\.[0-9]+)?)(k)?", question.lower()):
+        amount = float(value.replace(",", ""))
+        if suffix:
+            amount *= 1000
+        values.append(amount)
+    if len(values) < 2:
+        return None
+    lower, upper = sorted(values[:2])
+    return lower, upper
 
 
 def _live_paper_entry_plan(config, market, signal, market_config, reference_yes_price: float):
@@ -576,7 +1883,11 @@ def _live_paper_entry_plan(config, market, signal, market_config, reference_yes_
     reference_side_price = reference_yes_price if signal.action == "BUY_YES" else max(0.0, 1.0 - reference_yes_price)
     adverse_repricing = max(0.0, quote.ask - reference_side_price)
     repriced_edge = signal.net_edge - adverse_repricing
-    required_edge = market_config.signal.min_edge * max(1.0, config.risk.live_reprice_edge_multiplier)
+    required_edge = (
+        config.risk.paper_probe_min_edge
+        if _is_paper_probe_reason(signal.reason)
+        else market_config.signal.min_edge * max(1.0, config.risk.live_reprice_edge_multiplier)
+    )
     if repriced_edge < required_edge:
         hold = Signal(
             "HOLD",
@@ -610,7 +1921,7 @@ def _paper_position_state_signal(config, storage, market, yes_price: float, run_
             realized_pnl = _paper_close_value(position, current_price, market, config)
             cooldown_seconds = (
                 config.risk.target_stop_cooldown_seconds
-                if classify_market(market).market_type in {"price_target", "price_target_daily"}
+                if is_target_like_market_type(classify_market(market).market_type)
                 else config.risk.paper_reentry_cooldown_seconds
             )
             cooldown_until = run_timestamp + cooldown_seconds
@@ -686,6 +1997,21 @@ def _paper_settlement_signal(config, storage, market, position: PaperPositionSta
         0.0,
         f"模拟持仓按已解析结果结算; side={position.side}; payout={settlement_price:.0f}; realized_pnl={realized_pnl:.2f}",
     )
+
+
+def _paper_market_end_date_has_passed(market, run_timestamp: int) -> bool:
+    if not market.end_date:
+        return False
+    try:
+        raw_value = str(market.end_date)
+        if raw_value.endswith("Z"):
+            raw_value = raw_value[:-1] + "+00:00"
+        end_time = datetime.fromisoformat(raw_value)
+    except ValueError:
+        return False
+    if end_time.tzinfo is None:
+        end_time = end_time.replace(tzinfo=timezone.utc)
+    return end_time.timestamp() <= run_timestamp
 
 
 def _resolved_side_price(market, side: str) -> float | None:
@@ -776,14 +2102,14 @@ def _replace_paper_position(position: PaperPositionState, **changes) -> PaperPos
     return PaperPositionState(**values)
 
 
-def _save_paper_position(config, storage, market, execution_plan, run_timestamp: int) -> None:
+def _save_paper_position(config, storage, market, execution_plan, run_timestamp: int, notional_override: float | None = None) -> None:
     if execution_plan.side not in {"BUY_YES", "BUY_NO"} or execution_plan.limit_price is None:
         return
     side = "NO" if execution_plan.side == "BUY_NO" else "YES"
     entry_price = execution_plan.limit_price
     entry_fee_rate = taker_fee_rate(entry_price, market.effective_taker_fee_rate(config.backtest.taker_fee_rate))
     slippage_rate = config.backtest.slippage_bps / 10_000
-    notional = config.backtest.trade_size_usdc
+    notional = notional_override if notional_override is not None else config.backtest.trade_size_usdc
     cost_basis = notional + notional * entry_fee_rate + notional * slippage_rate
     execution_price = entry_price * (1 + slippage_rate)
     if execution_price <= 0:
@@ -833,24 +2159,134 @@ def _run_paper_report(config) -> None:
     print(f"paper_report_csv={path}")
 
 
-def _run_kalshi_discover(config) -> None:
-    markets = discover_kalshi_btc_markets(config, use_cache=False)
-    print(f"kalshi_markets | count={len(markets)}")
-    for market in markets[:25]:
-        yes = market.mid_yes_price
-        yes_label = f"{yes:.3f}" if yes is not None else "n/a"
-        print(f"- {market.ticker} | yes={yes_label} | vol24h={market.volume_24h:.0f} | close={market.close_time} | {market.question}")
+def _run_paper_sample_report(config, recent_runs: int) -> None:
+    rows = build_paper_sample_report(config.backtest.output_dir, recent_runs=recent_runs)
+    path = write_paper_sample_report_csv(rows, config.backtest.output_dir)
+    print_paper_sample_report(rows)
+    print(f"paper_sample_report_csv={path}")
 
 
-def _run_cross_platform_report(config, market_type: str) -> None:
+def _run_live_universe_report(config, recent_runs: int) -> None:
+    try:
+        markets = discover_btc_markets(config, use_cache=False)
+    except HttpError as exc:
+        raise SystemExit(f"Live discovery failed; not falling back to historical SQLite markets: {exc}") from exc
+    sample_rows = build_paper_sample_report(config.backtest.output_dir, recent_runs=recent_runs)
+    rows = build_live_universe_report(markets, sample_rows)
+    path = write_live_universe_report_csv(rows, config.backtest.output_dir)
+    print_live_universe_report(rows)
+    print(f"live_universe_report_csv={path}")
+
+
+def _run_strategy_review(config, recent_runs: int) -> None:
+    rows = build_strategy_review(config.backtest.output_dir, recent_runs=recent_runs)
+    path = write_strategy_review_csv(rows, config.backtest.output_dir)
+    print_strategy_review(rows)
     storage = storage_from_config(config)
-    polymarket_markets = _filter_markets(storage.load_markets(), market_type)
-    if not polymarket_markets:
-        polymarket_markets = _filter_markets(_discover_markets_with_quality_guard(config, storage, "cross-platform-report"), market_type)
-    kalshi_markets = discover_kalshi_btc_markets(config, use_cache=False)
-    rows = match_btc_markets(polymarket_markets, kalshi_markets)
-    path = write_cross_platform_matches_csv(rows, config.backtest.output_dir)
-    print_cross_platform_summary(rows, path)
+    account = storage.load_paper_account_summary()
+    total_open_exposure = _paper_open_exposure_usdc(storage)
+    probe_open_exposure = _paper_open_probe_exposure_usdc(config, storage)
+    probe_open_count = len(_paper_open_probe_positions(config, storage))
+    probe_slots = _paper_probe_available_slots(config, storage)
+    zero_taker_streak = _recent_zero_taker_runs(config.backtest.output_dir)
+    print(
+        f"strategy_review_slots | open_positions={account.open_position_count} | "
+        f"probe_open_positions={probe_open_count} | "
+        f"probe_soft_max_open={config.risk.paper_probe_max_open_positions} | "
+        f"probe_hard_max_open={config.risk.paper_probe_hard_max_open_positions} | "
+        f"total_open_exposure={total_open_exposure:.2f} | "
+        f"probe_open_exposure={probe_open_exposure:.2f} | "
+        f"probe_max_exposure={config.risk.paper_probe_max_total_exposure_usdc:.2f} | "
+        f"zero_taker_streak={zero_taker_streak} | "
+        f"probe_slots={probe_slots}"
+    )
+    disabled_families = sorted(_underperforming_probe_families(config, storage))
+    print(f"strategy_review_disabled_probe_families | count={len(disabled_families)} | families={','.join(disabled_families) or 'none'}")
+    print(f"strategy_review_csv={path}")
+
+
+def _run_filter_reason_report(config, recent_runs: int) -> None:
+    rows = build_filter_reason_report(config.backtest.output_dir, recent_runs=recent_runs)
+    path = write_filter_reason_report_csv(rows, config.backtest.output_dir)
+    print_filter_reason_report(rows)
+    print(f"filter_reason_report_csv={path}")
+
+
+def _run_blocked_edge_report(config, recent_runs: int) -> None:
+    rows = build_blocked_edge_report(config.backtest.output_dir, recent_runs=recent_runs)
+    path = write_blocked_edge_report_csv(rows, config.backtest.output_dir)
+    print_blocked_edge_report(rows)
+    print(f"blocked_edge_report_csv={path}")
+
+
+def _run_touch_below_path_report(config, recent_runs: int) -> None:
+    btc_candles = load_btc_candles_csv(Path(config.backtest.output_dir) / "btc_price_candles.csv")
+    rows = build_touch_below_path_report(config.backtest.output_dir, btc_candles, recent_runs=recent_runs)
+    path = write_touch_below_path_report_csv(rows, config.backtest.output_dir)
+    print_touch_below_path_report(rows)
+    print(f"touch_below_path_report_csv={path}")
+
+
+def _run_probe_performance_report(config) -> None:
+    storage = storage_from_config(config)
+    rows = build_probe_performance_report(
+        config.backtest.output_dir,
+        storage.load_closed_paper_position_history(),
+        storage.load_open_paper_market_ids(),
+    )
+    path = write_probe_performance_report_csv(rows, config.backtest.output_dir)
+    print_probe_performance_report(rows)
+    print(f"probe_performance_report_csv={path}")
+
+
+def _run_strategy_autotune_report(config, recent_runs: int) -> None:
+    storage = storage_from_config(config)
+    strategy_rows = build_strategy_review(config.backtest.output_dir, recent_runs=recent_runs)
+    probe_rows = build_probe_performance_report(
+        config.backtest.output_dir,
+        storage.load_closed_paper_position_history(),
+        storage.load_open_paper_market_ids(),
+    )
+    context = AutotuneContext(
+        open_positions=storage.load_paper_account_summary().open_position_count,
+        probe_slots=_paper_probe_available_slots(config, storage),
+        open_exposure_usdc=_paper_open_probe_exposure_usdc(config, storage),
+        probe_max_exposure_usdc=config.risk.paper_probe_max_total_exposure_usdc,
+        disabled_probe_families=sorted(_underperforming_probe_families(config, storage)),
+        zero_taker_streak=_recent_zero_taker_runs(config.backtest.output_dir),
+        probe_zero_run_threshold=config.risk.paper_probe_zero_run_threshold,
+    )
+    rows = build_strategy_autotune_report(strategy_rows, probe_rows, context)
+    path = write_strategy_autotune_report_csv(rows, config.backtest.output_dir)
+    print_strategy_autotune_report(rows)
+    print(f"strategy_autotune_report_csv={path}")
+
+
+def _run_open_position_report(config, live_quotes: bool) -> None:
+    storage = storage_from_config(config)
+    markets = storage.load_markets()
+    market_by_id = {market.id: market for market in markets}
+    positions = []
+    for market_id in storage.load_open_paper_market_ids():
+        position = storage.load_paper_position(market_id)
+        if position is not None and position.status == "open":
+            positions.append(position)
+    live_side_prices = {}
+    if live_quotes:
+        for position in positions:
+            market = market_by_id.get(position.market_id)
+            token_id = None if market is None else (market.yes_token_id if position.side == "YES" else market.no_token_id)
+            if not token_id:
+                continue
+            try:
+                quote = get_token_quote(config, token_id)
+            except HttpError:
+                continue
+            live_side_prices[position.market_id] = quote.bid
+    rows = build_open_position_report(config.backtest.output_dir, markets, positions, int(time()), live_side_prices)
+    path = write_open_position_report_csv(rows, config.backtest.output_dir)
+    print_open_position_report(rows)
+    print(f"open_position_report_csv={path}")
 
 
 def _print_cache_info(config) -> None:
@@ -915,14 +2351,14 @@ def _run_btc_price(config) -> None:
     )
 
 
-def _run_alignment_report(config, market_type: str) -> None:
+def _run_alignment_report(config, market_type: str, max_points_per_market: int | None = None) -> None:
     storage = storage_from_config(config)
     markets = _filter_markets(storage.load_markets(), market_type)
     candles = load_btc_candles_csv(Path(config.backtest.output_dir) / "btc_price_candles.csv")
     if not candles:
         candles = get_btc_candles(config)
         write_btc_candles_csv(candles, config.backtest.output_dir)
-    rows = build_alignment_rows(markets, storage, candles, [1, 3, 6])
+    rows = build_alignment_rows(markets, storage, candles, [1, 3, 6], max_points_per_market=max_points_per_market)
     summaries = summarize_alignment(rows)
     rows_path = write_alignment_rows_csv(rows, config.backtest.output_dir)
     summary_path = write_alignment_summary_csv(summaries, config.backtest.output_dir)
@@ -933,16 +2369,15 @@ def _run_alignment_report(config, market_type: str) -> None:
 
 def _run_edge_report(config, min_samples: int) -> None:
     alignment_path = Path(config.backtest.output_dir) / "alignment_report.csv"
-    rows = load_alignment_rows_csv(alignment_path)
-    if not rows:
+    if not alignment_path.exists():
         raise SystemExit("No alignment rows found. Run alignment-report first.")
-    buckets = build_edge_buckets(rows, min_samples=min_samples)
+    buckets = build_edge_buckets_from_csv(alignment_path, min_samples=min_samples)
     path = write_edge_report_csv(buckets, config.backtest.output_dir)
     print_edge_report_summary(buckets)
     print(f"edge_report_csv={path}")
 
 
-def _run_strategy_sweep(config, market_type: str, limit: int, candidate_limit: int | None) -> None:
+def _run_strategy_sweep(config, market_type: str, limit: int, candidate_limit: int | None, max_points_per_market: int | None = None) -> None:
     storage = storage_from_config(config)
     markets = storage.load_markets()
     btc_candles = load_btc_candles_csv(Path(config.backtest.output_dir) / "btc_price_candles.csv")
@@ -950,11 +2385,13 @@ def _run_strategy_sweep(config, market_type: str, limit: int, candidate_limit: i
         raise SystemExit("--limit must be > 0")
     if candidate_limit is not None and candidate_limit <= 0:
         raise SystemExit("--candidate-limit must be > 0")
+    if max_points_per_market is not None and max_points_per_market <= 0:
+        raise SystemExit("--max-points-per-market must be > 0")
     if not markets:
         raise SystemExit("No local markets found. Run discover or backtest first.")
     if not btc_candles:
         raise SystemExit("No BTC candles found. Run btc-price first.")
-    results = run_strategy_sweep(config, storage, markets, btc_candles, market_type, limit, candidate_limit)
+    results = run_strategy_sweep(config, storage, markets, btc_candles, market_type, limit, candidate_limit, max_points_per_market)
     path = write_strategy_sweep_csv(results, config.backtest.output_dir)
     print_strategy_sweep_summary(results, path)
 
@@ -1035,6 +2472,18 @@ def _run_market_type_report(config) -> None:
     rows = build_market_type_report(config, storage, candles)
     path = write_market_type_report_csv(rows, config.backtest.output_dir)
     print_market_type_report(rows, path)
+
+
+def _run_observation_report(config, recent_runs: int) -> None:
+    rows = build_observation_report(config.backtest.output_dir, recent_runs)
+    path = write_observation_report_csv(rows, config.backtest.output_dir)
+    print_observation_report(rows, path)
+
+
+def _run_side_diagnostics(config) -> None:
+    rows = build_side_diagnostics(config.backtest.output_dir)
+    path = write_side_diagnostics_csv(rows, config.backtest.output_dir)
+    print_side_diagnostics(rows, path)
 
 
 def _run_strike_report(config) -> None:

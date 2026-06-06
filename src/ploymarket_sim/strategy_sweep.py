@@ -65,13 +65,17 @@ def run_strategy_sweep(
     market_type: str,
     limit: int,
     candidate_limit: int | None = None,
+    max_points_per_market: int | None = None,
 ) -> list[SweepResult]:
     selected_markets = [market for market in markets if is_market_type(market, market_type)]
-    histories_by_market = {
-        market.id: storage.load_price_history(market.yes_token_id or "")
-        for market in selected_markets
-        if market.yes_token_id
-    }
+    histories_by_market = {}
+    for market in selected_markets:
+        if not market.yes_token_id:
+            continue
+        history = storage.load_price_history(market.yes_token_id or "")
+        if max_points_per_market is not None and max_points_per_market > 0 and len(history) > max_points_per_market:
+            history = history[-max_points_per_market:]
+        histories_by_market[market.id] = history
     candidates = default_candidates()
     if candidate_limit is not None:
         candidates = candidates[:candidate_limit]

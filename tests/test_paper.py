@@ -27,7 +27,7 @@ class PaperTests(unittest.TestCase):
 
         row = build_paper_signal_row(market, signal, 0.02, 123)
 
-        self.assertEqual(row.market_type, "price_target")
+        self.assertEqual(row.market_type, "touch_above")
         self.assertEqual(row.taker_fee_rate, 0.07)
         self.assertEqual(row.action, "BUY_YES")
         self.assertEqual(row.execution_mode, "SKIP")

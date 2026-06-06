@@ -65,9 +65,12 @@ class Storage:
     def __init__(self, enabled: bool, sqlite_path: str):
         self.enabled = enabled
         self.sqlite_path = sqlite_path
+        self._initialized = False
 
     def init(self) -> None:
         if not self.enabled:
+            return
+        if self._initialized:
             return
         path = Path(self.sqlite_path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -198,6 +201,7 @@ class Storage:
                 WHERE status = 'closed' AND closed_at IS NOT NULL
                 """
             )
+        self._initialized = True
 
     def save_markets(self, markets: list[Market]) -> None:
         if not self.enabled:
@@ -713,7 +717,9 @@ class Storage:
         return sum(1 for (question,) in rows if infer_strike_direction(str(question)) == direction)
 
     def _connect(self) -> sqlite3.Connection:
-        return sqlite3.connect(self.sqlite_path)
+        connection = sqlite3.connect(self.sqlite_path, timeout=30)
+        connection.execute("PRAGMA busy_timeout = 30000")
+        return connection
 
 
 def storage_from_config(config) -> Storage:

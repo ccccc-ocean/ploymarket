@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 from .btc_price import BtcCandle
-from .classifier import classify_market
+from .classifier import classify_market, is_range_like_market_type, is_target_like_market_type
 from .polymarket import Market
 
 
@@ -14,14 +14,14 @@ def blocks_btc_strike_entry(
     action: str = "BUY_YES",
     tolerance_pct: float = 0.0015,
 ) -> tuple[bool, str]:
-    if classify_market(market).market_type != "price_range_daily":
+    if classify_market(market).market_type != "above_below_expiry":
         return False, ""
     strike = extract_usd_strike(market.question)
     if strike is None:
         return False, ""
     candle = latest_btc_candle_at_or_before(btc_candles, timestamp)
     if candle is None:
-        return True, f"price_range_daily 缺少 BTC 现货确认，暂停 {action}"
+        return True, f"range-like 市场缺少 BTC 现货确认，暂停 {action}"
     if action != "BUY_YES":
         return False, ""
 
@@ -48,7 +48,7 @@ def blocks_price_range_entry(
     safety_band_pct: float = 0.02,
     moving_away_return_pct: float = 0.001,
 ) -> tuple[bool, str]:
-    if classify_market(market).market_type != "price_range_daily":
+    if classify_market(market).market_type != "above_below_expiry":
         return False, ""
     if action not in {"BUY_YES", "BUY_NO"}:
         return False, ""
@@ -57,17 +57,17 @@ def blocks_price_range_entry(
     direction = infer_strike_direction(market.question)
     candle = latest_btc_candle_at_or_before(btc_candles, timestamp)
     if strike is None or direction == "unknown":
-        return True, f"price_range_daily 缺少可识别 strike/方向，暂停 {action}"
+        return True, f"range-like 市场缺少可识别 strike/方向，暂停 {action}"
     if candle is None or candle.close <= 0:
-        return True, f"price_range_daily 缺少 BTC 现货确认，暂停 {action}"
+        return True, f"range-like 市场缺少 BTC 现货确认，暂停 {action}"
 
     if yes_price is not None:
         if action == "BUY_YES" and yes_price > buy_yes_max_price:
-            return True, f"price_range_daily BUY_YES 价格过高，避免追高: yes={yes_price:.3f}, max={buy_yes_max_price:.3f}"
+            return True, f"range-like BUY_YES 价格过高，避免追高: yes={yes_price:.3f}, max={buy_yes_max_price:.3f}"
         if action == "BUY_NO":
             no_price = max(0.0, 1.0 - yes_price)
             if no_price > buy_no_max_price:
-                return True, f"price_range_daily BUY_NO 价格过高，避免高价追 NO: no={no_price:.3f}, max={buy_no_max_price:.3f}"
+                return True, f"range-like BUY_NO 价格过高，避免高价追 NO: no={no_price:.3f}, max={buy_no_max_price:.3f}"
 
     recent_return = _return_since(btc_candles, timestamp, 15 * 60, candle.close)
     hourly_return = _return_since(btc_candles, timestamp, 60 * 60, candle.close)
@@ -77,20 +77,20 @@ def blocks_price_range_entry(
     distance_pct = (strike - candle.close) / candle.close
     near_band = abs(distance_pct) <= safety_band_pct
     if direction == "above":
-        if action == "BUY_NO" and 0 < distance_pct <= safety_band_pct and recent_return >= moving_away_return_pct:
+        if action == "BUY_NO" and 0 < distance_pct <= safety_band_pct and recent_return > -moving_away_return_pct:
             return (
                 True,
-                f"BTC 正接近 above strike，暂停 BUY_NO: BTC={candle.close:.2f}, strike={strike:.2f}, distance={distance_pct:.2%}, 15m={recent_return:.2%}",
+                f"BTC 未明显远离 above strike，暂停 BUY_NO: BTC={candle.close:.2f}, strike={strike:.2f}, distance={distance_pct:.2%}, 15m={recent_return:.2%}",
             )
         if (
             action == "BUY_NO"
             and 0 < distance_pct <= safety_band_pct / 2
             and hourly_return is not None
-            and hourly_return >= moving_away_return_pct
+            and hourly_return > -moving_away_return_pct
         ):
             return (
                 True,
-                f"BTC 1h 正接近 above strike，暂停 BUY_NO: BTC={candle.close:.2f}, strike={strike:.2f}, distance={distance_pct:.2%}, 1h={hourly_return:.2%}",
+                f"BTC 1h 未明显远离 above strike，暂停 BUY_NO: BTC={candle.close:.2f}, strike={strike:.2f}, distance={distance_pct:.2%}, 1h={hourly_return:.2%}",
             )
         if action == "BUY_YES" and distance_pct > 0 and recent_return <= -moving_away_return_pct:
             return (
@@ -125,7 +125,7 @@ def blocks_price_target_entry(
     moving_away_return_pct: float = 0.001,
 ) -> tuple[bool, str]:
     classification = classify_market(market).market_type
-    if classification not in {"price_target", "price_target_daily"}:
+    if not is_target_like_market_type(classification):
         return False, ""
     if action not in {"BUY_YES", "BUY_NO"}:
         return False, ""

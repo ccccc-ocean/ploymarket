@@ -10,8 +10,8 @@ class SignalTests(unittest.TestCase):
     def test_positive_momentum_generates_buy_yes(self) -> None:
         market = Market(
             "1",
-            "Will BTC be above X?",
-            "btc-x",
+            "Bitcoin Up or Down on May 22?",
+            "btc-up-down",
             None,
             5000,
             1000,

@@ -4,6 +4,7 @@ import csv
 from dataclasses import dataclass
 from pathlib import Path
 
+from .classifier import is_range_like_market_type
 from .market_rules import extract_usd_strike
 
 
@@ -30,7 +31,7 @@ def build_strike_report(summary_path: str | Path) -> list[StrikeReportRow]:
     buckets: dict[float, dict[str, float]] = {}
     with csv_path.open("r", newline="", encoding="utf-8") as file:
         for row in csv.DictReader(file):
-            if row.get("market_type") != "price_range_daily":
+            if not is_range_like_market_type(row.get("market_type", "")):
                 continue
             strike = extract_usd_strike(row.get("question", ""))
             if strike is None:

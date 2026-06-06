@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .btc_price import BtcCandle
-from .classifier import classify_market
+from .classifier import classify_market, is_range_like_market_type, is_target_like_market_type
 from .market_rules import extract_usd_strike, infer_strike_direction, latest_btc_candle_at_or_before
 from .polymarket import Market
 from .signals import Signal
@@ -52,7 +52,7 @@ def blocks_directional_entry(
     if signal.action not in {"BUY_YES", "BUY_NO"}:
         return False, ""
     market_type = classify_market(market).market_type
-    if market_type not in {"price_range_daily", "price_target", "price_target_daily"}:
+    if not (is_range_like_market_type(market_type) or is_target_like_market_type(market_type)):
         return False, ""
 
     strike = extract_usd_strike(market.question)
@@ -64,7 +64,7 @@ def blocks_directional_entry(
     distance_to_strike = (strike - regime.close) / regime.close
     near_strike = abs(distance_to_strike) <= near_strike_pct
 
-    if market_type in {"price_target", "price_target_daily"}:
+    if is_target_like_market_type(market_type):
         if direction == "above" and signal.action == "BUY_YES" and regime.label == "downtrend":
             return True, _reason("BUY_YES", regime, "target above 市场遇到 BTC 下跌趋势")
         if direction == "below" and signal.action == "BUY_YES" and regime.label == "uptrend":

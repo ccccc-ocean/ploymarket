@@ -17,15 +17,21 @@ tags: #strategy #btc #execution #paper-trading
 - 最近资金流是在支持 YES，还是支持 NO。
 - 扣除手续费、滑点、价差和尾部风险后，是否还有净 edge。
 
+后续任何策略修复都必须遵守 [策略复盘与反过拟合原则](/Users/pizza_yang/code/ploymarket/docs/strategy/anti-overfit-review-principles.md)。具体亏损市场只能作为案例，不能直接变成“某个价格附近特殊处理”的规则。落地条件必须转写为相对变量，例如 strike 距离、BTC regime、距离到期时间、盘口成本、流动性、资金流和连续亏损簇。
+
 ## 当前市场类型范围
 
 优先研究：
 
-- `price_range_daily`: 例如 `Will Bitcoin be above $78,000 on May 22?`
-- `price_target`: 例如 `Will Bitcoin hit $100,000 in May?`
+- `above_below_expiry`: 到期时 above/below 某个 strike，例如 `Will Bitcoin be above $78,000 on May 22?`
+- `up_down_short_term`: 短周期 Up/Down 方向盘。
+- `touch_above`: 路径触碰上方目标，例如 `Will Bitcoin hit $100,000 in May?`，当前只允许保守 NO 侧候选。
 
 暂不自动交易：
 
+- `range_bucket`
+- `touch_below`
+- `expiry_target`
 - `company_treasury`
 - `indirect_event`
 - `unknown`
@@ -118,22 +124,26 @@ strike_distance_pct = (strike - current_btc_price) / current_btc_price
 
 ### 可以考虑 BUY_YES 的条件
 
-- 市场属于 `price_range_daily` 或 `price_target`。
+- 市场属于 `up_down_short_term`。
 - 当前 market strike 与 BTC 现货关系可解释，不是盲目固定 strike。
-- 对 `price_target` / `price_target_daily`，必须能拿到 BTC 现货确认；缺少 BTC 现货时不允许入场。
-- 对 `price_target` / `price_target_daily`，目标 strike 与 BTC 现货距离默认不能超过 `2.5%`；更远的 `reach/hit/dip/drop` 目标只观察，不吃单。
-- 对 `price_target`，允许在 YES 动量转弱且净 edge 足够时评估 `BUY_NO`，但必须同时满足现货距离、趋势和赔率过滤。
-- 对 `price_target`，`BUY_YES` 当前价格默认不能高于 `0.65`，`BUY_NO` 当前 NO 价格默认不能高于 `0.75`；否则即使方向正确，赔率也可能不足以覆盖一次反转亏损。
-- 对 `price_range_daily`，`BUY_YES` 当前 YES 价格默认不能高于 `0.88`，`BUY_NO` 当前 NO 价格默认不能高于 `0.75`；避免类似 `above 74k` 中高价追 NO 后被中途波动止损。
-- 对 `price_range_daily`，如果 BTC 在 `2%` 安全带内正接近 strike，则不逆势买另一边；例如 BTC 低于 above strike 但 15 分钟快速上行时，暂停 `BUY_NO`。
-- 对 `price_target` / `price_target_daily`，如果 BTC 15 分钟走势正在远离目标方向，则暂停 `BUY_YES`；例如 `dip to 72.5k` 但 BTC 正上行远离 72.5k，不再让止损替入场质量兜底。
-- 对 `price_target` / `price_target_daily`，如果 BTC 1 小时走势也在远离目标方向，同样暂停 `BUY_YES`；这是为了过滤最近 `dip to 72k/72.5k` 在短暂 edge 后快速反转止损的场景。
-- 对 `price_target`，当前模拟盘已把 `BUY_YES/BUY_NO` 的净 edge 与动量门槛提高到约 `1%` 级别，避免 `0.4%~1.5%` 的薄 edge 被实时 ask、价差和反向波动吃掉。
+- 对 `above_below_expiry`，`BUY_YES` 当前不进入主策略；不是因为某个 strike，而是该结构在样本中 YES 侧亏损机制更一致。
+- 对 `touch_above` / `touch_below` / `expiry_target`，`BUY_YES` 当前默认观察，不主动开仓。
+- 对所有方向性市场，必须能拿到 BTC 现货确认；缺少 BTC 现货时不允许入场。
+- 对 `range_bucket`，当前不做 BUY_YES；它需要同时检查上下边界，避免在边界附近追单。
 - 对 `above` 市场，不能在 `far_above_spot + NO_PRESSURE` 时买 YES。
 - 对 `under/below` 市场，不能在 `far_below_spot + NO_PRESSURE` 时买 YES。
 - `near_spot + YES_PRESSURE` 可以进入候选，但仍要通过净 edge、价差和风控。
 - 如果市场已经明显价内，只能在剩余收益覆盖成本和尾部风险时考虑。
 - 每笔交易必须能写出可复盘原因，不能只有“价格看起来便宜”。
+
+### 可以考虑 BUY_NO 的条件
+
+- `above_below_expiry` 是当前主研究对象：YES 动量转弱、NO 侧扣除成本后仍有净 edge，且 BTC 没有接近/突破 strike 时，才允许 `BUY_NO`。
+- `touch_above` 允许保守 `BUY_NO`，但必须满足目标距离、BTC 没有快速接近目标、NO 价格不拥挤。
+- `up_down_short_term` 可以双边评估，但需要更短窗口和更高 edge。
+- `range_bucket` 当前不做 `BUY_NO`；VPS 样本显示单边动量会在区间边界来回扫损，后续需要双边界模型再重新开启。
+- `touch_below` 与 `expiry_target` 当前不作为主策略主动 `BUY_NO`，避免把路径依赖目标市场当成普通动量盘。
+- `touch_below` 允许独立小仓探索家族 `touch_below_certainty_no`：仅当 below/dip 目标距离 BTC 现货仍有安全距离、NO 价格虽高但实时 ask 重定价后仍有净 edge、且 BTC 没有明显下跌加速逼近目标时，才用 3 USDC 级别模拟仓验证。该家族单独统计 PnL，亏损会自动停用，不能直接证明主策略可实盘。
 
 ### 必须跳过的条件
 
@@ -145,14 +155,15 @@ strike_distance_pct = (strike - current_btc_price) / current_btc_price
 - 单日亏损、最大回撤、总敞口、单市场敞口触发风控。
 - 同一市场已有模拟持仓时，不重复开仓。
 - 同一市场刚触发止损后，必须等待较长冷却期结束。
-- `price_target` 止损后的同方向冷却更长，当前默认 `21600` 秒，避免在同一个 weekly target 上连续补刀式亏损。
+- `touch_above` / `touch_below` / `expiry_target` 止损后的同方向冷却更长，当前默认 `21600` 秒，避免在同一个 target 上连续补刀式亏损。
 - 同一市场触发止盈后只进入短冷却；止盈是兑现利润，冷却结束后仍允许重新评估开仓。
 - 止盈后重新入场必须满足更高 edge 门槛，避免“卖出落袋后马上追进”导致手续费和滑点变多。
 - 同类型、同方向市场在观察窗口内连续出现亏损后，暂停该类型/方向的新开仓；这是跨 market_id 的熔断，不再只依赖单市场冷却。
-- 连续亏损暂停现在按 `market_type + strike direction + side` 统计，例如 `price_target below BUY_YES` 的连续亏损不会误伤 `price_target above BUY_NO`，但会阻止同类 dip/reach 方向继续补刀。
+- 连续亏损暂停现在按 `market_type + strike direction + side` 统计，例如 `touch_below BUY_YES` 的连续亏损不会误伤 `above_below_expiry above BUY_NO`，但会阻止同类方向继续补刀。
 - 实时 ask 重定价后不能只勉强高于最低 edge；当前模拟盘要求重定价后的净 edge 至少达到 `min_edge * 2`，减少追单后立刻变成负期望。
 - 浮盈达到分批止盈阈值时，先卖出部分仓位，剩余仓位继续用移动止盈保护。
-- `above` 市场买 `NO` 时，如果 BTC 已接近或站上 strike，暂停逆突破方向；`below/under` 市场买 `NO` 时规则反向处理。
+- `above` 市场买 `NO` 时，如果 BTC 已接近或站上 strike，暂停逆突破方向；即使 BTC 仍低于 strike，只要没有在 15m/1h 维度明确远离 strike，也不再允许主仓开 `BUY_NO`。`below/under` 市场买 `NO` 时规则反向处理。
+- `above_below_expiry` 的 near-strike `BUY_NO` 探索仓不再挑战“正在贴近 strike”的场景；只有 BTC 已经从 strike 明确退开时，才允许极小仓验证。这是通用突破区噪音控制，不针对任何固定价格。
 - 实时 `TAKER` 候选必须继续经过执行压力观察：如果模拟发单延迟后的 ask 恶化已经吞掉净 edge，未来实盘层必须拒绝追单。
 - 真实订单状态未知、部分成交未完成撤单、签名/余额连续失败时，未来实盘层必须暂停新单并优先对账；详见 [[live-execution-risk-controls|实盘执行风险与压力模拟]]。
 - 交易理由依赖未来信息，或依赖手工挑出来的固定 strike。
@@ -174,6 +185,14 @@ strike_distance_pct = (strike - current_btc_price) / current_btc_price
 - 扣除费用和滑点后仍为正。
 - 最大回撤可接受。
 - 亏损交易可以解释，并能归类到可改进的条件。
+
+每次把修复规则推进主策略前，还必须回答：
+
+- 该规则解决的是通用市场结构问题，还是只修了某个具体 strike？
+- 去掉价格数字后，规则是否仍然成立？
+- 它在单边上涨、单边下跌、区间震荡、假突破中分别有什么副作用？
+- 它减少的是坏入场，还是只是减少交易次数？
+- 是否应该先进入观察模式，再升级为硬拦截？
 
 ## 实盘前结论
 

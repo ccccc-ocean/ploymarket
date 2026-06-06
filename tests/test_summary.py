@@ -24,7 +24,7 @@ class SummaryTests(unittest.TestCase):
 
         summary = summarize_market(market(), result)
 
-        self.assertEqual(summary.market_type, "price_target")
+        self.assertEqual(summary.market_type, "touch_above")
         self.assertEqual(summary.taker_fee_rate, 0.0)
         self.assertEqual(summary.entry_count, 1)
         self.assertEqual(summary.exit_count, 1)
@@ -41,7 +41,7 @@ class SummaryTests(unittest.TestCase):
 
         self.assertEqual(all_summary.market_type, "all")
         self.assertEqual(all_summary.market_count, 1)
-        self.assertEqual(by_type[0].market_type, "price_target")
+        self.assertEqual(by_type[0].market_type, "touch_above")
 
     def test_summarizes_buy_no_entries_and_exits(self) -> None:
         result = BacktestResult(

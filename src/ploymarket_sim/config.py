@@ -14,17 +14,6 @@ class ApiConfig:
 
 
 @dataclass(frozen=True)
-class KalshiConfig:
-    base_url: str = "https://external-api.kalshi.com/trade-api/v2"
-    request_timeout_seconds: int = 12
-    limit: int = 10
-    max_pages: int = 2
-    status: str = "open"
-    min_volume_24h: float = 0.0
-    series_tickers: list[str] = field(default_factory=lambda: ["KXBTC", "KXBTCD", "KXBTC15M", "KXBTCMAX150"])
-
-
-@dataclass(frozen=True)
 class CacheConfig:
     enabled: bool
     directory: str
@@ -135,6 +124,14 @@ class RiskConfig:
     strategy_loss_pause_count: int = 2
     strategy_loss_pause_window_seconds: int = 21600
     readiness_max_drawdown_pct: float = 0.08
+    paper_probe_enabled: bool = True
+    paper_probe_zero_run_threshold: int = 12
+    paper_probe_trade_size_usdc: float = 5.0
+    paper_probe_min_edge: float = 0.0015
+    paper_probe_max_open_positions: int = 5
+    paper_probe_hard_max_open_positions: int = 10
+    paper_probe_max_total_exposure_usdc: float = 30.0
+    paper_probe_max_new_positions_per_run: int = 3
 
 
 @dataclass(frozen=True)
@@ -157,7 +154,6 @@ class AppConfig:
     execution: ExecutionConfig
     risk: RiskConfig
     backtest: BacktestConfig
-    kalshi: KalshiConfig = field(default_factory=KalshiConfig)
     execution_stress: ExecutionStressConfig = field(default_factory=ExecutionStressConfig)
 
 
@@ -174,7 +170,6 @@ def load_config(path: str | Path) -> AppConfig:
         execution=ExecutionConfig(**data["execution"]),
         risk=RiskConfig(**data["risk"]),
         backtest=BacktestConfig(**data["backtest"]),
-        kalshi=KalshiConfig(**data.get("kalshi", {})),
         execution_stress=ExecutionStressConfig(**data.get("execution_stress", {})),
     )
 

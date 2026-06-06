@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from bisect import bisect_left, bisect_right
 from dataclasses import dataclass
 
 from .btc_price import BtcCandle
@@ -37,24 +38,30 @@ def build_alignment_rows(
     storage: Storage,
     btc_candles: list[BtcCandle],
     horizons_hours: list[int],
+    max_points_per_market: int | None = None,
 ) -> list[AlignmentRow]:
     if not btc_candles:
         return []
+    sorted_candles = sorted(btc_candles, key=lambda candle: candle.timestamp)
+    candle_timestamps = [candle.timestamp for candle in sorted_candles]
     rows: list[AlignmentRow] = []
     for market in markets:
-        history = storage.load_price_history(market.yes_token_id or "")
+        history = sorted(storage.load_price_history(market.yes_token_id or ""), key=lambda point: point.timestamp)
         if not history:
             continue
+        if max_points_per_market is not None and max_points_per_market > 0 and len(history) > max_points_per_market:
+            history = history[-max_points_per_market:]
+        history_timestamps = [point.timestamp for point in history]
         for point in history:
-            btc_now = _latest_candle_at_or_before(btc_candles, point.timestamp)
-            btc_past_1h = _latest_candle_at_or_before(btc_candles, point.timestamp - 3600)
-            btc_past_3h = _latest_candle_at_or_before(btc_candles, point.timestamp - 3 * 3600)
+            btc_now = _latest_candle_at_or_before(sorted_candles, point.timestamp, candle_timestamps)
+            btc_past_1h = _latest_candle_at_or_before(sorted_candles, point.timestamp - 3600, candle_timestamps)
+            btc_past_3h = _latest_candle_at_or_before(sorted_candles, point.timestamp - 3 * 3600, candle_timestamps)
             if btc_now is None or btc_past_1h is None or btc_past_3h is None:
                 continue
             for horizon in horizons_hours:
                 target_timestamp = point.timestamp + horizon * 3600
-                future_yes = _first_price_at_or_after(history, target_timestamp)
-                future_btc = _first_candle_at_or_after(btc_candles, target_timestamp)
+                future_yes = _first_price_at_or_after(history, target_timestamp, history_timestamps)
+                future_btc = _first_candle_at_or_after(sorted_candles, target_timestamp, candle_timestamps)
                 if future_yes is None or future_btc is None:
                     continue
                 rows.append(
@@ -91,20 +98,19 @@ def summarize_alignment(rows: list[AlignmentRow]) -> list[AlignmentSummary]:
     return summaries
 
 
-def _latest_candle_at_or_before(candles: list[BtcCandle], timestamp: int) -> BtcCandle | None:
-    candidates = [candle for candle in candles if candle.timestamp <= timestamp]
-    return candidates[-1] if candidates else None
+def _latest_candle_at_or_before(candles: list[BtcCandle], timestamp: int, timestamps: list[int] | None = None) -> BtcCandle | None:
+    candle_timestamps = timestamps if timestamps is not None else [candle.timestamp for candle in candles]
+    index = bisect_right(candle_timestamps, timestamp) - 1
+    return candles[index] if index >= 0 else None
 
 
-def _first_candle_at_or_after(candles: list[BtcCandle], timestamp: int) -> BtcCandle | None:
-    for candle in candles:
-        if candle.timestamp >= timestamp:
-            return candle
-    return None
+def _first_candle_at_or_after(candles: list[BtcCandle], timestamp: int, timestamps: list[int] | None = None) -> BtcCandle | None:
+    candle_timestamps = timestamps if timestamps is not None else [candle.timestamp for candle in candles]
+    index = bisect_left(candle_timestamps, timestamp)
+    return candles[index] if index < len(candles) else None
 
 
-def _first_price_at_or_after(history: list[PricePoint], timestamp: int) -> PricePoint | None:
-    for point in history:
-        if point.timestamp >= timestamp:
-            return point
-    return None
+def _first_price_at_or_after(history: list[PricePoint], timestamp: int, timestamps: list[int] | None = None) -> PricePoint | None:
+    history_timestamps = timestamps if timestamps is not None else [point.timestamp for point in history]
+    index = bisect_left(history_timestamps, timestamp)
+    return history[index] if index < len(history) else None

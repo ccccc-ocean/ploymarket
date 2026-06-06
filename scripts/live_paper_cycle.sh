@@ -26,5 +26,13 @@ run() {
 run btc-price
 run paper-run --market-type all
 run paper-report
+run strategy-review --recent-runs "${PLOYMARKET_LIVE_STRATEGY_REVIEW_RECENT_RUNS:-72}"
+run filter-reason-report --recent-runs "${PLOYMARKET_LIVE_STRATEGY_REVIEW_RECENT_RUNS:-72}"
+run blocked-edge-report --recent-runs "${PLOYMARKET_LIVE_STRATEGY_REVIEW_RECENT_RUNS:-72}"
+run touch-below-path-report --recent-runs "${PLOYMARKET_LIVE_STRATEGY_REVIEW_RECENT_RUNS:-72}"
+run live-universe-report --recent-runs "${PLOYMARKET_LIVE_STRATEGY_REVIEW_RECENT_RUNS:-72}"
+run probe-performance-report
+run strategy-autotune-report --recent-runs "${PLOYMARKET_LIVE_STRATEGY_REVIEW_RECENT_RUNS:-72}"
+run open-position-report --live-quotes
 run spread-scan --market-type all
 run flow-scan --market-type all --limit 250 --large-trade-usdc 500

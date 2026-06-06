@@ -24,11 +24,22 @@ run() {
 }
 
 run backtest --market-type all
-run reversal-backtest --market-type price_range_daily
-run alignment-report --market-type all
+run reversal-backtest --market-type above_below_expiry
+run alignment-report --market-type all --max-points-per-market "${PLOYMARKET_ALIGNMENT_MAX_POINTS_PER_MARKET:-600}"
 run edge-report --min-samples 30
-run strategy-sweep --market-type all --limit 10 --candidate-limit "${PLOYMARKET_STRATEGY_SWEEP_CANDIDATE_LIMIT:-2}"
+run strategy-sweep --market-type all --limit 10 --candidate-limit "${PLOYMARKET_STRATEGY_SWEEP_CANDIDATE_LIMIT:-2}" --max-points-per-market "${PLOYMARKET_STRATEGY_SWEEP_MAX_POINTS_PER_MARKET:-600}"
 run market-type-report
+run observation-report --recent-runs "${PLOYMARKET_OBSERVATION_RECENT_RUNS:-288}"
+run paper-sample-report --recent-runs "${PLOYMARKET_STRATEGY_REVIEW_RECENT_RUNS:-72}"
+run strategy-review --recent-runs "${PLOYMARKET_STRATEGY_REVIEW_RECENT_RUNS:-72}"
+run filter-reason-report --recent-runs "${PLOYMARKET_STRATEGY_REVIEW_RECENT_RUNS:-72}"
+run blocked-edge-report --recent-runs "${PLOYMARKET_STRATEGY_REVIEW_RECENT_RUNS:-72}"
+run touch-below-path-report --recent-runs "${PLOYMARKET_STRATEGY_REVIEW_RECENT_RUNS:-72}"
+run live-universe-report --recent-runs "${PLOYMARKET_STRATEGY_REVIEW_RECENT_RUNS:-72}"
+run probe-performance-report
+run strategy-autotune-report --recent-runs "${PLOYMARKET_STRATEGY_REVIEW_RECENT_RUNS:-72}"
+run open-position-report
+run side-diagnostics
 run strike-report
 run data-quality
 run daily-report

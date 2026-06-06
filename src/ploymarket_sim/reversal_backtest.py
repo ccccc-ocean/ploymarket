@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from statistics import mean
 
-from .classifier import classify_market
+from .classifier import classify_market, is_range_like_market_type
 from .clob import PricePoint
 from .config import AppConfig
 from .costs import estimate_entry_cost, fee_amount, taker_fee_rate
@@ -268,7 +268,7 @@ def write_reversal_summary_csv(rows: list[ReversalSummaryRow], output_dir: str) 
 
 
 def print_reversal_summary(rows: list[ReversalSummaryRow], path: Path) -> None:
-    strategy_rows = [row for row in rows if row.market_type == "price_range_daily"]
+    strategy_rows = [row for row in rows if is_range_like_market_type(row.market_type)]
     if not strategy_rows:
         print(f"reversal_backtest | rows={len(rows)} | {path}")
         return
