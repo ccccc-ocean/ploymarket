@@ -16,6 +16,7 @@ from ploymarket_sim.cli import _paper_run_data_degraded
 from ploymarket_sim.cli import _paper_markets_including_open_positions
 from ploymarket_sim.cli import _paper_probe_available_slots
 from ploymarket_sim.cli import _paper_probe_signal
+from ploymarket_sim.cli import _positive_edge_blocked_market_types
 from ploymarket_sim.cli import _realtime_market_discovery_is_healthy
 from ploymarket_sim.cli import _strategy_loss_pause_blocks_entry
 from ploymarket_sim.cli import _underperforming_probe_families
@@ -1369,6 +1370,117 @@ class PaperPositionTests(unittest.TestCase):
         ]
 
         probe = _paper_probe_signal(config, market, history, config, signal, candles)
+
+        self.assertIsNone(probe)
+
+    def test_strategy_review_positive_edge_blocked_types_are_loaded(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            Path(directory, "strategy_review.csv").write_text(
+                "\n".join(
+                    [
+                        "market_type,status,recommended_action,reason,taker_count,probe_taker_count,positive_edge_skip_count,max_expected_edge,top_blocker",
+                        "above_below_expiry,positive_edge_blocked,allow,reason,0,0,42,0.08,type_side_not_enabled:42/42",
+                        "touch_above,edge_insufficient,hold,reason,0,0,42,0.08,type_side_not_enabled:42/42",
+                        "range_bucket,positive_edge_blocked,allow,reason,0,0,2,0.08,type_side_not_enabled:2/2",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            blocked = _positive_edge_blocked_market_types(directory)
+
+            self.assertEqual(blocked, {"above_below_expiry"})
+
+    def test_blocked_edge_above_below_yes_micro_probe_uses_strategy_review_context(self) -> None:
+        config = app_config("unused.sqlite")
+        timestamp = 7200
+        blocked_market = Market(
+            "blocked-yes",
+            "Will the price of Bitcoin be above $66,000 on June 4?",
+            "btc-above-66000-jun-4",
+            None,
+            1000,
+            100,
+            True,
+            ["Yes", "No"],
+            [0.88, 0.12],
+            ["yes", "no"],
+            False,
+            None,
+            None,
+        )
+        history = [PricePoint(timestamp - config.signal.long_window + index + 1, 0.88) for index in range(config.signal.long_window)]
+        signal = Signal(
+            "HOLD",
+            0.0,
+            0.09,
+            0.08,
+            "above_below_expiry 暂不允许 BUY_YES，避免把高噪音结构硬套方向多单",
+        )
+        candles = [
+            BtcCandle(timestamp - 3600, 67400.0, 67500.0, 67300.0, 67400.0),
+            BtcCandle(timestamp - 900, 67500.0, 67600.0, 67400.0, 67500.0),
+            BtcCandle(history[-1].timestamp, 67600.0, 67700.0, 67500.0, 67600.0),
+        ]
+
+        probe = _paper_probe_signal(
+            config,
+            blocked_market,
+            history,
+            config,
+            signal,
+            candles,
+            {"above_below_yes", "certainty_above_below_yes", "ultra_certainty_above_below_yes"},
+            {"above_below_expiry"},
+        )
+
+        self.assertIsNotNone(probe)
+        assert probe is not None
+        self.assertEqual(probe.action, "BUY_YES")
+        self.assertIn("报告阻塞正edge above_below_expiry/YES v1", probe.reason)
+        self.assertAlmostEqual(_paper_probe_trade_size_usdc(config, probe), 1.0)
+
+    def test_blocked_edge_above_below_yes_micro_probe_requires_strategy_review_context(self) -> None:
+        config = app_config("unused.sqlite")
+        timestamp = 7200
+        blocked_market = Market(
+            "blocked-yes",
+            "Will the price of Bitcoin be above $66,000 on June 4?",
+            "btc-above-66000-jun-4",
+            None,
+            1000,
+            100,
+            True,
+            ["Yes", "No"],
+            [0.88, 0.12],
+            ["yes", "no"],
+            False,
+            None,
+            None,
+        )
+        history = [PricePoint(timestamp - config.signal.long_window + index + 1, 0.88) for index in range(config.signal.long_window)]
+        signal = Signal(
+            "HOLD",
+            0.0,
+            0.09,
+            0.08,
+            "above_below_expiry 暂不允许 BUY_YES，避免把高噪音结构硬套方向多单",
+        )
+        candles = [
+            BtcCandle(timestamp - 3600, 67400.0, 67500.0, 67300.0, 67400.0),
+            BtcCandle(history[-1].timestamp, 67600.0, 67700.0, 67500.0, 67600.0),
+        ]
+
+        probe = _paper_probe_signal(
+            config,
+            blocked_market,
+            history,
+            config,
+            signal,
+            candles,
+            {"above_below_yes", "certainty_above_below_yes", "ultra_certainty_above_below_yes"},
+        )
 
         self.assertIsNone(probe)
 

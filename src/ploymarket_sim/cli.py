@@ -442,6 +442,7 @@ def _run_paper_scan(config, market_type: str) -> None:
     probe_candidates = []
     probe_slots = _paper_probe_available_slots(config, storage)
     disabled_probe_families = _underperforming_probe_families(config, storage)
+    positive_edge_blocked_market_types = _positive_edge_blocked_market_types(config.backtest.output_dir)
     for market in markets:
         history = _safe_history(config, market, storage, prefer_local=False, use_cache=False, allow_local_fallback=False)
         if not history:
@@ -511,7 +512,16 @@ def _run_paper_scan(config, market_type: str) -> None:
             signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, "止盈后重新入场 edge 不够强，避免频繁止盈/再开仓消耗手续费")
             execution_plan = plan_execution(market, signal, market_config.signal, market_config.backtest, market_config.execution, history[-1].price)
         if execution_plan.mode == "SKIP" and probe_slots > 0:
-            probe_signal = _paper_probe_signal(config, market, history, market_config, signal, btc_candles, disabled_probe_families)
+            probe_signal = _paper_probe_signal(
+                config,
+                market,
+                history,
+                market_config,
+                signal,
+                btc_candles,
+                disabled_probe_families,
+                positive_edge_blocked_market_types,
+            )
             if probe_signal is not None:
                 probe_signal, probe_plan = _live_paper_entry_plan(config, market, probe_signal, market_config, history[-1].price)
                 if probe_plan.mode == "TAKER":
@@ -752,10 +762,20 @@ def _recent_zero_taker_runs(output_dir: str) -> int:
     return streak
 
 
-def _paper_probe_signal(config, market, history, market_config, current_signal: Signal, btc_candles, disabled_probe_families: set[str] | None = None) -> Signal | None:
+def _paper_probe_signal(
+    config,
+    market,
+    history,
+    market_config,
+    current_signal: Signal,
+    btc_candles,
+    disabled_probe_families: set[str] | None = None,
+    positive_edge_blocked_market_types: set[str] | None = None,
+) -> Signal | None:
     if _paper_probe_blocked_by_hard_risk(current_signal.reason):
         return None
     disabled_probe_families = disabled_probe_families or set()
+    positive_edge_blocked_market_types = positive_edge_blocked_market_types or set()
     market_type = classify_market(market).market_type
     if market_type == "range_bucket":
         center_probe = _paper_range_bucket_center_probe_signal(
@@ -850,6 +870,11 @@ def _paper_probe_signal(config, market, history, market_config, current_signal: 
     )
     if ultra_certainty_yes_signal is not None:
         return ultra_certainty_yes_signal
+    blocked_edge_yes_signal = _paper_blocked_edge_above_below_yes_probe_signal(
+        config, market, history, current_signal, btc_candles, disabled_probe_families, positive_edge_blocked_market_types
+    )
+    if blocked_edge_yes_signal is not None:
+        return blocked_edge_yes_signal
     expensive_no_signal = _paper_expensive_edge_above_below_no_probe_signal(
         config, market, history, current_signal, btc_candles, disabled_probe_families
     )
@@ -967,6 +992,28 @@ def _underperforming_probe_families(config, storage) -> set[str]:
         if family is not None and position.realized_pnl <= -0.5:
             disabled.add(family)
     return disabled
+
+
+def _positive_edge_blocked_market_types(output_dir: str) -> set[str]:
+    path = Path(output_dir) / "strategy_review.csv"
+    if not path.exists():
+        return set()
+    blocked = set()
+    with path.open("r", newline="", encoding="utf-8") as file:
+        for row in csv.DictReader(file):
+            if row.get("status") != "positive_edge_blocked":
+                continue
+            if "type_side_not_enabled" not in row.get("top_blocker", ""):
+                continue
+            try:
+                positive_edge_skip_count = int(float(row.get("positive_edge_skip_count") or 0))
+                max_expected_edge = float(row.get("max_expected_edge") or 0.0)
+            except ValueError:
+                continue
+            if positive_edge_skip_count >= 20 and max_expected_edge >= 0.03:
+                blocked.add(row.get("market_type", ""))
+    blocked.discard("")
+    return blocked
 
 
 def _paper_range_bucket_probe_signal(
@@ -1387,6 +1434,78 @@ def _paper_above_below_ultra_certainty_yes_probe_signal(
         current_signal.net_edge,
         (
             "微型探索仓: 1USDC 验证超高确定性 above_below_expiry/YES v1; "
+            f"yes={yes_price:.3f}, BTC={candle.close:.2f}, strike={strike:.2f}, "
+            f"distance={distance_pct:.2%}, 15m={_fmt_pct(return_15m)}, 1h={_fmt_pct(return_1h)}; "
+            f"原因={current_signal.reason}"
+        ),
+    )
+
+
+def _paper_blocked_edge_above_below_yes_probe_signal(
+    config,
+    market,
+    history,
+    current_signal: Signal,
+    btc_candles,
+    disabled_probe_families: set[str] | None = None,
+    positive_edge_blocked_market_types: set[str] | None = None,
+) -> Signal | None:
+    if disabled_probe_families and "blocked_edge_above_below_yes" in disabled_probe_families:
+        return None
+    if "above_below_expiry" not in (positive_edge_blocked_market_types or set()):
+        return None
+    if not current_signal.reason.startswith("above_below_expiry 暂不允许 BUY_YES"):
+        return None
+    if infer_strike_direction(market.question) != "above":
+        return None
+    if current_signal.net_edge < max(0.05, config.risk.paper_probe_min_edge * 25):
+        return None
+    current = history[-1]
+    yes_price = current.price
+    if yes_price <= 0.18 or yes_price > 0.92:
+        return None
+    strike = extract_usd_strike(market.question)
+    candle = latest_btc_candle_at_or_before(btc_candles, current.timestamp)
+    if strike is None or candle is None or candle.close <= 0:
+        return None
+    distance_pct = (candle.close - strike) / candle.close
+    min_distance_pct = 0.012 if yes_price >= 0.70 else 0.02
+    if distance_pct < max(min_distance_pct, config.risk.range_market_safety_band_pct / 2) or distance_pct > 0.16:
+        return None
+    return_15m = _btc_return_since(btc_candles, current.timestamp, 15 * 60, candle.close)
+    return_1h = _btc_return_since(btc_candles, current.timestamp, 60 * 60, candle.close)
+    moving_toward_strike = (return_15m is not None and return_15m <= -0.0025) or (
+        return_1h is not None and return_1h <= -0.005
+    )
+    if moving_toward_strike:
+        return None
+    strike_blocked, _ = blocks_btc_strike_entry(market, current.timestamp, btc_candles, "BUY_YES")
+    range_blocked, _ = blocks_price_range_entry(
+        market,
+        "BUY_YES",
+        current.timestamp,
+        btc_candles,
+        yes_price,
+        0.925,
+        config.risk.range_buy_no_max_price,
+        config.risk.range_market_safety_band_pct,
+        config.risk.btc_moving_away_return_pct,
+    )
+    regime_blocked, _ = blocks_directional_entry(
+        market,
+        Signal("BUY_YES", current_signal.confidence, current_signal.edge, current_signal.net_edge, current_signal.reason),
+        btc_candles,
+        current.timestamp,
+    )
+    if strike_blocked or range_blocked or regime_blocked:
+        return None
+    return Signal(
+        "BUY_YES",
+        min(0.08, current_signal.net_edge / 0.40),
+        current_signal.edge,
+        current_signal.net_edge,
+        (
+            "微型探索仓: 1USDC 验证报告阻塞正edge above_below_expiry/YES v1; "
             f"yes={yes_price:.3f}, BTC={candle.close:.2f}, strike={strike:.2f}, "
             f"distance={distance_pct:.2%}, 15m={_fmt_pct(return_15m)}, 1h={_fmt_pct(return_1h)}; "
             f"原因={current_signal.reason}"

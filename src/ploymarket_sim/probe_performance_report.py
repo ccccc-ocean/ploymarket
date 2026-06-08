@@ -167,6 +167,8 @@ def probe_family_from_reason(reason: str) -> str:
     if "touch_below/YES" in reason:
         return "touch_below_yes"
     if "above_below_expiry/YES" in reason:
+        if "报告阻塞正edge" in reason:
+            return "blocked_edge_above_below_yes"
         return "above_below_yes"
     if "above_below_expiry/NO" in reason:
         return "above_below_no"
