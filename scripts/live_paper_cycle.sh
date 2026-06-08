@@ -35,4 +35,4 @@ run probe-performance-report
 run strategy-autotune-report --recent-runs "${PLOYMARKET_LIVE_STRATEGY_REVIEW_RECENT_RUNS:-72}"
 run open-position-report --live-quotes
 run spread-scan --market-type all
-run flow-scan --market-type all --limit 250 --large-trade-usdc 500
+pipeline_run_step "${PLOYMARKET_LIVE_FLOW_SCAN_TIMEOUT_SECONDS:-180}" "flow-scan" --config "$CONFIG_PATH" flow-scan --market-type all --limit 250 --large-trade-usdc 500
