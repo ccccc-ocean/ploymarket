@@ -1380,6 +1380,7 @@ class PaperPositionTests(unittest.TestCase):
                     [
                         "market_type,status,recommended_action,reason,taker_count,probe_taker_count,positive_edge_skip_count,max_expected_edge,top_blocker",
                         "above_below_expiry,positive_edge_blocked,allow,reason,0,0,42,0.08,type_side_not_enabled:42/42",
+                        "price_target,probe_active,monitor,reason,3,2,753,0.149,type_side_not_enabled:753/753",
                         "touch_above,edge_insufficient,hold,reason,0,0,42,0.08,type_side_not_enabled:42/42",
                         "range_bucket,positive_edge_blocked,allow,reason,0,0,2,0.08,type_side_not_enabled:2/2",
                     ]
@@ -1390,7 +1391,7 @@ class PaperPositionTests(unittest.TestCase):
 
             blocked = _positive_edge_blocked_market_types(directory)
 
-            self.assertEqual(blocked, {"above_below_expiry"})
+            self.assertEqual(blocked, {"above_below_expiry", "price_target"})
 
     def test_blocked_edge_above_below_yes_micro_probe_uses_strategy_review_context(self) -> None:
         config = app_config("unused.sqlite")

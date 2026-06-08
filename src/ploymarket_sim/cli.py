@@ -1001,7 +1001,8 @@ def _positive_edge_blocked_market_types(output_dir: str) -> set[str]:
     blocked = set()
     with path.open("r", newline="", encoding="utf-8") as file:
         for row in csv.DictReader(file):
-            if row.get("status") != "positive_edge_blocked":
+            status = row.get("status", "")
+            if status in {"edge_insufficient", "no_edge_available", "observe_only"}:
                 continue
             if "type_side_not_enabled" not in row.get("top_blocker", ""):
                 continue
