@@ -40,7 +40,15 @@ def build_signal(
     market_type = classify_market(market).market_type
     buy_yes_min_momentum = config.min_momentum
     buy_yes_min_edge = config.min_edge
-    allow_buy_yes = market_type in {"up_down_short_term"}
+    # Critical #1: re-enable BUY_YES on above_below_expiry / target-like markets
+    # so the ×2/×3 thresholds below stop being dead code. BUY_NO thresholds are
+    # intentionally NOT mirrored here — the existing BUY_NO regression suite
+    # already validates that real BTC weakness must remain tradeable; symmetry
+    # tightening should follow once we have live evidence of BUY_NO over-firing.
+    allow_buy_yes = (
+        market_type in {"up_down_short_term", "above_below_expiry"}
+        or is_target_like_market_type(market_type)
+    )
     allow_buy_no = market_type in {"up_down_short_term", "above_below_expiry", "touch_above"}
     if market_type == "above_below_expiry":
         buy_yes_min_momentum *= 2

@@ -106,6 +106,7 @@ paper_probe_max_open_positions = 5
 paper_probe_hard_max_open_positions = 10
 paper_probe_max_total_exposure_usdc = 30.0
 paper_probe_max_new_positions_per_run = 3
+btc_candle_max_age_seconds = 3600
 
 [backtest]
 trade_size_usdc = 3.0

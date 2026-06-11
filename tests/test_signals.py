@@ -75,6 +75,61 @@ class SignalTests(unittest.TestCase):
         self.assertEqual(signal.action, "HOLD")
         self.assertIn("NO 价格太接近 0", signal.reason)
 
+    def test_above_below_expiry_allows_buy_yes_after_unblock(self) -> None:
+        # Regression: signals.py previously gated BUY_YES to up_down_short_term
+        # only, while strategy_profiles.py tuned thresholds for above_below_expiry.
+        # The ×2/×3 BUY_YES multipliers were dead code. Critical #1 unblocks
+        # this path; this test pins the new behaviour.
+        market = Market(
+            "1",
+            "Will the price of Bitcoin be above $78,000 on May 22?",
+            "btc-above-78k",
+            None,
+            5000,
+            1000,
+            True,
+            ["Yes", "No"],
+            [0.5, 0.5],
+            ["yes", "no"],
+            False,
+            None,
+            None,
+        )
+        history = [PricePoint(i, 0.40) for i in range(24)] + [PricePoint(24 + i, 0.55) for i in range(6)]
+        config = SignalConfig("1w", 60, 6, 24, 0.01, 0.015, 0.0, 0.92, 0.08)
+
+        signal = build_signal(market, history, config)
+
+        self.assertEqual(signal.action, "BUY_YES")
+
+    def test_above_below_expiry_buy_yes_respects_multiplied_threshold(self) -> None:
+        # The ×2 momentum / ×3 edge multipliers for above_below_expiry must
+        # actually gate weak signals; otherwise unblocking allow_buy_yes would
+        # have flooded entries.
+        market = Market(
+            "1",
+            "Will the price of Bitcoin be above $78,000 on May 22?",
+            "btc-above-78k",
+            None,
+            5000,
+            1000,
+            True,
+            ["Yes", "No"],
+            [0.5, 0.5],
+            ["yes", "no"],
+            False,
+            None,
+            None,
+        )
+        # Momentum ≈ +0.015 — would have passed the base threshold (0.01) but
+        # must fail the ×2 above_below_expiry threshold (0.02).
+        history = [PricePoint(i, 0.50) for i in range(24)] + [PricePoint(24 + i, 0.52) for i in range(6)]
+        config = SignalConfig("1w", 60, 6, 24, 0.01, 0.015, 0.0, 0.92, 0.08)
+
+        signal = build_signal(market, history, config)
+
+        self.assertEqual(signal.action, "HOLD")
+
     def test_negative_price_target_momentum_generates_buy_no(self) -> None:
         market = Market(
             "1",

@@ -126,8 +126,12 @@ class BacktestTests(unittest.TestCase):
 
         result = backtest_market(market, history, config, btc_candles)
 
+        # Critical #1 lets the signal layer emit BUY_YES on target-like markets;
+        # the market_rules distance gate is now the sole rejection point.
         self.assertFalse(any(trade.action == "BUY_YES" for trade in result.trades))
-        self.assertEqual(result.trades, [])
+        self.assertTrue(
+            any(trade.action == "REJECTED" and "距离过远" in trade.reason for trade in result.trades)
+        )
 
     def test_near_price_target_dip_buy_yes_is_observe_only(self) -> None:
         config = AppConfig(
@@ -143,14 +147,22 @@ class BacktestTests(unittest.TestCase):
             backtest=BacktestConfig(10.0, 0.0, 0, "data"),
         )
         market = Market("m1", "Will Bitcoin dip to $74,000 May 18-24?", "btc-dip-74k", None, 1000, 1000, True, ["Yes", "No"], [0.5, 0.5], ["yes", "no"], False, None, None)
-        history = [PricePoint(i * 300, price) for i, price in enumerate([0.50, 0.50, 0.52, 0.58, 0.60])]
+        # Critical #1 enables BUY_YES on target-like markets when momentum/edge
+        # clear the ×3 multipliers. Keep the "observe only" intent by giving a
+        # mild uptrend that fails the tightened thresholds rather than relying
+        # on the signal layer's old blanket block.
+        history = [PricePoint(i * 300, price) for i, price in enumerate([0.50, 0.50, 0.51, 0.52, 0.53])]
         btc_candles = [BtcCandle(i * 300, 75400.0, 75800.0, 75600.0, 75600.0) for i in range(5)]
 
         result = backtest_market(market, history, config, btc_candles)
 
         self.assertFalse(any(trade.action == "BUY_YES" for trade in result.trades))
 
-    def test_price_target_buy_yes_no_longer_opens_stop_loss_path(self) -> None:
+    def test_price_target_buy_yes_stop_loss_path_uses_target_cooldown(self) -> None:
+        # Critical #1 re-enables BUY_YES on target-like markets. This test now
+        # pins the full lifecycle: BUY_YES opens with strong momentum, then a
+        # sharp drawdown triggers SELL_YES via stop loss and the target-specific
+        # cooldown keeps the same market off-limits.
         config = AppConfig(
             api=ApiConfig("", "", 1),
             cache=CacheConfig(False, ".cache/http", 60, False),
@@ -170,7 +182,10 @@ class BacktestTests(unittest.TestCase):
 
         result = backtest_market(market, history, config, btc_candles)
 
-        self.assertFalse(any(trade.action == "SELL_YES" for trade in result.trades))
+        self.assertTrue(any(trade.action == "BUY_YES" for trade in result.trades))
+        self.assertTrue(
+            any(trade.action == "SELL_YES" and "止损" in trade.reason for trade in result.trades)
+        )
 
     def test_price_range_stop_loss_sets_market_reentry_cooldown(self) -> None:
         config = AppConfig(
@@ -280,5 +295,9 @@ class BacktestTests(unittest.TestCase):
 
         result = backtest_market(market, history, config, btc_candles)
 
+        # Critical #1 lets the signal layer emit BUY_YES; market_rules' price
+        # cap is now the rejection point and surfaces a REJECTED row.
         self.assertFalse(any(trade.action == "BUY_YES" for trade in result.trades))
-        self.assertEqual(result.trades, [])
+        self.assertTrue(
+            any(trade.action == "REJECTED" and "价格过高" in trade.reason for trade in result.trades)
+        )

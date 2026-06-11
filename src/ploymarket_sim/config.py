@@ -132,6 +132,7 @@ class RiskConfig:
     paper_probe_hard_max_open_positions: int = 10
     paper_probe_max_total_exposure_usdc: float = 30.0
     paper_probe_max_new_positions_per_run: int = 3
+    btc_candle_max_age_seconds: int = 3600
 
 
 @dataclass(frozen=True)

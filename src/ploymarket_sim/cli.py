@@ -609,7 +609,9 @@ def _paper_run_data_degraded(market_type: str, live_markets: list) -> bool:
 def _fresh_paper_btc_candles(config, candles, run_timestamp: int):
     if not candles:
         return []
-    max_age_seconds = max(15 * 60, config.signal.history_fidelity_minutes * 60 * 3)
+    configured_max_age = max(0, int(getattr(config.risk, "btc_candle_max_age_seconds", 0)))
+    fidelity_floor = config.signal.history_fidelity_minutes * 60 * 3
+    max_age_seconds = max(configured_max_age, fidelity_floor) if configured_max_age else max(15 * 60, fidelity_floor)
     age_seconds = max(0, run_timestamp - candles[-1].timestamp)
     if age_seconds > max_age_seconds:
         print(

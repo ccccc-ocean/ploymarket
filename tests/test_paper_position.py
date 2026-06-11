@@ -223,11 +223,28 @@ class PaperPositionTests(unittest.TestCase):
             self.assertEqual({item.id for item in markets}, {"m1", "target-1"})
 
     def test_stale_btc_candles_are_not_accepted_for_paper_entries(self) -> None:
+        # Default RiskConfig.btc_candle_max_age_seconds is 3600s (Critical #2 —
+        # the previous 15-min hard ceiling was killing all directional entries
+        # whenever the BTC fetch fell behind by even a few minutes).
         config = app_config("unused.sqlite")
         candles = [BtcCandle(100, 1.0, 1.0, 1.0, 1.0)]
 
-        self.assertEqual(_fresh_paper_btc_candles(config, candles, 100 + 901), [])
-        self.assertEqual(_fresh_paper_btc_candles(config, candles, 100 + 900), candles)
+        self.assertEqual(_fresh_paper_btc_candles(config, candles, 100 + 3601), [])
+        self.assertEqual(_fresh_paper_btc_candles(config, candles, 100 + 3600), candles)
+
+    def test_btc_candle_max_age_is_configurable(self) -> None:
+        # Operators can tighten or relax the freshness window without touching
+        # code. This pins the behaviour so the next "make it stricter" PR has
+        # to update the test instead of silently regressing.
+        config = app_config("unused.sqlite")
+        tight_config = replace(config, risk=replace(config.risk, btc_candle_max_age_seconds=900))
+        relaxed_config = replace(config, risk=replace(config.risk, btc_candle_max_age_seconds=7200))
+        candles = [BtcCandle(100, 1.0, 1.0, 1.0, 1.0)]
+
+        self.assertEqual(_fresh_paper_btc_candles(tight_config, candles, 100 + 901), [])
+        self.assertEqual(_fresh_paper_btc_candles(tight_config, candles, 100 + 900), candles)
+        self.assertEqual(_fresh_paper_btc_candles(relaxed_config, candles, 100 + 7201), [])
+        self.assertEqual(_fresh_paper_btc_candles(relaxed_config, candles, 100 + 7200), candles)
 
     def test_live_entry_uses_orderbook_ask(self) -> None:
         config = app_config("unused.sqlite")
