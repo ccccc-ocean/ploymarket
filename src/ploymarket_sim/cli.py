@@ -315,11 +315,18 @@ def _explain_risk(config) -> None:
     print(f"- max_open_positions: 最多同时持有 {risk.max_open_positions} 个仓位")
     print(f"- daily_loss_limit_usdc: 单日已实现亏损达到 {risk.daily_loss_limit_usdc:.2f} USDC 后停止开仓")
     print(f"- max_drawdown_pct: 账户回撤达到 {risk.max_drawdown_pct:.0%} 后停止开仓")
-    print(f"- stop_loss_pct: 单笔浮亏达到 {risk.stop_loss_pct:.0%} 后退出")
-    print(f"- take_profit_pct: 回测/策略单笔浮盈达到 {risk.take_profit_pct:.0%} 后退出")
-    print(f"- paper_full_take_profit_pct: 模拟盘单笔浮盈达到 {risk.paper_full_take_profit_pct:.0%} 后全量止盈")
-    print(f"- partial_take_profit_pct: 单笔浮盈达到 {risk.partial_take_profit_pct:.1%} 后先卖出 {risk.partial_take_profit_fraction:.0%}")
-    print(f"- trailing_stop: 浮盈达到 {risk.trailing_stop_activation_pct:.0%} 后，如果从峰值回吐 {risk.trailing_stop_drawdown_pct:.0%} 则保护性退出")
+    if risk.stop_loss_usdc > 0:
+        print(f"- stop_loss_usdc: 单笔亏损达到 {risk.stop_loss_usdc:.2f} USDC 后退出")
+    else:
+        print(f"- stop_loss_pct: 单笔浮亏达到 {risk.stop_loss_pct:.0%} 后退出")
+    if risk.take_profit_usdc > 0:
+        print(f"- take_profit_usdc: 单笔利润达到 {risk.take_profit_usdc:.2f} USDC 后全量退出")
+        print("- partial_take_profit/trailing_stop: 固定 USDC 止盈启用时关闭")
+    else:
+        print(f"- take_profit_pct: 回测/策略单笔浮盈达到 {risk.take_profit_pct:.0%} 后退出")
+        print(f"- paper_full_take_profit_pct: 模拟盘单笔浮盈达到 {risk.paper_full_take_profit_pct:.0%} 后全量止盈")
+        print(f"- partial_take_profit_pct: 单笔浮盈达到 {risk.partial_take_profit_pct:.1%} 后先卖出 {risk.partial_take_profit_fraction:.0%}")
+        print(f"- trailing_stop: 浮盈达到 {risk.trailing_stop_activation_pct:.0%} 后，如果从峰值回吐 {risk.trailing_stop_drawdown_pct:.0%} 则保护性退出")
     print(f"- paper_take_profit_reentry_cooldown_seconds: 止盈后同市场短冷却 {risk.paper_take_profit_reentry_cooldown_seconds} 秒")
     print(f"- paper_reentry_edge_multiplier: 止盈后重新入场需要达到普通 edge 门槛的 {risk.paper_reentry_edge_multiplier:.1f} 倍")
     print(f"- max_spread: 买卖价差高于 {risk.max_spread:.2f} 不交易")
@@ -512,6 +519,18 @@ def _run_paper_scan(config, market_type: str) -> None:
         ):
             signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, "止盈后重新入场 edge 不够强，避免频繁止盈/再开仓消耗手续费")
             execution_plan = plan_execution(market, signal, market_config.signal, market_config.backtest, market_config.execution, history[-1].price)
+        if execution_plan.mode == "TAKER":
+            blocked, reason = _paper_account_blocks_entry(config, storage)
+            if blocked:
+                signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, reason)
+                execution_plan = plan_execution(
+                    market,
+                    signal,
+                    market_config.signal,
+                    market_config.backtest,
+                    market_config.execution,
+                    history[-1].price,
+                )
         if execution_plan.mode == "SKIP" and probe_slots > 0:
             probe_signal = _paper_probe_signal(
                 config,
@@ -2042,9 +2061,16 @@ def _paper_position_state_signal(config, storage, market, yes_price: float, run_
         peak_pnl_pct = (peak_price - position.entry_price) / position.entry_price if position.entry_price > 0 else 0.0
         trailing_drawdown_pct = peak_pnl_pct - pnl_pct
         updated_position = _replace_paper_position(position, peak_price=peak_price)
+        estimated_pnl_usdc = _paper_close_value(position, current_price, market, config)
 
-        if pnl_pct <= -config.risk.stop_loss_pct:
-            realized_pnl = _paper_close_value(position, current_price, market, config)
+        if (
+            config.risk.stop_loss_usdc > 0
+            and estimated_pnl_usdc <= -config.risk.stop_loss_usdc
+        ) or (
+            config.risk.stop_loss_usdc <= 0
+            and pnl_pct <= -config.risk.stop_loss_pct
+        ):
+            realized_pnl = estimated_pnl_usdc
             cooldown_seconds = (
                 config.risk.target_stop_cooldown_seconds
                 if is_target_like_market_type(classify_market(market).market_type)
@@ -2052,14 +2078,21 @@ def _paper_position_state_signal(config, storage, market, yes_price: float, run_
             )
             cooldown_until = run_timestamp + cooldown_seconds
             storage.close_paper_position(market.id, run_timestamp, realized_pnl, cooldown_until)
-            return Signal("HOLD", 0.0, 0.0, 0.0, f"模拟持仓触发止损，进入同市场冷却; pnl_pct={pnl_pct:.1%}; cooldown_until={cooldown_until}")
-        elif pnl_pct >= config.risk.paper_full_take_profit_pct:
-            realized_pnl = _paper_close_value(position, current_price, market, config)
+            return Signal("HOLD", 0.0, 0.0, 0.0, f"模拟持仓触发止损，进入同市场冷却; pnl_usdc={realized_pnl:.2f}; cooldown_until={cooldown_until}")
+        elif (
+            config.risk.take_profit_usdc > 0
+            and estimated_pnl_usdc >= config.risk.take_profit_usdc
+        ) or (
+            config.risk.take_profit_usdc <= 0
+            and pnl_pct >= config.risk.paper_full_take_profit_pct
+        ):
+            realized_pnl = estimated_pnl_usdc
             cooldown_until = run_timestamp + config.risk.paper_take_profit_reentry_cooldown_seconds
             storage.close_paper_position(market.id, run_timestamp, realized_pnl, cooldown_until)
-            return Signal("HOLD", 0.0, 0.0, 0.0, f"模拟持仓触发全量止盈，短冷却后可重新评估; pnl_pct={pnl_pct:.1%}; cooldown_until={cooldown_until}")
+            return Signal("HOLD", 0.0, 0.0, 0.0, f"模拟持仓触发全量止盈，短冷却后可重新评估; pnl_usdc={realized_pnl:.2f}; cooldown_until={cooldown_until}")
         elif (
-            peak_pnl_pct >= config.risk.trailing_stop_activation_pct
+            config.risk.take_profit_usdc <= 0
+            and peak_pnl_pct >= config.risk.trailing_stop_activation_pct
             and trailing_drawdown_pct >= config.risk.trailing_stop_drawdown_pct
         ):
             realized_pnl = _paper_close_value(position, current_price, market, config)
@@ -2072,7 +2105,11 @@ def _paper_position_state_signal(config, storage, market, yes_price: float, run_
                 0.0,
                 f"模拟持仓触发移动止盈，保护已产生利润; pnl_pct={pnl_pct:.1%}; peak_pnl_pct={peak_pnl_pct:.1%}; cooldown_until={cooldown_until}",
             )
-        elif pnl_pct >= config.risk.partial_take_profit_pct and position.partial_take_profit_count == 0:
+        elif (
+            config.risk.take_profit_usdc <= 0
+            and pnl_pct >= config.risk.partial_take_profit_pct
+            and position.partial_take_profit_count == 0
+        ):
             updated_position, partial_realized_pnl = _paper_partial_close(position, current_price, market, config)
             updated_position = _replace_paper_position(
                 updated_position,
@@ -2101,6 +2138,20 @@ def _paper_position_state_signal(config, storage, market, yes_price: float, run_
     if position.cooldown_until > run_timestamp:
         return Signal("HOLD", 0.0, 0.0, 0.0, f"同一市场冷却中，cooldown_until={position.cooldown_until}")
     return None
+
+
+def _paper_account_blocks_entry(config, storage) -> tuple[bool, str]:
+    open_positions = []
+    for market_id in storage.load_open_paper_market_ids():
+        position = storage.load_paper_position(market_id)
+        if position is not None and position.status == "open":
+            open_positions.append(position)
+    if len(open_positions) >= config.risk.max_open_positions:
+        return True, f"全账户持仓数量达到上限 {config.risk.max_open_positions}，不再开新仓"
+    next_notional = config.backtest.trade_size_usdc
+    if sum(position.notional for position in open_positions) + next_notional > config.risk.max_total_exposure_usdc:
+        return True, "全账户风险敞口达到上限，不再开新仓"
+    return False, ""
 
 
 def _paper_settlement_signal(config, storage, market, position: PaperPositionState, run_timestamp: int) -> Signal | None:

@@ -70,10 +70,25 @@ def approve_entry(
     return RiskDecision(True, "通过风控")
 
 
-def should_exit(position: Position, current_price: float, config: RiskConfig) -> tuple[bool, str]:
+def should_exit(
+    position: Position,
+    current_price: float,
+    config: RiskConfig,
+    estimated_pnl_usdc: float | None = None,
+) -> tuple[bool, str]:
+    pnl_usdc = (
+        estimated_pnl_usdc
+        if estimated_pnl_usdc is not None
+        else position.shares * current_price - position.notional
+    )
+    if config.stop_loss_usdc > 0 and pnl_usdc <= -config.stop_loss_usdc:
+        return True, "触发 USDC 固定止损"
+    if config.take_profit_usdc > 0 and pnl_usdc >= config.take_profit_usdc:
+        return True, "触发 USDC 固定止盈"
+
     pnl_pct = (current_price - position.entry_price) / position.entry_price
-    if pnl_pct <= -config.stop_loss_pct:
+    if config.stop_loss_usdc <= 0 and pnl_pct <= -config.stop_loss_pct:
         return True, "触发止损"
-    if pnl_pct >= config.take_profit_pct:
+    if config.take_profit_usdc <= 0 and pnl_pct >= config.take_profit_pct:
         return True, "触发止盈"
     return False, "继续持有"

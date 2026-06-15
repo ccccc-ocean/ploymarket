@@ -14,6 +14,7 @@ from ploymarket_sim.cli import _live_paper_entry_plan
 from ploymarket_sim.cli import _market_discovery_is_healthy
 from ploymarket_sim.cli import _paper_run_data_degraded
 from ploymarket_sim.cli import _paper_markets_including_open_positions
+from ploymarket_sim.cli import _paper_account_blocks_entry
 from ploymarket_sim.cli import _paper_probe_available_slots
 from ploymarket_sim.cli import _paper_probe_signal
 from ploymarket_sim.cli import _positive_edge_blocked_market_types
@@ -183,6 +184,113 @@ def resolved_market(yes_price: float, no_price: float) -> Market:
 
 
 class PaperPositionTests(unittest.TestCase):
+    def test_paper_position_closes_at_fixed_usdc_stop_loss(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config = app_config(str(Path(temp_dir) / "paper.sqlite"))
+            config = replace(
+                config,
+                risk=replace(config.risk, stop_loss_usdc=10.0, take_profit_usdc=20.0),
+            )
+            storage = Storage(True, config.storage.sqlite_path)
+            storage.save_open_paper_position(
+                PaperPositionState(
+                    market_id="m1",
+                    side="YES",
+                    entry_price=0.5,
+                    shares=60.0,
+                    notional=30.0,
+                    opened_at=100,
+                    status="open",
+                    closed_at=None,
+                    realized_pnl=0.0,
+                    cooldown_until=0,
+                    peak_price=0.5,
+                    partial_take_profit_count=0,
+                )
+            )
+
+            signal = _paper_position_state_signal(
+                config,
+                storage,
+                market(),
+                yes_price=0.333,
+                run_timestamp=200,
+                current_side_price=0.333,
+            )
+
+            self.assertIsNotNone(signal)
+            self.assertIn("pnl_usdc=-10.02", signal.reason)
+            self.assertEqual(storage.load_paper_position("m1").status, "closed")
+
+    def test_paper_position_closes_at_fixed_usdc_take_profit(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config = app_config(str(Path(temp_dir) / "paper.sqlite"))
+            config = replace(
+                config,
+                risk=replace(config.risk, stop_loss_usdc=10.0, take_profit_usdc=20.0),
+            )
+            storage = Storage(True, config.storage.sqlite_path)
+            storage.save_open_paper_position(
+                PaperPositionState(
+                    market_id="m1",
+                    side="YES",
+                    entry_price=0.5,
+                    shares=60.0,
+                    notional=30.0,
+                    opened_at=100,
+                    status="open",
+                    closed_at=None,
+                    realized_pnl=0.0,
+                    cooldown_until=0,
+                    peak_price=0.5,
+                    partial_take_profit_count=0,
+                )
+            )
+
+            signal = _paper_position_state_signal(
+                config,
+                storage,
+                market(),
+                yes_price=0.834,
+                run_timestamp=200,
+                current_side_price=0.834,
+            )
+
+            self.assertIsNotNone(signal)
+            self.assertIn("pnl_usdc=20.04", signal.reason)
+            self.assertEqual(storage.load_paper_position("m1").status, "closed")
+
+    def test_account_position_limit_blocks_second_market(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config = app_config(str(Path(temp_dir) / "paper.sqlite"))
+            config = replace(
+                config,
+                risk=replace(config.risk, max_open_positions=1, max_total_exposure_usdc=31.0),
+                backtest=replace(config.backtest, trade_size_usdc=30.0),
+            )
+            storage = Storage(True, config.storage.sqlite_path)
+            storage.save_open_paper_position(
+                PaperPositionState(
+                    market_id="existing",
+                    side="YES",
+                    entry_price=0.5,
+                    shares=60.0,
+                    notional=30.0,
+                    opened_at=100,
+                    status="open",
+                    closed_at=None,
+                    realized_pnl=0.0,
+                    cooldown_until=0,
+                    peak_price=0.5,
+                    partial_take_profit_count=0,
+                )
+            )
+
+            blocked, reason = _paper_account_blocks_entry(config, storage)
+
+            self.assertTrue(blocked)
+            self.assertIn("持仓数量达到上限 1", reason)
+
     def test_realtime_live_discovery_is_not_rejected_by_accumulated_research_universe(self) -> None:
         live_markets = [market()] * 56
         local_markets = [market()] * 115

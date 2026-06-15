@@ -147,7 +147,14 @@ def backtest_market(
 
         if position:
             current_side_price = _side_price(position.side, current.price)
-            exit_now, reason = should_exit(position, current_side_price, config.risk)
+            estimated_gross_proceeds = position.shares * current_side_price
+            estimated_exit_fee = fee_amount(
+                estimated_gross_proceeds,
+                current_side_price,
+                market.effective_taker_fee_rate(config.backtest.taker_fee_rate),
+            )
+            estimated_pnl = estimated_gross_proceeds - estimated_exit_fee - position.notional
+            exit_now, reason = should_exit(position, current_side_price, config.risk, estimated_pnl)
             if exit_now:
                 order_sequence += 1
                 order_id = make_order_id(market.id, current.timestamp, order_sequence)
