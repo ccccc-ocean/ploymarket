@@ -12,7 +12,7 @@ from .execution import ExecutionPlan, plan_execution
 from .orders import OrderEvent, canceled_events, lifecycle_events, make_order_id, rejected_events
 from .polymarket import Market
 from .risk import Portfolio, Position, approve_entry, should_exit
-from .signals import build_signal
+from .signals import apply_entry_policy, build_signal
 from .market_rules import blocks_btc_strike_entry, blocks_price_range_entry, blocks_price_target_entry, latest_btc_candle_at_or_before
 from .strategy_profiles import is_tradeable_market, strategy_config_for_market
 
@@ -171,7 +171,11 @@ def backtest_market(
                     market_cooldown_until = current.timestamp + cooldown_seconds
             continue
 
-        signal = build_signal(market, visible_history, config.signal, config.backtest)
+        signal = apply_entry_policy(
+            market,
+            build_signal(market, visible_history, config.signal, config.backtest),
+            config.signal,
+        )
         if _blocked_by_btc_filter(signal, current, config, btc_candles or []):
             continue
         entry_side = _signal_entry_side(signal.action)

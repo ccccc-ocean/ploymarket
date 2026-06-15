@@ -68,6 +68,8 @@ class SignalConfig:
     safety_margin: float
     buy_below: float
     sell_above: float
+    entry_allowlist: list[str] = field(default_factory=list)
+    min_entry_net_edge: float = 0.0
 
 
 @dataclass(frozen=True)

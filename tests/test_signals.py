@@ -3,10 +3,80 @@ import unittest
 from ploymarket_sim.clob import PricePoint
 from ploymarket_sim.config import SignalConfig
 from ploymarket_sim.polymarket import Market
-from ploymarket_sim.signals import build_signal
+from ploymarket_sim.signals import Signal, apply_entry_policy, build_signal
 
 
 class SignalTests(unittest.TestCase):
+    def test_entry_policy_blocks_direction_outside_allowlist(self) -> None:
+        market = Market(
+            "1",
+            "Will the price of Bitcoin be above $78,000 on May 22?",
+            "btc-above-78k",
+            None,
+            5000,
+            1000,
+            True,
+            ["Yes", "No"],
+            [0.5, 0.5],
+            ["yes", "no"],
+            False,
+            None,
+            None,
+        )
+        config = SignalConfig(
+            "1w",
+            60,
+            6,
+            24,
+            0.01,
+            0.015,
+            0.0,
+            0.92,
+            0.08,
+            ["above_below_expiry:BUY_YES"],
+            0.01,
+        )
+
+        signal = apply_entry_policy(market, Signal("BUY_NO", 1.0, 0.05, 0.04, "test"), config)
+
+        self.assertEqual(signal.action, "HOLD")
+        self.assertIn("白名单", signal.reason)
+
+    def test_entry_policy_requires_minimum_net_edge(self) -> None:
+        market = Market(
+            "1",
+            "Will the price of Bitcoin be above $78,000 on May 22?",
+            "btc-above-78k",
+            None,
+            5000,
+            1000,
+            True,
+            ["Yes", "No"],
+            [0.5, 0.5],
+            ["yes", "no"],
+            False,
+            None,
+            None,
+        )
+        config = SignalConfig(
+            "1w",
+            60,
+            6,
+            24,
+            0.01,
+            0.015,
+            0.0,
+            0.92,
+            0.08,
+            ["above_below_expiry:BUY_YES"],
+            0.01,
+        )
+
+        signal = apply_entry_policy(market, Signal("BUY_YES", 1.0, 0.05, 0.009, "test"), config)
+
+        self.assertEqual(signal.action, "HOLD")
+        self.assertIn("净 edge 不足", signal.reason)
+
     def test_positive_momentum_generates_buy_yes(self) -> None:
         market = Market(
             "1",

@@ -80,7 +80,7 @@ from .reversal_backtest import (
     write_reversal_summary_csv,
     write_reversal_trades_csv,
 )
-from .signals import Signal, build_signal
+from .signals import Signal, apply_entry_policy, build_signal
 from .side_diagnostics import build_side_diagnostics, print_side_diagnostics, write_side_diagnostics_csv
 from .spread_scan import print_spread_scan_summary, scan_spreads, write_spread_scan_csv
 from .storage import PaperPositionState, storage_from_config
@@ -461,6 +461,7 @@ def _run_paper_scan(config, market_type: str) -> None:
             signal = Signal("HOLD", 0.0, signal.edge, signal.net_edge, "当前市场类型暂不交易，只记录观察")
         else:
             signal = build_signal(market, history, market_config.signal, market_config.backtest)
+            signal = apply_entry_policy(market, signal, market_config.signal)
             blocked, reason = blocks_btc_strike_entry(
                 market,
                 history[-1].timestamp,
@@ -2008,7 +2009,10 @@ def _live_paper_entry_plan(config, market, signal, market_config, reference_yes_
     required_edge = (
         config.risk.paper_probe_min_edge
         if _is_paper_probe_reason(signal.reason)
-        else market_config.signal.min_edge * max(1.0, config.risk.live_reprice_edge_multiplier)
+        else max(
+            market_config.signal.min_entry_net_edge,
+            market_config.signal.min_edge * max(1.0, config.risk.live_reprice_edge_multiplier),
+        )
     )
     if repriced_edge < required_edge:
         hold = Signal(

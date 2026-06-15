@@ -86,6 +86,31 @@ def build_signal(
     return Signal("HOLD", 0.0, momentum, net_edge, "净优势不足，等待更清晰的定价偏差")
 
 
+def apply_entry_policy(market: Market, signal: Signal, config: SignalConfig) -> Signal:
+    if signal.action not in {"BUY_YES", "BUY_NO"}:
+        return signal
+
+    market_type = classify_market(market).market_type
+    entry_key = f"{market_type}:{signal.action}"
+    if config.entry_allowlist and entry_key not in config.entry_allowlist:
+        return Signal(
+            "HOLD",
+            0.0,
+            signal.edge,
+            signal.net_edge,
+            f"入场白名单未包含 {entry_key}，候选策略不交易该方向",
+        )
+    if signal.net_edge < config.min_entry_net_edge:
+        return Signal(
+            "HOLD",
+            0.0,
+            signal.edge,
+            signal.net_edge,
+            f"候选策略净 edge 不足: net_edge={signal.net_edge:.4f}, required={config.min_entry_net_edge:.4f}",
+        )
+    return signal
+
+
 def _net_edge(
     market: Market,
     momentum: float,
